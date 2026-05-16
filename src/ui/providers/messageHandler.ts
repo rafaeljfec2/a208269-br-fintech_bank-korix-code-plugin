@@ -15,11 +15,12 @@ import type {
 } from '../../shared/protocol';
 import { TOKENS } from '../../di/tokens';
 import type { Logger } from '../../telemetry/logger';
+import { TerminalBridge } from './terminalBridge';
 
 export class MessageHandler {
   private readonly logger: Logger;
   private readonly eventEmitter: RuntimeEventEmitter;
-  private readonly terminalManager: TerminalSessionManager;
+  private readonly terminalBridge: TerminalBridge;
 
   constructor(
     private readonly webview: vscode.Webview,
@@ -27,7 +28,8 @@ export class MessageHandler {
   ) {
     this.logger = container.get<Logger>(TOKENS.Logger);
     this.eventEmitter = container.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
-    this.terminalManager = container.get<TerminalSessionManager>(TOKENS.SessionManager);
+    const terminalManager = container.get<TerminalSessionManager>(TOKENS.SessionManager);
+    this.terminalBridge = new TerminalBridge(webview, terminalManager, this.logger);
 
     this.setupEventForwarding();
   }
@@ -164,64 +166,15 @@ export class MessageHandler {
   /**
    * User types in terminal
    */
-  private async handleTerminalInput(sessionId: string, data: string): Promise<void> {
-    const session = this.terminalManager.getSession(sessionId);
-    if (!session) {
-      this.logger.error('Terminal session not found', { sessionId });
-      return;
-    }
-
-    session.pty.write(data);
+  private handleTerminalInput(sessionId: string, data: string): void {
+    this.terminalBridge.write(sessionId, data);
   }
 
   /**
    * User creates a new terminal
    */
-  private async handleCreateTerminal(shellPath?: string): Promise<void> {
-    this.logger.info('Creating terminal session', { shellPath });
-
-    const sessionId = this.terminalManager.createSession({
-      cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-      env: process.env as Record<string, string>,
-    });
-
-    const session = this.terminalManager.getSession(sessionId);
-    if (!session) {
-      this.logger.error('Failed to retrieve created terminal session', { sessionId });
-      return;
-    }
-
-    // Setup PTY output forwarding
-    session.pty.onData((data: string) => {
-      const message: ExtensionToWebviewMessage = {
-        type: 'terminal_output',
-        payload: {
-          sessionId,
-          data,
-        },
-      };
-
-      this.webview.postMessage(message).then(
-        () => {
-          // Success
-        },
-        (error) => {
-          this.logger.error('Failed to forward terminal output', error);
-        },
-      );
-    });
-
-    // Notify webview of new session
-    const sessionCreatedMsg: ExtensionToWebviewMessage = {
-      type: 'terminal_session_created',
-      payload: {
-        sessionId,
-        shellPath: shellPath ?? 'default',
-      },
-    };
-    await this.webview.postMessage(sessionCreatedMsg);
-
-    this.logger.info('Terminal session created', { sessionId });
+  private handleCreateTerminal(shellPath?: string): void {
+    this.terminalBridge.createSession(shellPath);
   }
 
   /**

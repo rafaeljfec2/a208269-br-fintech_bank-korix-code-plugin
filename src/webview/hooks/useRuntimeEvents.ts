@@ -16,6 +16,8 @@ export function useRuntimeEvents() {
   const updateMetrics = useStore((state) => state.updateMetrics);
   const setMode = useStore((state) => state.setMode);
   const setModel = useStore((state) => state.setModel);
+  const createSession = useStore((state) => state.createSession);
+  const appendOutput = useStore((state) => state.appendOutput);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
@@ -134,6 +136,16 @@ export function useRuntimeEvents() {
           }
         }
       }
+
+      if (message.type === 'terminal_session_created') {
+        const { sessionId, shellPath } = message.payload;
+        createSession(sessionId, shellPath);
+      }
+
+      if (message.type === 'terminal_output') {
+        const { sessionId, data } = message.payload;
+        appendOutput(sessionId, data);
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -148,5 +160,7 @@ export function useRuntimeEvents() {
     updateMetrics,
     setMode,
     setModel,
+    createSession,
+    appendOutput,
   ]);
 }
