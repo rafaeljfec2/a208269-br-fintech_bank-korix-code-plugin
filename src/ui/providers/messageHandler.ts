@@ -24,11 +24,11 @@ export class MessageHandler {
 
   constructor(
     private readonly webview: vscode.Webview,
-    private readonly container: Container,
+    private readonly _container: Container,
   ) {
-    this.logger = container.get<Logger>(TOKENS.Logger);
-    this.eventEmitter = container.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
-    const terminalManager = container.get<TerminalSessionManager>(TOKENS.SessionManager);
+    this.logger = _container.get<Logger>(TOKENS.Logger);
+    this.eventEmitter = _container.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
+    const terminalManager = _container.get<TerminalSessionManager>(TOKENS.SessionManager);
     this.terminalBridge = new TerminalBridge(webview, terminalManager, this.logger);
 
     this.setupEventForwarding();

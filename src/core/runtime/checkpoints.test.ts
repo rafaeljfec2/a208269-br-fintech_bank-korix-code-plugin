@@ -1,5 +1,6 @@
 /**
  * CheckpointManager unit tests
+ * @vitest-environment node
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';

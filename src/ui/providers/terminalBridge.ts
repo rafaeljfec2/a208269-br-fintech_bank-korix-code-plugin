@@ -98,6 +98,6 @@ export class TerminalBridge {
    * Get active session IDs
    */
   getActiveSessions(): string[] {
-    return this.terminalManager.getActiveSessions();
+    return this.terminalManager.getActiveSessions().map((session) => session.id);
   }
 }
