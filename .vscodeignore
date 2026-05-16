@@ -1,0 +1,46 @@
+# Source files
+src/**
+webview/src/**
+webview/node_modules/**
+
+# Build artifacts
+*.ts
+*.map
+tsconfig.json
+esbuild.config.js
+
+# Dependencies
+node_modules/**
+
+# Tests
+tests/**
+**/*.test.ts
+**/*.spec.ts
+.vscode-test/**
+
+# Development
+.vscode/**
+.gitignore
+.eslintrc.json
+.prettierrc
+.editorconfig
+
+# Documentation
+docs/**
+*.md
+!README.md
+!CHANGELOG.md
+!LICENSE.md
+
+# CI/CD
+.github/**
+.gitlab-ci.yml
+.travis.yml
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+*.vsix
+.env
+.env.local

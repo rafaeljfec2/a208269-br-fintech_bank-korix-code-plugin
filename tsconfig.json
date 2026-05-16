@@ -1,0 +1,55 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": ["ES2022"],
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "paths": {
+      "@/core/*": ["./src/core/*"],
+      "@/providers/*": ["./src/providers/*"],
+      "@/harness/*": ["./src/harness/*"],
+      "@/tools/*": ["./src/tools/*"],
+      "@/modes/*": ["./src/modes/*"],
+      "@/context/*": ["./src/context/*"],
+      "@/patch/*": ["./src/patch/*"],
+      "@/terminal/*": ["./src/terminal/*"],
+      "@/ui/*": ["./src/ui/*"],
+      "@/memory/*": ["./src/memory/*"],
+      "@/telemetry/*": ["./src/telemetry/*"]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "out",
+    "webview",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
+}

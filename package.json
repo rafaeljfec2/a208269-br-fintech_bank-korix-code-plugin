@@ -1,0 +1,215 @@
+{
+  "name": "korix-code",
+  "displayName": "Korix Code",
+  "description": "AI-native coding runtime agentic - um assistente de código inteligente, rápido e controlável integrado ao VSCode",
+  "version": "0.1.0",
+  "publisher": "korix",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "code-generation",
+    "refactoring",
+    "productivity"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "korix.ask",
+        "title": "Korix: Ask Mode",
+        "category": "Korix",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "korix.plan",
+        "title": "Korix: Plan Mode",
+        "category": "Korix",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "korix.agent",
+        "title": "Korix: Agent Mode",
+        "category": "Korix",
+        "icon": "$(robot)"
+      },
+      {
+        "command": "korix.openSidebar",
+        "title": "Korix: Open Sidebar",
+        "category": "Korix",
+        "icon": "$(sidebar-expand)"
+      },
+      {
+        "command": "korix.cancelExecution",
+        "title": "Korix: Cancel Execution",
+        "category": "Korix",
+        "icon": "$(stop)"
+      },
+      {
+        "command": "korix.clearHistory",
+        "title": "Korix: Clear History",
+        "category": "Korix",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "korix.testProvider",
+        "title": "Korix: Test Provider Streaming",
+        "category": "Korix",
+        "icon": "$(debug-alt)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "korix-sidebar",
+          "title": "Korix Code",
+          "icon": "resources/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "korix-sidebar": [
+        {
+          "id": "korix.chatView",
+          "name": "Chat",
+          "type": "webview"
+        },
+        {
+          "id": "korix.timelineView",
+          "name": "Timeline"
+        },
+        {
+          "id": "korix.sessionsView",
+          "name": "Sessions"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Korix Code",
+      "properties": {
+        "korix.provider": {
+          "type": "string",
+          "enum": [
+            "anthropic",
+            "openai",
+            "ollama",
+            "openrouter"
+          ],
+          "default": "anthropic",
+          "description": "LLM provider to use"
+        },
+        "korix.anthropic.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API key (stored securely in VSCode secrets)"
+        },
+        "korix.anthropic.model": {
+          "type": "string",
+          "enum": [
+            "claude-opus-4-7",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001"
+          ],
+          "default": "claude-sonnet-4-6",
+          "description": "Anthropic model to use"
+        },
+        "korix.maxIterations": {
+          "type": "number",
+          "default": 25,
+          "description": "Maximum iterations for agent loop"
+        },
+        "korix.contextTokenBudget": {
+          "type": "number",
+          "default": 180000,
+          "description": "Maximum tokens for context window"
+        },
+        "korix.terminal.defaultTimeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Default timeout for terminal commands (ms)"
+        },
+        "korix.approvalFlow.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable approval flow for destructive actions"
+        },
+        "korix.telemetry.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable telemetry and logging"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "korix.ask",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "korix.agent",
+        "key": "ctrl+shift+k",
+        "mac": "cmd+shift+k"
+      },
+      {
+        "command": "korix.cancelExecution",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "korix.isExecuting"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.config.js --production",
+    "watch": "node esbuild.config.js --watch",
+    "pretest": "npm run compile",
+    "test": "vitest",
+    "package": "vsce package --no-dependencies",
+    "lint": "eslint src --ext ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "eventemitter3": "^5.0.1",
+    "node-pty": "^1.0.0",
+    "pino": "^10.3.1",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/pino": "^7.0.5",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vscode/test-electron": "^2.3.9",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.19.12",
+    "eslint": "^8.56.0",
+    "pino-pretty": "^13.1.3",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/korix/korix-code"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/korix/korix-code/issues"
+  },
+  "homepage": "https://github.com/korix/korix-code#readme"
+}
