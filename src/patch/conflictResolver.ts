@@ -77,7 +77,7 @@ export class ConflictResolver {
         `Conflict: ${conflict.file}`
       );
     } catch (error) {
-      logger.error('Failed to show conflict diff', error as Error);
+      logger.error('Failed to show conflict diff', error);
     }
   }
 

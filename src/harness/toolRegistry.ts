@@ -247,7 +247,7 @@ export class ToolRegistry {
       const required: string[] = [];
 
       for (const [key, value] of Object.entries(shape)) {
-        const fieldSchema = value as z.ZodTypeAny;
+        const fieldSchema = value;
         properties[key] = this.convertZodType(fieldSchema);
 
         if (!fieldSchema.isOptional()) {

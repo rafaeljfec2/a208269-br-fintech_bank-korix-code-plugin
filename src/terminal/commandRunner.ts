@@ -87,7 +87,7 @@ export class CommandRunner {
 
     return new Promise((resolve) => {
       let stdout = '';
-      let stderr = '';
+      const stderr = '';
       let completed = false;
       let timeoutId: NodeJS.Timeout;
 

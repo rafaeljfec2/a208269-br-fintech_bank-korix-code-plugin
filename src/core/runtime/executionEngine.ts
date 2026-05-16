@@ -87,7 +87,7 @@ export class ExecutionEngine {
 
       return result;
     } catch (error) {
-      this.logger.error('Execution step failed', error as Error);
+      this.logger.error('Execution step failed', error);
       result.error = (error as Error).message;
       result.recoverable = this.isRecoverable(error as Error);
       throw error;

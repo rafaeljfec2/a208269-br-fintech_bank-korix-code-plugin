@@ -172,7 +172,7 @@ function parseGitStatus(output: string): GitStatusResult {
     } else if (line.startsWith('# branch.ab ')) {
       // Format: # branch.ab +<ahead> -<behind>
       const match = /# branch\.ab \+(\d+) -(\d+)/.exec(line);
-      if (match && match[1] && match[2]) {
+      if (match?.[1] && match[2]) {
         ahead = parseInt(match[1], 10);
         behind = parseInt(match[2], 10);
       }

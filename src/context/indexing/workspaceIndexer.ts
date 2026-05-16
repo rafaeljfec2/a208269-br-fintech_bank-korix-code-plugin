@@ -57,7 +57,7 @@ export class WorkspaceIndexer {
 
       this.index.lastIndexed = Date.now();
     } catch (error) {
-      logger.error('Failed to index workspace', error as Error);
+      logger.error('Failed to index workspace', error);
     } finally {
       this.indexing = false;
     }

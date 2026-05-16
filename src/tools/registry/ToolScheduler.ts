@@ -86,7 +86,7 @@ export class ToolScheduler {
       const queued: QueuedTask<T> = {
         task,
         queuedAt: Date.now(),
-        resolve: resolve as (result: TaskResult) => void,
+        resolve: resolve,
         reject,
       };
 

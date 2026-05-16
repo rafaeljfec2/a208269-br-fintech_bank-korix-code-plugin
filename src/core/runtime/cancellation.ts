@@ -39,7 +39,7 @@ export class CancellationManager {
       try {
         await callback();
       } catch (error) {
-        this.logger.error('Cleanup callback failed', error as Error);
+        this.logger.error('Cleanup callback failed', error);
       }
     }
 

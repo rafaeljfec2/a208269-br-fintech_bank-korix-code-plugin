@@ -63,7 +63,7 @@ Your plans should be actionable and detailed.`;
     try {
       // Try to parse JSON task breakdown if provided
       const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch && jsonMatch[1]) {
+      if (jsonMatch?.[1]) {
         return JSON.parse(jsonMatch[1]) as TaskBreakdown;
       }
     } catch {

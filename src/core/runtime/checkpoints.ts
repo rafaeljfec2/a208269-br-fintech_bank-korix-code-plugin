@@ -31,7 +31,7 @@ export class CheckpointManager {
           timestamp: Date.now(),
         });
       } catch (error) {
-        this.logger.error(`Failed to snapshot file ${filePath}`, error as Error);
+        this.logger.error(`Failed to snapshot file ${filePath}`, error);
         throw error; // Re-throw to fail checkpoint creation
       }
     }
@@ -73,7 +73,7 @@ export class CheckpointManager {
       try {
         await fs.writeFile(snapshot.path, snapshot.content, 'utf-8');
       } catch (error) {
-        this.logger.error(`Failed to restore file ${snapshot.path}`, error as Error);
+        this.logger.error(`Failed to restore file ${snapshot.path}`, error);
         throw error; // Re-throw to fail restore
       }
     }

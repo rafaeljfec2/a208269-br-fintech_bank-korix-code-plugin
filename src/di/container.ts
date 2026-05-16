@@ -20,7 +20,7 @@ export class Container {
    */
   bind<T>(token: Token<T>, factory: Factory<T>, singleton = false): this {
     this.bindings.set(token, {
-      factory: factory as Factory<unknown>,
+      factory: factory,
       singleton,
     });
     return this;

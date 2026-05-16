@@ -27,7 +27,7 @@ export class PTYManager {
       cols: 80,
       rows: 30,
       cwd,
-      env: env as { [key: string]: string },
+      env: env,
     });
 
     this.pty.onData((data) => {

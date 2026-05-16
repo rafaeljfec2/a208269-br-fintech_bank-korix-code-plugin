@@ -159,7 +159,7 @@ function parseDiffOutput(output: string): GitDiffResult {
   for (const line of lines) {
     // Parse numstat lines (format: insertions deletions filename)
     const numstatMatch = /^(\d+|-)\s+(\d+|-)\s+(.+)$/.exec(line);
-    if (numstatMatch && numstatMatch[1] && numstatMatch[2]) {
+    if (numstatMatch?.[1] && numstatMatch[2]) {
       filesChanged++;
       const ins = numstatMatch[1] === '-' ? 0 : parseInt(numstatMatch[1], 10);
       const del = numstatMatch[2] === '-' ? 0 : parseInt(numstatMatch[2], 10);

@@ -197,7 +197,7 @@ export class ToolMetrics {
     const indices: number[] = [];
     for (let i = 0; i < this.metrics.length; i++) {
       const metric = this.metrics[i];
-      if (metric && metric.tool === tool) {
+      if (metric?.tool === tool) {
         indices.push(i);
       }
     }

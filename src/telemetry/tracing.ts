@@ -154,7 +154,7 @@ export class Tracer {
    */
   getAllTraces(): Trace[] {
     const rootSpans = Array.from(this.spans.values()).filter(s => !s.parentId);
-    return rootSpans.map(s => this.getTrace(s.id)).filter(t => t !== null) as Trace[];
+    return rootSpans.map(s => this.getTrace(s.id)).filter(t => t !== null);
   }
 
   /**
@@ -163,7 +163,7 @@ export class Tracer {
   getActiveSpans(): Span[] {
     return Array.from(this.activeSpans)
       .map(id => this.spans.get(id))
-      .filter(s => s !== undefined) as Span[];
+      .filter(s => s !== undefined);
   }
 
   /**
