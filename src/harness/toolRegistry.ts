@@ -5,6 +5,9 @@
 import { z } from "zod";
 import type { ExecutionContext } from "../core/types";
 import type { ToolDefinition } from "../providers/types";
+import { ToolCache } from "../tools/registry/ToolCache";
+import { ToolMetrics } from "../tools/registry/ToolMetrics";
+import { ToolScheduler } from "../tools/registry/ToolScheduler";
 
 export interface ToolContext {
   execution: ExecutionContext;
@@ -20,6 +23,8 @@ export interface ToolResult<T = unknown> {
     duration: number;
     approved: boolean;
     timestamp: number;
+    cached?: boolean;
+    cacheHitRate?: number;
   };
 }
 
@@ -46,6 +51,22 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
 
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
+  private readonly cache: ToolCache;
+  private readonly metrics: ToolMetrics;
+  private readonly scheduler: ToolScheduler;
+
+  constructor() {
+    // Initialize cache with 100MB limit, 5min TTL, max 1000 entries
+    this.cache = new ToolCache({
+      maxSize: 100 * 1024 * 1024, // 100MB
+      maxAge: 5 * 60 * 1000, // 5 minutes
+      maxEntries: 1000,
+      enableHotCold: true,
+    });
+
+    this.metrics = new ToolMetrics(10000);
+    this.scheduler = new ToolScheduler();
+  }
 
   register<TInput, TOutput>(tool: Tool<TInput, TOutput>): void {
     if (this.tools.has(tool.name)) {
@@ -86,31 +107,38 @@ export class ToolRegistry {
     context: ToolContext,
   ): Promise<ToolResult<TOutput>> {
     const startTime = Date.now();
+    let cached = false;
 
     try {
       const tool = this.tools.get(name);
 
       if (!tool) {
+        const error = `Tool not found: ${name}`;
+        this.recordMetric(name, startTime, false, cached, input, null, error);
         return {
           success: false,
-          error: `Tool not found: ${name}`,
+          error,
           metadata: {
             duration: Date.now() - startTime,
             approved: false,
             timestamp: startTime,
+            cached,
           },
         };
       }
 
       // Check if tool is allowed in current mode
       if (tool.allowedInMode && !tool.allowedInMode(context.execution.mode)) {
+        const error = `Tool "${name}" not allowed in ${context.execution.mode} mode`;
+        this.recordMetric(name, startTime, false, cached, input, null, error);
         return {
           success: false,
-          error: `Tool "${name}" not allowed in ${context.execution.mode} mode`,
+          error,
           metadata: {
             duration: Date.now() - startTime,
             approved: false,
             timestamp: startTime,
+            cached,
           },
         };
       }
@@ -119,13 +147,33 @@ export class ToolRegistry {
       const validationResult = tool.schema.safeParse(input);
 
       if (!validationResult.success) {
+        const error = `Invalid input: ${validationResult.error.message}`;
+        this.recordMetric(name, startTime, false, cached, input, null, error);
         return {
           success: false,
-          error: `Invalid input: ${validationResult.error.message}`,
+          error,
           metadata: {
             duration: Date.now() - startTime,
             approved: false,
             timestamp: startTime,
+            cached,
+          },
+        };
+      }
+
+      // Check cache (only for read-only tools)
+      const cachedResult = this.cache.get<TOutput>(name, validationResult.data);
+      if (cachedResult) {
+        cached = true;
+        this.recordMetric(name, startTime, true, cached, input, cachedResult.data);
+        return {
+          ...cachedResult,
+          metadata: {
+            duration: Date.now() - startTime,
+            approved: cachedResult.metadata?.approved ?? false,
+            timestamp: cachedResult.metadata?.timestamp ?? startTime,
+            cached: true,
+            cacheHitRate: this.cache.getStats().hitRate,
           },
         };
       }
@@ -133,7 +181,7 @@ export class ToolRegistry {
       // Execute tool
       const result = await tool.execute(validationResult.data, context);
 
-      return {
+      const finalResult: ToolResult<TOutput> = {
         success: result.success,
         data: result.data as TOutput | undefined,
         error: result.error,
@@ -141,10 +189,22 @@ export class ToolRegistry {
           duration: Date.now() - startTime,
           approved: result.metadata?.approved ?? false,
           timestamp: startTime,
+          cached,
+          cacheHitRate: this.cache.getStats().hitRate,
         },
       };
+
+      // Cache successful read-only results
+      if (result.success && !this.isWriteTool(name)) {
+        this.cache.set(name, validationResult.data, finalResult);
+      }
+
+      this.recordMetric(name, startTime, result.success, cached, input, result.data, result.error);
+
+      return finalResult;
     } catch (error) {
       const err = error as Error;
+      this.recordMetric(name, startTime, false, cached, input, null, err.message);
       return {
         success: false,
         error: err.message,
@@ -152,6 +212,7 @@ export class ToolRegistry {
           duration: Date.now() - startTime,
           approved: false,
           timestamp: startTime,
+          cached,
         },
       };
     }
@@ -231,6 +292,70 @@ export class ToolRegistry {
       default:
         return { type: "string" };
     }
+  }
+
+  /**
+   * Check if tool is a write tool (should not be cached)
+   */
+  private isWriteTool(name: string): boolean {
+    const writeTools = ['WriteFile', 'EditFile', 'RunCommand', 'DeleteFile'];
+    return writeTools.includes(name);
+  }
+
+  /**
+   * Record metric for tool execution
+   */
+  private recordMetric(
+    tool: string,
+    startTime: number,
+    success: boolean,
+    cached: boolean,
+    input: unknown,
+    output: unknown,
+    error?: string,
+  ): void {
+    const duration = Date.now() - startTime;
+    const inputSize = Buffer.byteLength(JSON.stringify(input), 'utf-8');
+    const outputSize = output ? Buffer.byteLength(JSON.stringify(output), 'utf-8') : 0;
+
+    this.metrics.record({
+      tool,
+      timestamp: startTime,
+      duration,
+      cached,
+      success,
+      inputSize,
+      outputSize,
+      error,
+    });
+  }
+
+  /**
+   * Get cache instance
+   */
+  getCache(): ToolCache {
+    return this.cache;
+  }
+
+  /**
+   * Get metrics instance
+   */
+  getMetrics(): ToolMetrics {
+    return this.metrics;
+  }
+
+  /**
+   * Get scheduler instance
+   */
+  getScheduler(): ToolScheduler {
+    return this.scheduler;
+  }
+
+  /**
+   * Invalidate cache for specific pattern
+   */
+  invalidateCache(pattern: string | RegExp): void {
+    this.cache.invalidate(pattern);
   }
 }
 

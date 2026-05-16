@@ -20,6 +20,14 @@ import { globalToolRegistry } from '../harness/toolRegistry';
 import { PermissionManager } from '../harness/permissions';
 import { ProviderRegistry } from '../providers/registry';
 import { ProviderConfigManager } from '../providers/config';
+import { RuntimeEventEmitter } from '../core/runtime/runtimeEvents';
+import { RuntimeMetrics } from '../core/runtime/runtimeMetrics';
+import { CheckpointManager } from '../core/runtime/checkpoints';
+import { RecoveryManager } from '../core/runtime/recovery';
+import { IterationGuard } from '../core/runtime/iterationGuard';
+import { CancellationManager } from '../core/runtime/cancellation';
+import { TaskQueue } from '../core/runtime/taskQueue';
+// ExecutionEngine and AgentLoop created on-demand, not pre-bound
 
 export function configureContainer(
   container: Container,
@@ -93,4 +101,47 @@ export function configureContainer(
     const logger = c.get<Logger>(TOKENS.Logger);
     return new PatchApplier(root, parser, validator, rollbackManager, logger);
   });
+
+  // Runtime services
+  container.bindSingleton(TOKENS.RuntimeEventEmitter, () => new RuntimeEventEmitter());
+
+  container.bindSingleton(TOKENS.CheckpointManager, (c) => {
+    const logger = c.get<Logger>(TOKENS.Logger);
+    return new CheckpointManager(logger);
+  });
+
+  container.bindSingleton(TOKENS.TaskQueue, (c) => {
+    const logger = c.get<Logger>(TOKENS.Logger);
+    return new TaskQueue(logger);
+  });
+
+  // Transient: new instance per resolution
+  container.bind(TOKENS.RuntimeMetrics, (c) => {
+    const logger = c.get<Logger>(TOKENS.Logger);
+    return new RuntimeMetrics(logger);
+  });
+
+  container.bind(TOKENS.IterationGuard, (c) => {
+    const logger = c.get<Logger>(TOKENS.Logger);
+    const eventEmitter = c.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
+    return new IterationGuard(logger, eventEmitter);
+  });
+
+  container.bind(TOKENS.CancellationManager, (c) => {
+    const logger = c.get<Logger>(TOKENS.Logger);
+    const eventEmitter = c.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
+    return new CancellationManager(logger, eventEmitter);
+  });
+
+  container.bind(TOKENS.RecoveryManager, (c) => {
+    const logger = c.get<Logger>(TOKENS.Logger);
+    const checkpointManager = c.get<CheckpointManager>(TOKENS.CheckpointManager);
+    const eventEmitter = c.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
+    return new RecoveryManager(logger, checkpointManager, eventEmitter);
+  });
+
+  // Note: ExecutionEngine and AgentLoop require a provider instance
+  // which needs async config loading. These will be created on-demand
+  // when actually used, not pre-registered in DI.
+  // See extension.ts for manual instantiation when needed.
 }

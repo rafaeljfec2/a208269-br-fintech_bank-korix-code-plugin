@@ -1,140 +1,290 @@
 /**
- * Runtime state management for agent execution
+ * Runtime state management - modular, snapshot/restore capable
+ *
+ * State is split into 4 independent modules:
+ * - Conversation (messages, tool calls)
+ * - Execution (iteration, timing)
+ * - Workspace (files, selection)
+ * - Memory (short-term context, checkpoints)
  */
 
-import type { RuntimeState, ExecutionContext, Message } from "../types";
-import { EventEmitter } from "eventemitter3";
+import type { Message, ExecutionContext } from '../types';
+import type {
+  RuntimeStateSnapshot,
+  ConversationStateSnapshot,
+  ExecutionStateSnapshot,
+  WorkspaceStateSnapshot,
+  MemorySnapshot,
+  ToolCallRecord,
+} from './runtimeTypes';
 
-export interface RuntimeStateEvents {
-  stateChanged: (state: RuntimeState) => void;
-  iterationComplete: (iteration: number) => void;
-  executionStarted: () => void;
-  executionCompleted: () => void;
-  executionFailed: (error: Error) => void;
-}
-
-export class RuntimeStateManager extends EventEmitter<RuntimeStateEvents> {
-  private state: RuntimeState;
-
-  constructor(initialContext: ExecutionContext) {
-    super();
-
-    this.state = {
-      session: {
-        id: this.generateSessionId(),
-        mode: initialContext.mode,
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-      context: initialContext,
-      isExecuting: false,
-      currentIteration: 0,
-      maxIterations: 25,
-      checkpoints: [],
-    };
-  }
-
-  getState(): Readonly<RuntimeState> {
-    return { ...this.state };
-  }
-
-  setState(updates: Partial<RuntimeState>): void {
-    this.state = {
-      ...this.state,
-      ...updates,
-    };
-    this.emit("stateChanged", this.getState());
-  }
+/**
+ * Conversation state (immutable via getters)
+ */
+class ConversationState {
+  private messages: Message[] = [];
+  private turnCount = 0;
+  private toolCallHistory: ToolCallRecord[] = [];
 
   addMessage(message: Message): void {
-    this.state.session.messages.push(message);
-    this.state.session.updatedAt = Date.now();
-    this.emit("stateChanged", this.getState());
+    this.messages.push(message);
+    if (message.role === 'user') {
+      this.turnCount++;
+    }
   }
 
-  getMessages(): readonly Message[] {
-    return [...this.state.session.messages];
+  recordToolCall(record: ToolCallRecord): void {
+    this.toolCallHistory.push(record);
   }
 
-  clearMessages(): void {
-    this.state.session.messages = [];
-    this.state.session.updatedAt = Date.now();
-    this.emit("stateChanged", this.getState());
+  getSnapshot(): ConversationStateSnapshot {
+    return {
+      messages: [...this.messages],
+      turnCount: this.turnCount,
+      toolCallHistory: [...this.toolCallHistory],
+    };
   }
 
-  startExecution(): void {
-    this.state.isExecuting = true;
-    this.state.currentIteration = 0;
-    this.emit("executionStarted");
-    this.emit("stateChanged", this.getState());
+  restore(snapshot: ConversationStateSnapshot): void {
+    this.messages = [...snapshot.messages];
+    this.turnCount = snapshot.turnCount;
+    this.toolCallHistory = [...snapshot.toolCallHistory];
+  }
+}
+
+/**
+ * Execution state
+ */
+class ExecutionState {
+  private isExecuting = false;
+  private currentIteration = 0;
+  private maxIterations: number;
+  private startTime = 0;
+  private lastActivityTime = 0;
+
+  constructor(maxIterations = 25) {
+    this.maxIterations = maxIterations;
   }
 
-  stopExecution(): void {
-    this.state.isExecuting = false;
-    this.emit("executionCompleted");
-    this.emit("stateChanged", this.getState());
+  start(): void {
+    this.isExecuting = true;
+    this.startTime = Date.now();
+    this.lastActivityTime = Date.now();
+  }
+
+  stop(): void {
+    this.isExecuting = false;
   }
 
   incrementIteration(): void {
-    this.state.currentIteration++;
-    this.emit("iterationComplete", this.state.currentIteration);
-    this.emit("stateChanged", this.getState());
+    this.currentIteration++;
+    this.lastActivityTime = Date.now();
   }
 
-  getCurrentIteration(): number {
-    return this.state.currentIteration;
+  updateActivity(): void {
+    this.lastActivityTime = Date.now();
   }
 
-  getMaxIterations(): number {
-    return this.state.maxIterations;
-  }
-
-  setMaxIterations(max: number): void {
-    this.state.maxIterations = max;
-    this.emit("stateChanged", this.getState());
-  }
-
-  isExecuting(): boolean {
-    return this.state.isExecuting;
-  }
-
-  hasReachedMaxIterations(): boolean {
-    return this.state.currentIteration >= this.state.maxIterations;
-  }
-
-  getContext(): ExecutionContext {
-    return { ...this.state.context };
-  }
-
-  updateContext(updates: Partial<ExecutionContext>): void {
-    this.state.context = {
-      ...this.state.context,
-      ...updates,
+  getSnapshot(): ExecutionStateSnapshot {
+    return {
+      isExecuting: this.isExecuting,
+      currentIteration: this.currentIteration,
+      maxIterations: this.maxIterations,
+      startTime: this.startTime,
+      lastActivityTime: this.lastActivityTime,
     };
-    this.emit("stateChanged", this.getState());
   }
 
-  reset(): void {
-    const currentContext = this.state.context;
-    this.state = {
-      session: {
-        id: this.generateSessionId(),
-        mode: currentContext.mode,
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      },
-      context: currentContext,
-      isExecuting: false,
-      currentIteration: 0,
-      maxIterations: 25,
-      checkpoints: [],
+  restore(snapshot: ExecutionStateSnapshot): void {
+    this.isExecuting = snapshot.isExecuting;
+    this.currentIteration = snapshot.currentIteration;
+    this.maxIterations = snapshot.maxIterations;
+    this.startTime = snapshot.startTime;
+    this.lastActivityTime = snapshot.lastActivityTime;
+  }
+}
+
+/**
+ * Workspace state
+ */
+class WorkspaceState {
+  private readonly root: string;
+  private currentFile?: string;
+  private selection?: ExecutionContext['selection'];
+  private openFiles: string[] = [];
+  private modifiedFiles = new Set<string>();
+
+  constructor(root: string, context: ExecutionContext) {
+    this.root = root;
+    this.currentFile = context.currentFile;
+    this.selection = context.selection;
+    this.openFiles = [...context.openFiles];
+  }
+
+  markFileModified(filePath: string): void {
+    this.modifiedFiles.add(filePath);
+  }
+
+  getSnapshot(): WorkspaceStateSnapshot {
+    return {
+      root: this.root,
+      currentFile: this.currentFile,
+      selection: this.selection,
+      openFiles: [...this.openFiles],
+      modifiedFiles: new Set(this.modifiedFiles),
     };
-    this.emit("stateChanged", this.getState());
   }
 
-  private generateSessionId(): string {
-    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  restore(snapshot: WorkspaceStateSnapshot): void {
+    this.currentFile = snapshot.currentFile;
+    this.selection = snapshot.selection;
+    this.openFiles = [...snapshot.openFiles];
+    this.modifiedFiles = new Set(snapshot.modifiedFiles);
+  }
+}
+
+/**
+ * Memory state
+ */
+class MemoryState {
+  private shortTerm = new Map<string, unknown>();
+  private conversationContext: string[] = [];
+  private lastCheckpointId?: string;
+
+  set(key: string, value: unknown): void {
+    this.shortTerm.set(key, value);
+  }
+
+  get(key: string): unknown {
+    return this.shortTerm.get(key);
+  }
+
+  addContext(context: string): void {
+    this.conversationContext.push(context);
+  }
+
+  setCheckpoint(checkpointId: string): void {
+    this.lastCheckpointId = checkpointId;
+  }
+
+  getSnapshot(): MemorySnapshot {
+    return {
+      shortTerm: new Map(this.shortTerm),
+      conversationContext: [...this.conversationContext],
+      lastCheckpointId: this.lastCheckpointId,
+    };
+  }
+
+  restore(snapshot: MemorySnapshot): void {
+    this.shortTerm = new Map(snapshot.shortTerm);
+    this.conversationContext = [...snapshot.conversationContext];
+    this.lastCheckpointId = snapshot.lastCheckpointId;
+  }
+}
+
+/**
+ * Runtime state - aggregates 4 sub-states
+ */
+export class RuntimeState {
+  private readonly conversation: ConversationState;
+  private readonly execution: ExecutionState;
+  private readonly workspace: WorkspaceState;
+  private readonly memory: MemoryState;
+  private readonly correlationId: string;
+
+  constructor(context: ExecutionContext, maxIterations = 25) {
+    this.conversation = new ConversationState();
+    this.execution = new ExecutionState(maxIterations);
+    this.workspace = new WorkspaceState(context.workspaceRoot, context);
+    this.memory = new MemoryState();
+    this.correlationId = `runtime-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+
+  // === Getters (immutable snapshots) ===
+
+  getConversation(): Readonly<ConversationStateSnapshot> {
+    return this.conversation.getSnapshot();
+  }
+
+  getExecution(): Readonly<ExecutionStateSnapshot> {
+    return this.execution.getSnapshot();
+  }
+
+  getWorkspace(): Readonly<WorkspaceStateSnapshot> {
+    return this.workspace.getSnapshot();
+  }
+
+  getMemory(): Readonly<MemorySnapshot> {
+    return this.memory.getSnapshot();
+  }
+
+  getCorrelationId(): string {
+    return this.correlationId;
+  }
+
+  // === Mutations (controlled) ===
+
+  addMessage(message: Message): void {
+    this.conversation.addMessage(message);
+    this.execution.updateActivity();
+  }
+
+  recordToolCall(
+    toolName: string,
+    input: unknown,
+    result: unknown,
+    duration: number,
+    success: boolean,
+  ): void {
+    const record: ToolCallRecord = {
+      id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      toolName,
+      input,
+      result,
+      timestamp: Date.now(),
+      duration,
+      success,
+    };
+    this.conversation.recordToolCall(record);
+    this.execution.updateActivity();
+  }
+
+  startExecution(): void {
+    this.execution.start();
+  }
+
+  stopExecution(): void {
+    this.execution.stop();
+  }
+
+  incrementIteration(): void {
+    this.execution.incrementIteration();
+  }
+
+  markFileModified(filePath: string): void {
+    this.workspace.markFileModified(filePath);
+  }
+
+  setCheckpoint(checkpointId: string): void {
+    this.memory.setCheckpoint(checkpointId);
+  }
+
+  // === Snapshot/Restore ===
+
+  createSnapshot(): RuntimeStateSnapshot {
+    return {
+      conversation: this.conversation.getSnapshot(),
+      execution: this.execution.getSnapshot(),
+      workspace: this.workspace.getSnapshot(),
+      memory: this.memory.getSnapshot(),
+      correlationId: this.correlationId,
+    };
+  }
+
+  restoreSnapshot(snapshot: RuntimeStateSnapshot): void {
+    this.conversation.restore(snapshot.conversation);
+    this.execution.restore(snapshot.execution);
+    this.workspace.restore(snapshot.workspace);
+    this.memory.restore(snapshot.memory);
   }
 }

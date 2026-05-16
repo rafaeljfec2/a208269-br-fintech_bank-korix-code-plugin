@@ -34,6 +34,17 @@ export const TOKENS = {
   // Configuration
   WorkspaceRoot: Symbol('WorkspaceRoot'),
   ExtensionContext: Symbol('ExtensionContext'),
+
+  // Runtime
+  RuntimeEventEmitter: Symbol('RuntimeEventEmitter'),
+  RuntimeMetrics: Symbol('RuntimeMetrics'),
+  CheckpointManager: Symbol('CheckpointManager'),
+  RecoveryManager: Symbol('RecoveryManager'),
+  IterationGuard: Symbol('IterationGuard'),
+  CancellationManager: Symbol('CancellationManager'),
+  TaskQueue: Symbol('TaskQueue'),
+  ExecutionEngine: Symbol('ExecutionEngine'),
+  AgentLoop: Symbol('AgentLoop'),
 } as const;
 
 export type TokenType = (typeof TOKENS)[keyof typeof TOKENS];

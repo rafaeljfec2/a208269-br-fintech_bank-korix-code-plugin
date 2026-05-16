@@ -1,157 +1,193 @@
 /**
- * Main agent loop for iterative execution
+ * Agent Loop - MINIMALISTA lifecycle orchestration
+ *
+ * Responsibilities:
+ * - Lifecycle control (start, iterations, stop)
+ * - Iteration counting
+ * - Cancellation checking
+ * - Recovery orchestration
+ * - Supervision (guards, checkpoints)
+ *
+ * Delegates to:
+ * - ExecutionEngine (provider ↔ tools)
+ * - RecoveryManager (error handling)
+ * - IterationGuard (loop prevention)
+ * - CheckpointManager (snapshots)
  */
 
-import type { Message } from "../types";
-import { ExecutionEngine } from "./executionEngine";
-import { RuntimeStateManager } from "./runtimeState";
-import { CheckpointManager } from "./checkpoints";
-import { TaskQueue } from "./taskQueue";
-import type { StreamChunk } from "../../providers/types";
-
-export interface AgentLoopOptions {
-  executionEngine: ExecutionEngine;
-  stateManager: RuntimeStateManager;
-  checkpointManager?: CheckpointManager;
-  taskQueue?: TaskQueue;
-  maxIterations?: number;
-}
-
-export interface AgentLoopResult {
-  success: boolean;
-  iterations: number;
-  messages: Message[];
-  error?: string;
-}
+import type { Logger } from '../../telemetry/logger';
+import type { ExecutionContext } from '../types';
+import { ExecutionEngine } from './executionEngine';
+import { CheckpointManager } from './checkpoints';
+import { RecoveryManager } from './recovery';
+import { IterationGuard } from './iterationGuard';
+import { CancellationManager } from './cancellation';
+import { RuntimeMetrics } from './runtimeMetrics';
+import { RuntimeEventEmitter } from './runtimeEvents';
+import { RuntimeState } from './runtimeState';
+import type { AgentLoopResult } from './runtimeTypes';
+import type { RuntimeEvent } from './runtimeEvents';
 
 export class AgentLoop {
-  private executionEngine: ExecutionEngine;
-  private stateManager: RuntimeStateManager;
-  private checkpointManager: CheckpointManager;
-  private abortController: AbortController | null = null;
-
-  constructor(options: AgentLoopOptions) {
-    this.executionEngine = options.executionEngine;
-    this.stateManager = options.stateManager;
-    this.checkpointManager =
-      options.checkpointManager ?? new CheckpointManager();
-
-    if (options.maxIterations) {
-      this.stateManager.setMaxIterations(options.maxIterations);
-    }
-  }
+  constructor(
+    private readonly engine: ExecutionEngine,
+    private readonly checkpointManager: CheckpointManager,
+    private readonly recoveryManager: RecoveryManager,
+    private readonly iterationGuard: IterationGuard,
+    private readonly cancellationManager: CancellationManager,
+    private readonly metrics: RuntimeMetrics,
+    private readonly _eventEmitter: RuntimeEventEmitter, // Used by internal managers
+    private readonly logger: Logger,
+  ) {}
 
   async *run(
     initialMessage: string,
-  ): AsyncGenerator<
-    StreamChunk | { type: "iteration"; iteration: number },
-    AgentLoopResult
-  > {
-    this.stateManager.startExecution();
-    this.abortController = new AbortController();
+    context: ExecutionContext,
+  ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
+    const state = new RuntimeState(context, 25);
+    
+    // Add initial user message
+    state.addMessage({
+      role: 'user',
+      content: initialMessage,
+      timestamp: Date.now(),
+    });
+
+    state.startExecution();
+    let completed = false;
 
     try {
-      // Add initial user message
-      this.stateManager.addMessage({
-        role: "user",
-        content: initialMessage,
-        timestamp: Date.now(),
-      });
+      while (!completed) {
+        this.cancellationManager.checkCancellation();
+        
+        const execution = state.getExecution();
+        const iterationStartTime = Date.now();
 
-      while (
-        !this.stateManager.hasReachedMaxIterations() &&
-        this.stateManager.isExecuting()
-      ) {
-        // Check if aborted
-        if (this.abortController.signal.aborted) {
-          this.stateManager.stopExecution();
-          return {
-            success: false,
-            iterations: this.stateManager.getCurrentIteration(),
-            messages: this.stateManager.getMessages() as Message[],
-            error: "Execution aborted by user",
+        // Emit iteration start
+        yield {
+          type: 'iteration_start',
+          iteration: execution.currentIteration,
+          timestamp: iterationStartTime,
+        };
+
+        // Check guards
+        const guardResult = this.iterationGuard.checkIteration(state);
+        if (guardResult.shouldStop) {
+          this.logger.info('Guard triggered stop', { reason: guardResult.reason });
+          completed = true;
+          break;
+        }
+
+        // Execute step
+        let stepResult;
+        try {
+          stepResult = await this.engine.step(state);
+          this.recoveryManager.resetAttempts(`iteration_${execution.currentIteration}`);
+        } catch (error) {
+          // Handle error via recovery
+          const recoveryAction = await this.recoveryManager.handleError(
+            error as Error,
+            state,
+            `iteration_${execution.currentIteration}`,
+          );
+
+          await this.recoveryManager.executeRecovery(recoveryAction, state);
+
+          if (recoveryAction.action === 'fail') {
+            throw error;
+          }
+
+          // Retry this iteration
+          continue;
+        }
+
+        // Create checkpoint if had tool calls
+        if (stepResult.hadToolCalls) {
+          const workspace = state.getWorkspace();
+          const checkpointId = await this.checkpointManager.create(
+            state,
+            new Set(workspace.modifiedFiles),
+          );
+          state.setCheckpoint(checkpointId);
+          this.metrics.recordCheckpoint();
+
+          yield {
+            type: 'checkpoint_created',
+            checkpointId,
+            iteration: execution.currentIteration,
+            filesChanged: workspace.modifiedFiles.size,
+            timestamp: Date.now(),
           };
         }
 
+        // Record progress
+        const workspace = state.getWorkspace();
+        const conversation = state.getConversation();
+        this.iterationGuard.recordProgress({
+          iteration: execution.currentIteration,
+          modifiedFiles: workspace.modifiedFiles.size,
+          toolCallCount: conversation.toolCallHistory.length,
+          timestamp: Date.now(),
+        });
+
         // Increment iteration
-        this.stateManager.incrementIteration();
+        state.incrementIteration();
+        this.metrics.recordIteration();
+
+        // Emit iteration complete
         yield {
-          type: "iteration" as const,
-          iteration: this.stateManager.getCurrentIteration(),
+          type: 'iteration_complete',
+          iteration: execution.currentIteration,
+          hadToolCalls: stepResult.hadToolCalls,
+          duration: Date.now() - iterationStartTime,
+          timestamp: Date.now(),
         };
 
-        // Get current messages
-        const messages = this.stateManager.getMessages() as Message[];
-
-        // Execute iteration
-        const stream = this.executionEngine.execute(messages);
-        let hadToolCalls = false;
-
-        for await (const chunk of stream) {
-          // Check if tool call
-          if (chunk.type === "tool_use") {
-            hadToolCalls = true;
-          }
-
-          // Yield chunk
-          yield chunk as StreamChunk;
-        }
-
-        // Create checkpoint after tool execution
-        if (hadToolCalls) {
-          this.checkpointManager.save(this.stateManager.getState());
-        }
-
-        // If no tool calls, we're done
-        if (!hadToolCalls) {
-          this.stateManager.stopExecution();
-          break;
+        // Check completion
+        if (stepResult.stopReason === 'end_turn' && !stepResult.hadToolCalls) {
+          completed = true;
         }
       }
 
-      this.stateManager.stopExecution();
+      // Success
+      state.stopExecution();
+      const metricsSnapshot = this.metrics.finalize();
+      
+      yield {
+        type: 'execution_complete',
+        success: true,
+        iterations: state.getExecution().currentIteration,
+        metrics: metricsSnapshot,
+        timestamp: Date.now(),
+      };
 
       return {
         success: true,
-        iterations: this.stateManager.getCurrentIteration(),
-        messages: this.stateManager.getMessages() as Message[],
+        iterations: state.getExecution().currentIteration,
+        finalState: state.createSnapshot(),
+        metrics: metricsSnapshot,
       };
     } catch (error) {
-      this.stateManager.stopExecution();
+      // Failure
+      state.stopExecution();
+      const metricsSnapshot = this.metrics.finalize();
       const err = error as Error;
+
+      yield {
+        type: 'execution_complete',
+        success: false,
+        iterations: state.getExecution().currentIteration,
+        metrics: metricsSnapshot,
+        timestamp: Date.now(),
+      };
 
       return {
         success: false,
-        iterations: this.stateManager.getCurrentIteration(),
-        messages: this.stateManager.getMessages() as Message[],
+        iterations: state.getExecution().currentIteration,
+        finalState: state.createSnapshot(),
+        metrics: metricsSnapshot,
         error: err.message,
       };
-    } finally {
-      this.abortController = null;
     }
-  }
-
-  cancel(): void {
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-    this.stateManager.stopExecution();
-  }
-
-  getState() {
-    return this.stateManager.getState();
-  }
-
-  getCheckpoints() {
-    return this.checkpointManager.getAll();
-  }
-
-  async rollback(checkpointId: string): Promise<boolean> {
-    const state = this.checkpointManager.restore(checkpointId);
-    if (state) {
-      this.stateManager.setState(state);
-      return true;
-    }
-    return false;
   }
 }

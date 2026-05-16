@@ -1,58 +1,105 @@
 /**
- * Checkpoint management for rollback and recovery
+ * Checkpoint manager - incremental file snapshots
  */
 
-import type { Checkpoint, RuntimeState } from "../types";
+import * as crypto from 'crypto';
+import fs from 'fs/promises';
+import type { Logger } from '../../telemetry/logger';
+import type { RuntimeState } from './runtimeState';
+import type { RuntimeCheckpoint, FileSnapshot } from './runtimeTypes';
 
 export class CheckpointManager {
-  private checkpoints: Checkpoint[] = [];
-  private maxCheckpoints = 10;
+  private checkpoints = new Map<string, RuntimeCheckpoint>();
+  private readonly maxCheckpoints = 10;
 
-  save(state: RuntimeState, filesModified: string[] = []): Checkpoint {
-    const checkpoint: Checkpoint = {
-      id: this.generateCheckpointId(),
-      timestamp: Date.now(),
-      state: {
-        session: { ...state.session },
-        context: { ...state.context },
-        isExecuting: state.isExecuting,
-        currentIteration: state.currentIteration,
-        maxIterations: state.maxIterations,
-      },
-      filesModified,
-    };
+  constructor(private readonly logger: Logger) {}
 
-    this.checkpoints.push(checkpoint);
+  async create(state: RuntimeState, modifiedFiles: Set<string>): Promise<string> {
+    const checkpointId = `checkpoint-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    
+    // Snapshot modified files
+    const fileSnapshots: FileSnapshot[] = [];
+    for (const filePath of modifiedFiles) {
+      try {
+        const contentStr = await fs.readFile(filePath, 'utf-8');
+        const hash = crypto.createHash('sha256').update(contentStr).digest('hex');
 
-    if (this.checkpoints.length > this.maxCheckpoints) {
-      this.checkpoints.shift();
+        fileSnapshots.push({
+          path: filePath,
+          content: contentStr,
+          hash,
+          timestamp: Date.now(),
+        });
+      } catch (error) {
+        this.logger.error(`Failed to snapshot file ${filePath}`, error as Error);
+        throw error; // Re-throw to fail checkpoint creation
+      }
     }
 
-    return checkpoint;
+    const conversation = state.getConversation();
+    const execution = state.getExecution();
+    const memory = state.getMemory();
+
+    const checkpoint: RuntimeCheckpoint = {
+      id: checkpointId,
+      iteration: execution.currentIteration,
+      timestamp: Date.now(),
+      modifiedFiles: fileSnapshots,
+      operationJournal: conversation.toolCallHistory.map((tc) => ({
+        type: 'tool_call' as const,
+        toolName: tc.toolName,
+        toolInput: tc.input,
+        timestamp: tc.timestamp,
+        success: tc.success,
+      })),
+      memoryState: memory,
+      conversationSnapshot: conversation.messages,
+    };
+
+    this.checkpoints.set(checkpointId, checkpoint);
+    this.evictOldCheckpoints();
+
+    return checkpointId;
   }
 
-  restore(checkpointId: string): Partial<RuntimeState> | null {
-    const checkpoint = this.checkpoints.find((cp) => cp.id === checkpointId);
-    return checkpoint ? checkpoint.state : null;
+  async restore(checkpointId: string): Promise<void> {
+    const checkpoint = this.checkpoints.get(checkpointId);
+    if (!checkpoint) {
+      throw new Error(`Checkpoint not found: ${checkpointId}`);
+    }
+
+    // Restore files
+    for (const snapshot of checkpoint.modifiedFiles) {
+      try {
+        await fs.writeFile(snapshot.path, snapshot.content, 'utf-8');
+      } catch (error) {
+        this.logger.error(`Failed to restore file ${snapshot.path}`, error as Error);
+        throw error; // Re-throw to fail restore
+      }
+    }
   }
 
-  getLatest(): Checkpoint | null {
-    return this.checkpoints[this.checkpoints.length - 1] ?? null;
+  get(checkpointId: string): RuntimeCheckpoint | undefined {
+    return this.checkpoints.get(checkpointId);
   }
 
-  getAll(): readonly Checkpoint[] {
-    return [...this.checkpoints];
+  getLatest(): RuntimeCheckpoint | undefined {
+    const checkpoints = Array.from(this.checkpoints.values());
+    return checkpoints.sort((a, b) => b.timestamp - a.timestamp)[0];
   }
 
-  clear(): void {
-    this.checkpoints = [];
-  }
+  private evictOldCheckpoints(): void {
+    if (this.checkpoints.size <= this.maxCheckpoints) {
+      return;
+    }
 
-  count(): number {
-    return this.checkpoints.length;
-  }
+    const sorted = Array.from(this.checkpoints.entries()).sort(
+      ([, a], [, b]) => b.timestamp - a.timestamp,
+    );
 
-  private generateCheckpointId(): string {
-    return `checkpoint-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    for (let i = this.maxCheckpoints; i < sorted.length; i++) {
+      const [id] = sorted[i]!;
+      this.checkpoints.delete(id);
+    }
   }
 }

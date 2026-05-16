@@ -1,68 +1,65 @@
 /**
- * Task queue for managing subtasks
+ * Task queue - priority queue with AbortController per task
  */
 
-export interface Task {
-  id: string;
-  description: string;
-  status: "pending" | "in_progress" | "completed" | "failed";
-  createdAt: number;
-  completedAt?: number;
-  error?: string;
-}
+import type { Logger } from '../../telemetry/logger';
+import type { Task } from './runtimeTypes';
 
 export class TaskQueue {
-  private tasks: Task[] = [];
+  private queue: Task[] = [];
+  private activeTask: Task | null = null;
+  private abortControllers = new Map<string, AbortController>();
 
-  add(description: string): Task {
-    const task: Task = {
-      id: this.generateTaskId(),
-      description,
-      status: "pending",
-      createdAt: Date.now(),
-    };
+  constructor(private readonly logger: Logger) {}
 
-    this.tasks.push(task);
-    return task;
+  enqueue(task: Task): void {
+    this.queue.push(task);
+    this.queue.sort((a, b) => b.priority - a.priority);
+    this.abortControllers.set(task.id, new AbortController());
+    this.logger.debug('Task enqueued', { id: task.id, priority: task.priority });
   }
 
-  start(taskId: string): void {
-    const task = this.tasks.find((t) => t.id === taskId);
+  dequeue(): Task | null {
+    const task = this.queue.shift();
     if (task) {
-      task.status = "in_progress";
+      this.activeTask = task;
+      this.logger.debug('Task dequeued', { id: task.id });
     }
+    return task ?? null;
   }
 
   complete(taskId: string): void {
-    const task = this.tasks.find((t) => t.id === taskId);
-    if (task) {
-      task.status = "completed";
-      task.completedAt = Date.now();
+    if (this.activeTask?.id === taskId) {
+      this.activeTask = null;
     }
+    this.abortControllers.delete(taskId);
+    this.logger.debug('Task completed', { id: taskId });
   }
 
-  fail(taskId: string, error: string): void {
-    const task = this.tasks.find((t) => t.id === taskId);
-    if (task) {
-      task.status = "failed";
-      task.error = error;
-      task.completedAt = Date.now();
+  cancel(taskId: string): void {
+    const controller = this.abortControllers.get(taskId);
+    if (controller) {
+      controller.abort();
+      this.logger.info('Task cancelled', { id: taskId });
     }
+    
+    if (this.activeTask?.id === taskId) {
+      this.activeTask = null;
+    }
+    
+    this.queue = this.queue.filter((t) => t.id !== taskId);
+    this.abortControllers.delete(taskId);
   }
 
-  getAll(): readonly Task[] {
-    return [...this.tasks];
+  getAbortSignal(taskId: string): AbortSignal | undefined {
+    return this.abortControllers.get(taskId)?.signal;
   }
 
-  getPending(): readonly Task[] {
-    return this.tasks.filter((t) => t.status === "pending");
+  getActiveTask(): Task | null {
+    return this.activeTask;
   }
 
-  clear(): void {
-    this.tasks = [];
-  }
-
-  private generateTaskId(): string {
-    return `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  size(): number {
+    return this.queue.length;
   }
 }
