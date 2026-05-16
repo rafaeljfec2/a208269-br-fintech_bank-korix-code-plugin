@@ -4,7 +4,9 @@
 
 import { z } from 'zod';
 import type { Tool, ToolContext, ToolResult } from '../harness/toolRegistry';
-import { PatchApplier } from '../patch/applier';
+import type { PatchApplier } from '../patch/applier';
+import { getGlobalContainer } from '../di/container';
+import { TOKENS } from '../di/tokens';
 
 const EditFileInputSchema = z.object({
   patches: z
@@ -51,12 +53,13 @@ All patches are applied atomically with automatic rollback on failure.`,
 
   async execute(
     input: EditFileInput,
-    context: ToolContext
+    _context: ToolContext
   ): Promise<ToolResult<EditFileOutput>> {
     const startTime = Date.now();
 
     try {
-      const applier = new PatchApplier(context.workspaceRoot);
+      const container = getGlobalContainer();
+      const applier = container.get<PatchApplier>(TOKENS.PatchApplier);
       const result = await applier.applyPatches(input.patches);
 
       const output: EditFileOutput = {

@@ -2,8 +2,8 @@
  * Command execution with streaming, timeout, and security
  */
 
-import { getLogger } from '../telemetry/logger';
-import { getSessionManager } from './session';
+import type { Logger } from '../telemetry/logger';
+import type { TerminalSessionManager } from './session';
 import type { CommandResult, SecurityConfig, CommandDenylistPattern } from './types';
 
 export class CommandRunner {
@@ -31,6 +31,11 @@ export class CommandRunner {
     defaultTimeout: 30 * 1000,
   };
 
+  constructor(
+    private readonly sessionManager: TerminalSessionManager,
+    private readonly logger: Logger
+  ) {}
+
   async run(
     command: string,
     options: {
@@ -40,32 +45,30 @@ export class CommandRunner {
       env?: Record<string, string>;
     } = {}
   ): Promise<CommandResult> {
-    const logger = getLogger();
     const startTime = Date.now();
 
-    logger.info('Running command', { command, sessionId: options.sessionId });
+    this.logger.info('Running command', { command, sessionId: options.sessionId });
 
     const validation = this.validateCommand(command);
     if (!validation.allowed) {
       throw new Error(`Command blocked: ${validation.reason}`);
     }
 
-    const sessionManager = getSessionManager();
     let sessionId = options.sessionId;
 
-    if (!sessionId || !sessionManager.hasSession(sessionId)) {
-      sessionId = sessionManager.createSession({
+    if (!sessionId || !this.sessionManager.hasSession(sessionId)) {
+      sessionId = this.sessionManager.createSession({
         cwd: options.cwd,
         env: options.env,
       });
     }
 
-    const entry = sessionManager.getSession(sessionId);
+    const entry = this.sessionManager.getSession(sessionId);
     if (!entry) {
       throw new Error('Failed to get session');
     }
 
-    sessionManager.updateLastUsed(sessionId);
+    this.sessionManager.updateLastUsed(sessionId);
 
     const timeout = Math.min(
       options.timeout ?? this.securityConfig.defaultTimeout,
@@ -81,7 +84,6 @@ export class CommandRunner {
     timeout: number,
     startTime: number
   ): Promise<CommandResult> {
-    const logger = getLogger();
 
     return new Promise((resolve) => {
       let stdout = '';
@@ -113,7 +115,7 @@ export class CommandRunner {
           duration,
         };
 
-        logger.info('Command completed', {
+        this.logger.info('Command completed', {
           command,
           duration,
           timedOut,
@@ -131,12 +133,12 @@ export class CommandRunner {
       });
 
       pty.onExit((exitCode) => {
-        logger.debug('Command process exited', { command, exitCode });
+        this.logger.debug('Command process exited', { command, exitCode });
         finish(false, exitCode);
       });
 
       timeoutId = setTimeout(() => {
-        logger.warn('Command timed out', { command, timeout });
+        this.logger.warn('Command timed out', { command, timeout });
         finish(true, null);
       }, timeout);
 
@@ -174,18 +176,4 @@ export class CommandRunner {
   getSecurityConfig(): SecurityConfig {
     return { ...this.securityConfig };
   }
-}
-
-export let globalCommandRunner: CommandRunner | null = null;
-
-export function initializeCommandRunner(): CommandRunner {
-  globalCommandRunner = new CommandRunner();
-  return globalCommandRunner;
-}
-
-export function getCommandRunner(): CommandRunner {
-  if (!globalCommandRunner) {
-    throw new Error('Command runner not initialized');
-  }
-  return globalCommandRunner;
 }

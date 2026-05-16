@@ -4,7 +4,9 @@
 
 import { z } from 'zod';
 import type { Tool, ToolContext, ToolResult } from '../harness/toolRegistry';
-import { getCommandRunner } from '../terminal/commandRunner';
+import type { CommandRunner } from '../terminal/commandRunner';
+import { getGlobalContainer } from '../di/container';
+import { TOKENS } from '../di/tokens';
 
 const RunCommandInputSchema = z.object({
   command: z.string().min(1).describe('Shell command to execute'),
@@ -33,7 +35,8 @@ Examples:
   schema: RunCommandInputSchema,
 
   async execute(input: RunCommandInput, _context: ToolContext): Promise<ToolResult<string>> {
-    const commandRunner = getCommandRunner();
+    const container = getGlobalContainer();
+    const commandRunner = container.get<CommandRunner>(TOKENS.CommandRunner);
 
     const validation = commandRunner.validateCommand(input.command);
 
@@ -77,7 +80,8 @@ Examples:
   },
 
   requiresApproval(input: RunCommandInput, _context: ToolContext): boolean {
-    const commandRunner = getCommandRunner();
+    const container = getGlobalContainer();
+    const commandRunner = container.get<CommandRunner>(TOKENS.CommandRunner);
     const validation = commandRunner.validateCommand(input.command);
     return validation.requiresApproval ?? false;
   },

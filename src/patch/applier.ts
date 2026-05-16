@@ -4,10 +4,10 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { getLogger } from '../telemetry/logger';
-import { PatchParser } from './parser';
-import { PatchValidator } from './validation';
-import { RollbackManager } from './rollback';
+import type { Logger } from '../telemetry/logger';
+import type { PatchParser } from './parser';
+import type { PatchValidator } from './validation';
+import type { RollbackManager } from './rollback';
 import type {
   Patch,
   PatchResult,
@@ -17,21 +17,18 @@ import type {
 import { PatchErrorReason } from './types';
 
 export class PatchApplier {
-  private parser: PatchParser;
-  private validator: PatchValidator;
-  private rollbackManager: RollbackManager;
-
-  constructor(private workspaceRoot: string) {
-    this.parser = new PatchParser();
-    this.validator = new PatchValidator(workspaceRoot);
-    this.rollbackManager = new RollbackManager();
-  }
+  constructor(
+    private readonly workspaceRoot: string,
+    private readonly parser: PatchParser,
+    private readonly validator: PatchValidator,
+    private readonly rollbackManager: RollbackManager,
+    private readonly logger: Logger
+  ) {}
 
   async applyPatches(content: string): Promise<PatchResult> {
-    const logger = getLogger();
     const startTime = Date.now();
 
-    logger.info('Starting patch application');
+    this.logger.info('Starting patch application');
 
     const { patches, errors } = this.parser.parse(content);
 
@@ -95,7 +92,7 @@ export class PatchApplier {
 
     const duration = Date.now() - startTime;
 
-    logger.info('Patch application complete', {
+    this.logger.info('Patch application complete', {
       applied: appliedPatches.length,
       errors: allErrors.length,
       duration,
@@ -117,8 +114,6 @@ export class PatchApplier {
     applied?: AppliedPatch;
     error?: PatchError;
   }> {
-    const logger = getLogger();
-
     try {
       const uri = vscode.Uri.file(filePath);
       const content = await vscode.workspace.fs.readFile(uri);
@@ -152,13 +147,13 @@ export class PatchApplier {
       );
 
       if (!postValidation.valid) {
-        logger.warn('Post-validation failed', {
+        this.logger.warn('Post-validation failed', {
           file: patch.file,
           errors: postValidation.errors,
         });
       }
 
-      logger.debug('Patch applied', {
+      this.logger.debug('Patch applied', {
         file: patch.file,
         line: lineNumber,
       });

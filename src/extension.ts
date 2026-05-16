@@ -5,11 +5,13 @@ import { ProviderConfigManager } from "./providers/config";
 import type { AIProvider } from "./providers/types";
 import { KorixSidebarProvider } from "./ui/sidebar/sidebarProvider";
 import { TimelineProvider } from "./ui/timeline/timelineProvider";
-import { initializeLogger, getLogger } from "./telemetry/logger";
-import { initializeContextEngine, getContextEngine } from "./context/contextEngine";
-import { initializeSessionManager, getSessionManager } from "./terminal/session";
-import { initializeCommandRunner } from "./terminal/commandRunner";
+import type { Logger } from "./telemetry/logger";
+import type { ContextEngine } from "./context/contextEngine";
+import type { TerminalSessionManager } from "./terminal/session";
 import { registerAllTools } from "./tools";
+import { createContainer, setGlobalContainer, getGlobalContainer } from "./di/container";
+import { configureContainer } from "./di/bindings";
+import { TOKENS } from "./di/tokens";
 
 let outputChannel: vscode.OutputChannel;
 let currentMode: Mode = "ask";
@@ -22,13 +24,16 @@ let timelineProvider: TimelineProvider;
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("Korix Code");
 
-  initializeLogger({
-    level: "info",
-    outputChannel,
-    enablePrettyPrint: process.env.NODE_ENV !== "production",
-  });
+  // Create and configure DI container
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  const container = createContainer();
+  configureContainer(container, context, workspaceRoot);
+  setGlobalContainer(container);
 
-  const logger = getLogger();
+  // Resolve services from container
+  const logger = container.get<Logger>(TOKENS.Logger);
+  const contextEngine = container.get<ContextEngine>(TOKENS.ContextEngine);
+
   logger.info("Korix Code extension is now active");
   logger.info("Korix Code initialized");
 
@@ -37,15 +42,11 @@ export function activate(context: vscode.ExtensionContext) {
   void initializeProvider();
 
   // Initialize Context Engine
-  const contextEngine = initializeContextEngine();
   void contextEngine.initialize().then(() => {
     logger.info("Context Engine ready");
   });
 
-  // Initialize Terminal System
-  initializeSessionManager();
-  initializeCommandRunner();
-  logger.info("Terminal System initialized");
+  logger.info("DI Container initialized");
 
   // Register all tools
   registerAllTools();
@@ -119,33 +120,38 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export async function deactivate() {
-  const logger = getLogger();
-  logger.info("Korix Code extension is now deactivated");
-
-  if (outputChannel) {
-    logger.info("Korix Code deactivating...");
-  }
-
-  if (activeProvider) {
-    await activeProvider.dispose();
-  }
-
-  await globalRegistry.dispose();
-
-  // Dispose Context Engine
   try {
-    const contextEngine = getContextEngine();
-    contextEngine.dispose();
-  } catch {
-    // Context engine may not be initialized
-  }
+    const container = getGlobalContainer();
+    const logger = container.get<Logger>(TOKENS.Logger);
+    logger.info("Korix Code extension is now deactivated");
 
-  // Dispose Terminal System
-  try {
-    const sessionManager = getSessionManager();
-    sessionManager.dispose();
+    if (outputChannel) {
+      logger.info("Korix Code deactivating...");
+    }
+
+    if (activeProvider) {
+      await activeProvider.dispose();
+    }
+
+    await globalRegistry.dispose();
+
+    // Dispose Context Engine
+    try {
+      const contextEngine = container.get<ContextEngine>(TOKENS.ContextEngine);
+      contextEngine.dispose();
+    } catch {
+      // Context engine may not be initialized
+    }
+
+    // Dispose Terminal System
+    try {
+      const sessionManager = container.get<TerminalSessionManager>(TOKENS.SessionManager);
+      sessionManager.dispose();
+    } catch {
+      // Session manager may not be initialized
+    }
   } catch {
-    // Session manager may not be initialized
+    // Container may not be initialized
   }
 
   if (outputChannel) {
@@ -158,7 +164,7 @@ export async function deactivate() {
 }
 
 function handleModeSwitch(mode: Mode) {
-  const logger = getLogger();
+  const logger = getGlobalContainer().get<Logger>(TOKENS.Logger);
   currentMode = mode;
   updateStatusBar();
 
@@ -182,7 +188,7 @@ function handleModeSwitch(mode: Mode) {
 }
 
 async function initializeProvider() {
-  const logger = getLogger();
+  const logger = getGlobalContainer().get<Logger>(TOKENS.Logger);
   try {
     const config = await configManager.getConfig("anthropic");
     if (config) {
@@ -203,7 +209,7 @@ async function initializeProvider() {
 }
 
 async function testProviderStreaming() {
-  const logger = getLogger();
+  const logger = getGlobalContainer().get<Logger>(TOKENS.Logger);
   try {
     if (!activeProvider) {
       await configManager.ensureApiKey("anthropic");

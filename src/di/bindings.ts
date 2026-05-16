@@ -1,0 +1,96 @@
+/**
+ * DI Bindings configuration
+ */
+
+import * as vscode from 'vscode';
+import type { Container } from './container';
+import { TOKENS } from './tokens';
+import { initializeLogger, type Logger } from '../telemetry/logger';
+import { WorkspaceIndexer } from '../context/indexing/workspaceIndexer';
+import { HeuristicRanker } from '../context/ranking/heuristicRanker';
+import { ContextBuilder } from '../context/retrieval/contextBuilder';
+import { ContextEngine } from '../context/contextEngine';
+import { TerminalSessionManager } from '../terminal/session';
+import { CommandRunner } from '../terminal/commandRunner';
+import { PatchParser } from '../patch/parser';
+import { PatchValidator } from '../patch/validation';
+import { RollbackManager } from '../patch/rollback';
+import { PatchApplier } from '../patch/applier';
+import { globalToolRegistry } from '../harness/toolRegistry';
+import { PermissionManager } from '../harness/permissions';
+import { ProviderRegistry } from '../providers/registry';
+import { ProviderConfigManager } from '../providers/config';
+
+export function configureContainer(
+  container: Container,
+  context: vscode.ExtensionContext,
+  workspaceRoot: string
+): void {
+  // Configuration values
+  container.bindValue(TOKENS.ExtensionContext, context);
+  container.bindValue(TOKENS.WorkspaceRoot, workspaceRoot);
+
+  // Logger (singleton)
+  container.bindSingleton(TOKENS.Logger, () => {
+    const outputChannel = vscode.window.createOutputChannel('Korix Code');
+    return initializeLogger({ outputChannel });
+  });
+
+  // Tool Registry (use existing global)
+  container.bindValue(TOKENS.ToolRegistry, globalToolRegistry);
+
+  // Permission Manager (singleton)
+  container.bindSingleton(TOKENS.PermissionManager, () => new PermissionManager());
+
+  // Provider Registry (singleton)
+  container.bindSingleton(TOKENS.ProviderRegistry, () => new ProviderRegistry());
+
+  // Provider Config Manager (singleton)
+  container.bindSingleton(TOKENS.ProviderConfigManager, (c) => {
+    const ctx = c.get<vscode.ExtensionContext>(TOKENS.ExtensionContext);
+    return new ProviderConfigManager(ctx);
+  });
+
+  // Context services (singletons)
+  container.bindSingleton(TOKENS.WorkspaceIndexer, () => new WorkspaceIndexer());
+
+  container.bindSingleton(TOKENS.HeuristicRanker, (c) => {
+    const indexer = c.get<WorkspaceIndexer>(TOKENS.WorkspaceIndexer);
+    return new HeuristicRanker(indexer);
+  });
+
+  container.bindSingleton(TOKENS.ContextBuilder, (c) => {
+    const indexer = c.get<WorkspaceIndexer>(TOKENS.WorkspaceIndexer);
+    const ranker = c.get<HeuristicRanker>(TOKENS.HeuristicRanker);
+    return new ContextBuilder(indexer, ranker);
+  });
+
+  container.bindSingleton(TOKENS.ContextEngine, () => new ContextEngine());
+
+  // Terminal services (singletons)
+  container.bindSingleton(TOKENS.SessionManager, () => new TerminalSessionManager());
+  container.bindSingleton(TOKENS.CommandRunner, (c) => {
+    const sessionManager = c.get<TerminalSessionManager>(TOKENS.SessionManager);
+    const logger = c.get<Logger>(TOKENS.Logger);
+    return new CommandRunner(sessionManager, logger);
+  });
+
+  // Patch services
+  container.bindSingleton(TOKENS.PatchParser, () => new PatchParser());
+
+  container.bindSingleton(TOKENS.PatchValidator, (c) => {
+    const root = c.get<string>(TOKENS.WorkspaceRoot);
+    return new PatchValidator(root);
+  });
+
+  container.bindSingleton(TOKENS.RollbackManager, () => new RollbackManager());
+
+  container.bindSingleton(TOKENS.PatchApplier, (c) => {
+    const root = c.get<string>(TOKENS.WorkspaceRoot);
+    const parser = c.get<PatchParser>(TOKENS.PatchParser);
+    const validator = c.get<PatchValidator>(TOKENS.PatchValidator);
+    const rollbackManager = c.get<RollbackManager>(TOKENS.RollbackManager);
+    const logger = c.get<Logger>(TOKENS.Logger);
+    return new PatchApplier(root, parser, validator, rollbackManager, logger);
+  });
+}
