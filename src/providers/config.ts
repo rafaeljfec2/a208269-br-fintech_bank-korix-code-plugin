@@ -82,6 +82,8 @@ export class ProviderConfigManager {
           "openrouter.model",
           "anthropic/claude-sonnet-4",
         );
+      case "litellm":
+        return config.get<string>("litellm.model", "anthropic/claude-opus-4-7");
       default:
         return "claude-sonnet-4-6";
     }
@@ -101,6 +103,11 @@ export class ProviderConfigManager {
         return config.get<string>(
           "openrouter.baseUrl",
           "https://openrouter.ai/api/v1",
+        );
+      case "litellm":
+        return config.get<string>(
+          "litellm.apiBase",
+          "https://litellm.int.thomsonreuters.com",
         );
       default:
         return undefined;

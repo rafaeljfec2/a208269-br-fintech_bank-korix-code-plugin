@@ -9,6 +9,7 @@ import type {
   ProviderType,
 } from "./types";
 import { AnthropicProvider } from "./anthropic";
+import { LiteLLMFactory } from "../core/providers/litellm/litellmFactory";
 
 class AnthropicFactory implements ProviderFactory {
   create(config: ProviderConfig): AIProvider {
@@ -26,6 +27,7 @@ export class ProviderRegistry {
 
   constructor() {
     this.registerFactory("anthropic", new AnthropicFactory());
+    this.registerFactory("litellm", new LiteLLMFactory());
   }
 
   registerFactory(type: ProviderType, factory: ProviderFactory): void {
