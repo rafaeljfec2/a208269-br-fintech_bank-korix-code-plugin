@@ -2,7 +2,6 @@
  * Context Engine - orchestrates indexing, ranking, and context building
  */
 
-import type * as vscode from 'vscode';
 import { getLogger } from '../telemetry/logger';
 import { WorkspaceIndexer } from './indexing/workspaceIndexer';
 import { HeuristicRanker } from './ranking/heuristicRanker';

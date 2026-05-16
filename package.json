@@ -4,6 +4,7 @@
   "description": "AI-native coding runtime agentic - um assistente de código inteligente, rápido e controlável integrado ao VSCode",
   "version": "0.1.0",
   "publisher": "korix",
+  "type": "module",
   "icon": "resources/icon.png",
   "engines": {
     "vscode": "^1.85.0"
@@ -189,19 +190,21 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.11.0",
     "@types/pino": "^7.0.5",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.19.0",
-    "@typescript-eslint/parser": "^6.19.0",
+    "@vitest/coverage-v8": "^4.1.6",
     "@vscode/test-electron": "^2.3.9",
     "@vscode/vsce": "^2.22.0",
-    "esbuild": "^0.19.12",
-    "eslint": "^8.56.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.4.0",
     "pino-pretty": "^13.1.3",
     "prettier": "^3.2.4",
     "typescript": "^5.3.3",
-    "vitest": "^1.2.0"
+    "typescript-eslint": "^8.59.3",
+    "vite": "^8.0.13",
+    "vitest": "^4.1.6"
   },
   "repository": {
     "type": "git",

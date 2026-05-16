@@ -11,6 +11,7 @@ export class PTYManager {
   private pty: pty.IPty | null = null;
   private outputBuffer: string[] = [];
   private onDataCallback?: (data: string) => void;
+  private onExitCallback?: (exitCode: number) => void;
 
   spawn(options: TerminalOptions = {}): void {
     const logger = getLogger();
@@ -36,6 +37,14 @@ export class PTYManager {
       }
     });
 
+    this.pty.onExit((e) => {
+      const exitCode = e.exitCode;
+      logger.debug('PTY process exited', { pid: this.pty?.pid, exitCode });
+      if (this.onExitCallback) {
+        this.onExitCallback(exitCode);
+      }
+    });
+
     logger.info('PTY spawned', { pid: this.pty.pid, shell });
   }
 
@@ -55,6 +64,10 @@ export class PTYManager {
 
   onData(callback: (data: string) => void): void {
     this.onDataCallback = callback;
+  }
+
+  onExit(callback: (exitCode: number) => void): void {
+    this.onExitCallback = callback;
   }
 
   getOutput(): string {

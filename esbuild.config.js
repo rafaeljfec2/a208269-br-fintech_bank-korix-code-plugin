@@ -1,5 +1,4 @@
-const esbuild = require('esbuild');
-const path = require('path');
+import esbuild from 'esbuild';
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');

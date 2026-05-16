@@ -15,14 +15,14 @@ const ReadFileSchema = z.object({
 
 type ReadFileInput = z.infer<typeof ReadFileSchema>;
 
-export class ReadFileTool implements Tool<ReadFileInput, string> {
-  name = "ReadFile";
-  description = "Read the contents of a file";
-  schema = ReadFileSchema;
+export const ReadFileTool: Tool<ReadFileInput, string> = {
+  name: "ReadFile",
+  description: "Read the contents of a file",
+  schema: ReadFileSchema,
 
   allowedInMode(_mode: "ask" | "plan" | "agent"): boolean {
     return true; // Allowed in all modes
-  }
+  },
 
   async execute(
     input: ReadFileInput,
@@ -63,8 +63,8 @@ export class ReadFileTool implements Tool<ReadFileInput, string> {
         },
       };
     }
-  }
-}
+  },
+};
 
 // WriteFile Tool
 const WriteFileSchema = z.object({
@@ -75,18 +75,18 @@ const WriteFileSchema = z.object({
 
 type WriteFileInput = z.infer<typeof WriteFileSchema>;
 
-export class WriteFileTool implements Tool<WriteFileInput, void> {
-  name = "WriteFile";
-  description = "Write content to a file";
-  schema = WriteFileSchema;
+export const WriteFileTool: Tool<WriteFileInput, void> = {
+  name: "WriteFile",
+  description: "Write content to a file",
+  schema: WriteFileSchema,
 
   allowedInMode(mode: "ask" | "plan" | "agent"): boolean {
     return mode === "agent"; // Only in agent mode
-  }
+  },
 
   requiresApproval(): boolean {
     return true;
-  }
+  },
 
   async execute(
     input: WriteFileInput,
@@ -129,8 +129,8 @@ export class WriteFileTool implements Tool<WriteFileInput, void> {
         },
       };
     }
-  }
-}
+  },
+};
 
 // ListDirectory Tool
 const ListDirectorySchema = z.object({
@@ -146,17 +146,14 @@ interface FileEntry {
   size?: number;
 }
 
-export class ListDirectoryTool implements Tool<
-  ListDirectoryInput,
-  FileEntry[]
-> {
-  name = "ListDirectory";
-  description = "List files and directories in a directory";
-  schema = ListDirectorySchema;
+export const ListDirectoryTool: Tool<ListDirectoryInput, FileEntry[]> = {
+  name: "ListDirectory",
+  description: "List files and directories in a directory",
+  schema: ListDirectorySchema,
 
   allowedInMode(_mode: "ask" | "plan" | "agent"): boolean {
     return true;
-  }
+  },
 
   async execute(
     input: ListDirectoryInput,
@@ -196,5 +193,5 @@ export class ListDirectoryTool implements Tool<
         },
       };
     }
-  }
-}
+  },
+};

@@ -32,7 +32,7 @@ Examples:
 
   schema: RunCommandInputSchema,
 
-  async execute(input: RunCommandInput, context: ToolContext): Promise<ToolResult<string>> {
+  async execute(input: RunCommandInput, _context: ToolContext): Promise<ToolResult<string>> {
     const commandRunner = getCommandRunner();
 
     const validation = commandRunner.validateCommand(input.command);
@@ -64,7 +64,8 @@ Examples:
         data: result.stdout,
         metadata: {
           duration: result.duration,
-          exitCode: result.exitCode,
+          approved: true,
+          timestamp: Date.now(),
         },
       };
     } catch (error) {

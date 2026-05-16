@@ -18,7 +18,7 @@ export interface ContextBuildOptions {
 
 export class ContextBuilder {
   constructor(
-    private indexer: WorkspaceIndexer,
+    _indexer: WorkspaceIndexer,
     private ranker: HeuristicRanker
   ) {}
 

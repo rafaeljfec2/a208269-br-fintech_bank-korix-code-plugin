@@ -85,7 +85,7 @@ export class WorkspaceIndexer {
     }
   }
 
-  private async extractSymbols(uri: vscode.Uri, document: vscode.TextDocument): Promise<void> {
+  private async extractSymbols(uri: vscode.Uri, _document: vscode.TextDocument): Promise<void> {
     try {
       const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
         'vscode.executeDocumentSymbolProvider',
@@ -142,6 +142,10 @@ export class WorkspaceIndexer {
       let match;
       while ((match = regex.exec(text)) !== null) {
         const importPath = match[1];
+        if (!importPath) {
+          continue;
+        }
+
         const isExternal = !importPath.startsWith('.') && !importPath.startsWith('/');
 
         this.index.imports.push({

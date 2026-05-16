@@ -86,13 +86,10 @@ export class HeuristicRanker {
 
   private async scoreDirectImports(scores: Map<string, { score: number; reasons: string[] }>, file: string): Promise<void> {
     const imports = this.indexer.getImports(file);
-    const workspaceFolders = vscode.workspace.workspaceFolders;
 
-    if (!workspaceFolders || imports.length === 0) {
+    if (imports.length === 0) {
       return;
     }
-
-    const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
     for (const imp of imports) {
       if (imp.isExternal) {
