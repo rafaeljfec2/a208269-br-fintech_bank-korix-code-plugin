@@ -22,6 +22,23 @@ const extensionConfig = {
   metafile: production,
 };
 
+/**
+ * CRITICAL: CSS HANDLING RULES
+ *
+ * ❌ DO NOT add '.css': 'css' to the loader below
+ * ❌ DO NOT add external: ['*.css']
+ * ❌ DO NOT process CSS with esbuild in ANY way
+ *
+ * WHY: CSS is handled EXCLUSIVELY by Tailwind CLI (build:css).
+ * Adding CSS processing here will corrupt dist/webview.css.
+ *
+ * WORKFLOW:
+ * 1. Tailwind CLI: src/webview/main.css → dist/webview.css (17KB)
+ * 2. esbuild: src/webview/index.tsx → dist/webview.js (JS ONLY)
+ * 3. HTML loads CSS via <link> tag
+ *
+ * VALIDATION: scripts/validate-css.js runs after build
+ */
 const webviewConfig = {
   bundle: true,
   minify: production,
@@ -36,7 +53,7 @@ const webviewConfig = {
   loader: {
     '.tsx': 'tsx',
     '.ts': 'ts',
-    '.css': 'css',
+    // NO CSS LOADER - handled by Tailwind CLI
     '.svg': 'dataurl',
   },
   metafile: production,

@@ -31,11 +31,16 @@ export interface TerminalSessionCreatedPayload {
   readonly shellPath: string;
 }
 
+export interface ModeChangedPayload {
+  readonly mode: 'ask' | 'plan' | 'agent';
+}
+
 export type ExtensionToWebviewMessage =
   | { readonly type: 'init'; readonly payload: InitPayload }
   | { readonly type: 'runtime_event'; readonly payload: RuntimeEventPayload }
   | { readonly type: 'terminal_output'; readonly payload: TerminalOutputPayload }
-  | { readonly type: 'terminal_session_created'; readonly payload: TerminalSessionCreatedPayload };
+  | { readonly type: 'terminal_session_created'; readonly payload: TerminalSessionCreatedPayload }
+  | { readonly type: 'mode_changed'; readonly payload: ModeChangedPayload };
 
 // ============================================================
 // Webview → Extension Messages

@@ -167,7 +167,8 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "build:css": "tailwindcss -i src/webview/main.css -o dist/webview.css --minify",
-    "compile": "npm run build:css && node esbuild.config.js --production",
+    "validate:css": "node scripts/validate-css.js",
+    "compile": "npm run build:css && node esbuild.config.js --production && npm run validate:css",
     "watch": "node esbuild.config.js --watch",
     "pretest": "npm run compile",
     "test": "vitest run",

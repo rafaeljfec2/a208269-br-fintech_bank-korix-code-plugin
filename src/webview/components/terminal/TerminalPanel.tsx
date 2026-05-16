@@ -7,7 +7,6 @@ import React, { useEffect, useRef } from 'react';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebglAddon } from 'xterm-addon-webgl';
-import 'xterm/css/xterm.css';
 import { useStore } from '../../store';
 import { useVSCode } from '../../hooks/useVSCode';
 

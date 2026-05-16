@@ -38,6 +38,7 @@ export const TOKENS = {
   // Runtime
   RuntimeEventEmitter: Symbol('RuntimeEventEmitter'),
   RuntimeMetrics: Symbol('RuntimeMetrics'),
+  RuntimeStateManager: Symbol('RuntimeStateManager'),
   CheckpointManager: Symbol('CheckpointManager'),
   RecoveryManager: Symbol('RecoveryManager'),
   IterationGuard: Symbol('IterationGuard'),

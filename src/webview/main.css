@@ -1,3 +1,24 @@
+/**
+ * CRITICAL CSS BUILD FILE - DO NOT MODIFY WITHOUT UNDERSTANDING
+ *
+ * This file is processed by Tailwind CLI (build:css) and generates dist/webview.css.
+ *
+ * WORKFLOW (DO NOT BREAK):
+ * 1. Tailwind CLI processes this file → dist/webview.css (17KB with Tailwind + xterm)
+ * 2. esbuild processes ONLY JS → dist/webview.js (NO CSS processing)
+ * 3. HTML loads dist/webview.css via <link> tag
+ *
+ * RULES:
+ * - ✅ @import CSS libraries HERE (like xterm below)
+ * - ❌ NEVER import CSS in React components (.tsx files)
+ * - ❌ NEVER add CSS loader to esbuild.config.js
+ * - ✅ Validate with: pnpm run validate:css
+ *
+ * PROTECTION: scripts/validate-css.js runs after every build
+ */
+
+@import 'xterm/css/xterm.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

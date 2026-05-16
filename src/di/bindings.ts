@@ -22,6 +22,7 @@ import { ProviderRegistry } from '../providers/registry';
 import { ProviderConfigManager } from '../providers/config';
 import { RuntimeEventEmitter } from '../core/runtime/runtimeEvents';
 import { RuntimeMetrics } from '../core/runtime/runtimeMetrics';
+import { RuntimeStateManager } from '../core/runtime/runtimeStateManager';
 import { CheckpointManager } from '../core/runtime/checkpoints';
 import { RecoveryManager } from '../core/runtime/recovery';
 import { IterationGuard } from '../core/runtime/iterationGuard';
@@ -104,6 +105,8 @@ export function configureContainer(
 
   // Runtime services
   container.bindSingleton(TOKENS.RuntimeEventEmitter, () => new RuntimeEventEmitter());
+
+  container.bindSingleton(TOKENS.RuntimeStateManager, () => new RuntimeStateManager());
 
   container.bindSingleton(TOKENS.CheckpointManager, (c) => {
     const logger = c.get<Logger>(TOKENS.Logger);
