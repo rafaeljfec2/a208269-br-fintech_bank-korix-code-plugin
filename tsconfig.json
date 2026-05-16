@@ -49,6 +49,7 @@
     "dist",
     "out",
     "webview",
+    "src/webview",
     "**/*.test.ts",
     "**/*.spec.ts"
   ]

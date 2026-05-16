@@ -6,7 +6,7 @@
  * Executes: Tools sequentially with permission checking
  */
 
-import type { AIProvider, StreamChunk } from '../../providers/types';
+import type { AIProvider, ProviderEvent, RequestContext } from '../providers/types';
 import type { ToolRegistry } from '../../harness/toolRegistry';
 import type { PermissionManager } from '../../harness/permissions';
 import type { Logger } from '../../telemetry/logger';
@@ -56,18 +56,29 @@ export class ExecutionEngine {
       const conversation = state.getConversation();
       const tools = this.toolRegistry.toProviderDefinitions();
 
-      // Stream from provider
-      const stream = this.provider.send({
-        messages: [...conversation.messages], // Copy readonly array
-        tools,
-        maxTokens: 4096,
-      });
+      // Build request context
+      const context: RequestContext = {
+        correlationId: crypto.randomUUID(),
+        sessionId: crypto.randomUUID(), // TODO: Get from DI container session manager
+        agentRunId: crypto.randomUUID(),
+        iterationId: state.getExecution().currentIteration,
+      };
 
-      // Process stream chunks
-      for await (const chunk of stream) {
+      // Stream from provider
+      const stream = this.provider.send(
+        {
+          messages: [...conversation.messages], // Copy readonly array
+          tools,
+          maxTokens: 4096,
+        },
+        context,
+      );
+
+      // Process stream events
+      for await (const event of stream) {
         this.cancellationManager.checkCancellation();
-        
-        await this.processChunk(chunk, state, result);
+
+        await this.processEvent(event, state, result);
       }
 
       // Add assistant message if text was generated
@@ -94,60 +105,70 @@ export class ExecutionEngine {
     }
   }
 
-  private async processChunk(
-    chunk: StreamChunk,
+  private async processEvent(
+    event: ProviderEvent,
     _state: RuntimeState,
     result: StepResult,
   ): Promise<void> {
-    switch (chunk.type) {
-      case 'text':
-        this.currentTextBuffer += chunk.content;
+    switch (event.type) {
+      case 'token':
+        this.currentTextBuffer += event.value;
         this.metrics.recordToken();
         result.tokenCount++;
         this.eventEmitter.emitEvent({
           type: 'token',
-          content: chunk.content,
+          content: event.value,
           timestamp: Date.now(),
         });
         break;
 
       case 'thinking':
-        this.currentThinkingBuffer += chunk.content;
+        this.currentThinkingBuffer += event.value;
         result.hadThinking = true;
         this.eventEmitter.emitEvent({
           type: 'thinking',
-          content: chunk.content,
+          content: event.value,
           timestamp: Date.now(),
         });
         break;
 
-      case 'tool_use':
+      case 'tool_call_complete':
         this.pendingToolCalls.push({
-          id: chunk.id,
-          name: chunk.name,
-          input: chunk.input,
+          id: event.id,
+          name: event.name,
+          input: JSON.parse(event.arguments),
         });
         this.eventEmitter.emitEvent({
           type: 'tool_call',
-          id: chunk.id,
-          name: chunk.name,
-          input: chunk.input,
+          id: event.id,
+          name: event.name,
+          input: JSON.parse(event.arguments),
           timestamp: Date.now(),
         });
         break;
 
-      case 'done':
-        result.stopReason = chunk.stopReason as 'end_turn' | 'max_tokens' | 'stop_sequence' | undefined;
+      case 'usage':
+        // Usage events are tracked internally but not emitted to RuntimeEventEmitter
+        // Metrics are recorded in the final metadata
+        break;
+
+      case 'finish':
+        result.stopReason = event.reason as 'end_turn' | 'max_tokens' | 'stop_sequence' | undefined;
         this.eventEmitter.emitEvent({
           type: 'done',
-          stopReason: chunk.stopReason,
-          usage: chunk.usage,
+          stopReason: event.reason,
+          usage: undefined,
           timestamp: Date.now(),
         });
         break;
 
       case 'error':
-        throw new Error(chunk.error);
+        throw event.error;
+
+      case 'tool_call_delta':
+        // LiteLLMNormalizer already assembles deltas into tool_call_complete
+        // This case is here for completeness but should not be reached
+        break;
     }
   }
 

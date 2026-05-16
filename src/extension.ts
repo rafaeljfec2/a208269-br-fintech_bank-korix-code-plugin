@@ -3,7 +3,7 @@ import type { Mode } from "./core/types";
 import { globalRegistry } from "./providers/registry";
 import { ProviderConfigManager } from "./providers/config";
 import type { AIProvider } from "./providers/types";
-import { KorixSidebarProvider } from "./ui/sidebar/sidebarProvider";
+import { KorixWebviewProvider } from "./ui/providers/webviewProvider";
 import { TimelineProvider } from "./ui/timeline/timelineProvider";
 import type { Logger } from "./telemetry/logger";
 import type { ContextEngine } from "./context/contextEngine";
@@ -18,7 +18,7 @@ let currentMode: Mode = "ask";
 let statusBarItem: vscode.StatusBarItem;
 let configManager: ProviderConfigManager;
 let activeProvider: AIProvider | null = null;
-let sidebarProvider: KorixSidebarProvider;
+let webviewProvider: KorixWebviewProvider;
 let timelineProvider: TimelineProvider;
 
 export function activate(context: vscode.ExtensionContext) {
@@ -52,13 +52,13 @@ export function activate(context: vscode.ExtensionContext) {
   registerAllTools();
 
   // Register UI providers
-  sidebarProvider = new KorixSidebarProvider(context.extensionUri);
+  webviewProvider = new KorixWebviewProvider(context.extensionUri, container);
   timelineProvider = new TimelineProvider();
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
-      KorixSidebarProvider.viewType,
-      sidebarProvider,
+      KorixWebviewProvider.viewType,
+      webviewProvider,
     ),
   );
 
