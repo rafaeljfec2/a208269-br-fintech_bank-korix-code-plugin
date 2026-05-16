@@ -15,7 +15,7 @@ interface PendingApproval {
 
 export default function ToolApprovalModal() {
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
-  const vscode = useVSCode();
+  const { sendMessage } = useVSCode();
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -49,7 +49,7 @@ export default function ToolApprovalModal() {
   const handleApprove = (approval: 'once' | 'always') => {
     if (!pendingApproval) return;
 
-    vscode.postMessage({
+    sendMessage({
       type: 'approve_tool',
       payload: {
         toolCallId: pendingApproval.id,
@@ -63,7 +63,7 @@ export default function ToolApprovalModal() {
   const handleReject = () => {
     if (!pendingApproval) return;
 
-    vscode.postMessage({
+    sendMessage({
       type: 'approve_tool',
       payload: {
         toolCallId: pendingApproval.id,

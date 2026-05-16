@@ -20,7 +20,7 @@ export default function TerminalPanel() {
   const activeSessionId = useStore((state) => state.activeSessionId);
   const createSession = useStore((state) => state.createSession);
 
-  const vscode = useVSCode();
+  const { sendMessage } = useVSCode();
 
   const activeSession = activeSessionId ? sessions[activeSessionId] : null;
 
@@ -60,7 +60,7 @@ export default function TerminalPanel() {
     // Listen to user input
     term.onData((data: string) => {
       if (activeSessionId) {
-        vscode.postMessage({
+        sendMessage({
           type: 'terminal_input',
           payload: { sessionId: activeSessionId, data },
         });
@@ -80,7 +80,7 @@ export default function TerminalPanel() {
       window.removeEventListener('resize', handleResize);
       term.dispose();
     };
-  }, [activeSessionId, vscode]);
+  }, [activeSessionId, sendMessage]);
 
   // Write output to terminal
   useEffect(() => {
@@ -93,7 +93,7 @@ export default function TerminalPanel() {
 
   // Handle new terminal creation
   const handleCreateTerminal = () => {
-    vscode.postMessage({
+    sendMessage({
       type: 'create_terminal',
       payload: { shellPath: undefined },
     });

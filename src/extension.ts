@@ -4,7 +4,6 @@ import { globalRegistry } from "./providers/registry";
 import { ProviderConfigManager } from "./providers/config";
 import type { AIProvider } from "./providers/types";
 import { KorixWebviewProvider } from "./ui/providers/webviewProvider";
-import { TimelineProvider } from "./ui/timeline/timelineProvider";
 import type { Logger } from "./telemetry/logger";
 import type { ContextEngine } from "./context/contextEngine";
 import type { TerminalSessionManager } from "./terminal/session";
@@ -19,7 +18,6 @@ let statusBarItem: vscode.StatusBarItem;
 let configManager: ProviderConfigManager;
 let activeProvider: AIProvider | null = null;
 let webviewProvider: KorixWebviewProvider;
-let timelineProvider: TimelineProvider;
 
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("Korix Code");
@@ -53,19 +51,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register UI providers
   webviewProvider = new KorixWebviewProvider(context.extensionUri, container);
-  timelineProvider = new TimelineProvider();
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       KorixWebviewProvider.viewType,
       webviewProvider,
-    ),
-  );
-
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider(
-      "korix.timelineView",
-      timelineProvider,
     ),
   );
 

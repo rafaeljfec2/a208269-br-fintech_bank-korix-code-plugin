@@ -15,7 +15,7 @@ interface Checkpoint {
 
 export default function CheckpointList() {
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
-  const vscode = useVSCode();
+  const { sendMessage } = useVSCode();
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -48,7 +48,7 @@ export default function CheckpointList() {
   }, []);
 
   const handleRestore = (checkpointId: string) => {
-    vscode.postMessage({
+    sendMessage({
       type: 'restore_checkpoint',
       payload: { checkpointId },
     });
