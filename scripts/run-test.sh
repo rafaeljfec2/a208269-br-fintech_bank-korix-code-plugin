@@ -28,4 +28,4 @@ echo "   ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:0:10}...${ANTHROPIC_AUTH_T
 echo ""
 
 # Executa o teste
-pnpm tsx test-litellm.ts
+pnpm tsx scripts/test-litellm.ts
