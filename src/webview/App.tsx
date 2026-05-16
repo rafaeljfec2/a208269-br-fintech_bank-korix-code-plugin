@@ -9,6 +9,7 @@ import TopBar from './components/layout/TopBar';
 import BottomBar from './components/layout/BottomBar';
 import SidebarDrawer from './components/layout/SidebarDrawer';
 import MainPanel from './components/layout/MainPanel';
+import ToolApprovalModal from './components/tools/ToolApprovalModal';
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -31,6 +32,9 @@ export default function App() {
 
       {/* Sidebar Drawer (hidden by default) */}
       <SidebarDrawer isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
+
+      {/* Tool Approval Modal - Renders conditionally when approval is needed */}
+      <ToolApprovalModal />
     </div>
   );
 }

@@ -3,8 +3,10 @@
  * Cursor-inspired left panel
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../store';
+import RuntimeInspector from '../runtime/RuntimeInspector';
+import CheckpointList from '../checkpoints/CheckpointList';
 
 interface Session {
   id: string;
@@ -21,6 +23,7 @@ const mockSessions: Session[] = [
 ];
 
 export default function Sidebar() {
+  const [expandedSection, setExpandedSection] = useState<'inspector' | 'checkpoints' | null>(null);
   const mode = useStore((state) => state.mode);
   const setMode = useStore((state) => state.setMode);
 
@@ -135,6 +138,50 @@ export default function Sidebar() {
                 <span>{tool}</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* Runtime Section */}
+        <div className="px-4 py-4 border-t border-[var(--vscode-panel-border)]">
+          <div className="text-xs font-semibold opacity-60 mb-3">RUNTIME</div>
+          <div className="space-y-2">
+            {/* Inspector */}
+            <div>
+              <button
+                onClick={() =>
+                  setExpandedSection(expandedSection === 'inspector' ? null : 'inspector')
+                }
+                className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--vscode-list-hoverBackground)] rounded text-sm"
+              >
+                <span>Inspector</span>
+                <span>{expandedSection === 'inspector' ? '▼' : '▶'}</span>
+              </button>
+              {expandedSection === 'inspector' && (
+                <div className="mt-2">
+                  <RuntimeInspector />
+                </div>
+              )}
+            </div>
+
+            {/* Checkpoints */}
+            <div>
+              <button
+                onClick={() =>
+                  setExpandedSection(
+                    expandedSection === 'checkpoints' ? null : 'checkpoints',
+                  )
+                }
+                className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--vscode-list-hoverBackground)] rounded text-sm"
+              >
+                <span>Checkpoints</span>
+                <span>{expandedSection === 'checkpoints' ? '▼' : '▶'}</span>
+              </button>
+              {expandedSection === 'checkpoints' && (
+                <div className="mt-2 max-h-60 overflow-y-auto">
+                  <CheckpointList />
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
