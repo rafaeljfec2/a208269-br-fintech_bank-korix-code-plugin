@@ -12,6 +12,8 @@ import type {
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
   InitPayload,
+  SaveSettingsPayload,
+  TestConnectionPayload,
 } from '../../shared/protocol';
 import { TOKENS } from '../../di/tokens';
 import type { Logger } from '../../telemetry/logger';
@@ -178,6 +180,18 @@ export class MessageHandler {
         await this.handleRestoreCheckpoint(message.payload.checkpointId);
         break;
 
+      case 'load_settings':
+        await this.handleLoadSettings();
+        break;
+
+      case 'save_settings':
+        await this.handleSaveSettings(message.payload);
+        break;
+
+      case 'test_connection':
+        await this.handleTestConnection(message.payload);
+        break;
+
       default:
         this.logger.warn('Unknown message type from webview', { message });
     }
@@ -312,6 +326,186 @@ export class MessageHandler {
    */
   private async handleRestoreCheckpoint(checkpointId: string): Promise<void> {
     await this.checkpointHandler.handleRestoreCheckpoint(checkpointId);
+  }
+
+  /**
+   * Load current settings and send to webview
+   */
+  private async handleLoadSettings(): Promise<void> {
+    try {
+      const providerType = vscode.workspace
+        .getConfiguration('korix')
+        .get<'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm'>(
+          'provider',
+          'anthropic',
+        );
+
+      const config = await this.configManager.getConfig(providerType);
+      const maxTokens = vscode.workspace.getConfiguration('korix').get<number>('maxTokens', 4096);
+      const temperature = vscode.workspace
+        .getConfiguration('korix')
+        .get<number>('temperature', 0.7);
+
+      // Check if API key exists (don't send the key itself)
+      const hasApiKey = !!(await this.configManager.getApiKey(providerType));
+
+      const message: ExtensionToWebviewMessage = {
+        type: 'settings_loaded',
+        payload: {
+          provider: providerType,
+          model: config?.model ?? 'claude-sonnet-4-6',
+          baseUrl: config?.baseUrl,
+          maxTokens,
+          temperature,
+          hasApiKey,
+        },
+      };
+
+      await this.webview.postMessage(message);
+      this.logger.info('Settings loaded and sent to webview');
+    } catch (error) {
+      this.logger.error('Failed to load settings', error);
+    }
+  }
+
+  /**
+   * Save settings to workspace config and secrets
+   */
+  private async handleSaveSettings(payload: SaveSettingsPayload): Promise<void> {
+    try {
+      const config = vscode.workspace.getConfiguration('korix');
+
+      // Determinar target: Workspace se aberto, senão Global
+      const configTarget = vscode.workspace.workspaceFolders
+        ? vscode.ConfigurationTarget.Workspace
+        : vscode.ConfigurationTarget.Global;
+
+      // Save provider selection
+      await config.update('provider', payload.provider, configTarget);
+
+      // Save API key to secrets (if provided)
+      if (payload.apiKey) {
+        await this.configManager.setApiKey(payload.provider, payload.apiKey);
+      }
+
+      // Save model
+      if (payload.model) {
+        await config.update(
+          `${payload.provider}.model`,
+          payload.model,
+          configTarget,
+        );
+      }
+
+      // Save baseUrl (if provided)
+      if (payload.baseUrl !== undefined) {
+        await config.update(
+          `${payload.provider}.baseUrl`,
+          payload.baseUrl,
+          configTarget,
+        );
+      }
+
+      // Save advanced settings
+      if (payload.maxTokens !== undefined) {
+        await config.update('maxTokens', payload.maxTokens, configTarget);
+      }
+
+      if (payload.temperature !== undefined) {
+        await config.update(
+          'temperature',
+          payload.temperature,
+          configTarget,
+        );
+      }
+
+      // Notify success
+      const message: ExtensionToWebviewMessage = {
+        type: 'settings_saved',
+        payload: { success: true, message: 'Settings saved successfully' },
+      };
+
+      await this.webview.postMessage(message);
+      this.logger.info('Settings saved successfully', { provider: payload.provider });
+    } catch (error) {
+      this.logger.error('Failed to save settings', error);
+      const message: ExtensionToWebviewMessage = {
+        type: 'settings_saved',
+        payload: {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to save settings',
+        },
+      };
+      await this.webview.postMessage(message);
+    }
+  }
+
+  /**
+   * Test connection to provider
+   */
+  private async handleTestConnection(payload: TestConnectionPayload): Promise<void> {
+    try {
+      this.logger.info('Testing connection', { provider: payload.provider });
+
+      // Create temporary config for testing
+      const tempConfig = {
+        type: payload.provider as 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm',
+        apiKey: payload.apiKey,
+        baseUrl: payload.baseUrl,
+        model: 'test-model', // Placeholder for connection test
+      };
+
+      // Create provider instance
+      const provider = await this.agentLoopFactory.createProvider(tempConfig);
+
+      // Simple test: send a minimal message
+      const testPrompt = 'Hi';
+      let responseReceived = false;
+
+      const input = {
+        messages: [
+          { role: 'user' as const, content: testPrompt, timestamp: Date.now() },
+        ],
+      };
+
+      const context = {
+        correlationId: crypto.randomUUID(),
+        sessionId: this.stateManager.getSessionId() ?? crypto.randomUUID(),
+      };
+
+      const stream = provider.send(input, context);
+
+      // Check if we get any response
+      for await (const event of stream) {
+        if (event.type === 'token' || event.type === 'thinking') {
+          responseReceived = true;
+          break; // Connection successful, stop streaming
+        }
+      }
+
+      const message: ExtensionToWebviewMessage = {
+        type: 'connection_test_result',
+        payload: {
+          success: responseReceived,
+          message: responseReceived
+            ? 'Connection successful!'
+            : 'No response received from provider',
+        },
+      };
+
+      await this.webview.postMessage(message);
+      this.logger.info('Connection test completed', { success: responseReceived });
+    } catch (error) {
+      this.logger.error('Connection test failed', error);
+      const message: ExtensionToWebviewMessage = {
+        type: 'connection_test_result',
+        payload: {
+          success: false,
+          message: error instanceof Error ? error.message : 'Connection test failed',
+        },
+      };
+      await this.webview.postMessage(message);
+    }
   }
 
   /**

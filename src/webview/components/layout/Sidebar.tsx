@@ -26,6 +26,7 @@ export default function Sidebar() {
   const [expandedSection, setExpandedSection] = useState<'inspector' | 'checkpoints' | null>(null);
   const mode = useStore((state) => state.mode);
   const setMode = useStore((state) => state.setMode);
+  const setActiveTab = useStore((state) => state.setActiveTab);
 
   return (
     <div className="h-full w-full bg-[var(--vscode-sideBar-background)] border-r border-[var(--vscode-panel-border)] flex flex-col overflow-hidden">
@@ -188,7 +189,13 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="border-t border-[var(--vscode-panel-border)] p-4">
-        <button className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--vscode-list-hoverBackground)] rounded text-sm">
+        <button
+          onClick={() => {
+            console.log('[Sidebar] Settings button clicked, changing tab to settings');
+            setActiveTab('settings');
+          }}
+          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[var(--vscode-list-hoverBackground)] rounded text-sm"
+        >
           <span>⚙️</span>
           <span>Settings</span>
         </button>

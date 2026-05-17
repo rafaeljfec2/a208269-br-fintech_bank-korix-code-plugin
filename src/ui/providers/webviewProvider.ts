@@ -48,6 +48,9 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {
+    // Add timestamp to force cache invalidation
+    const timestamp = Date.now();
+
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview.js'),
     );
@@ -90,11 +93,11 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
 <body>
   <div id="root"></div>
   <script nonce="${nonce}">
-    console.log('Webview loading...');
-    console.log('Script URI:', '${scriptUri.toString()}');
-    console.log('Style URI:', '${styleUri.toString()}');
+    console.log('Webview loading... (v${timestamp})');
+    console.log('Script URI:', '${scriptUri.toString()}?v=${timestamp}');
+    console.log('Style URI:', '${styleUri.toString()}?v=${timestamp}');
   </script>
-  <script nonce="${nonce}" src="${scriptUri.toString()}"></script>
+  <script nonce="${nonce}" src="${scriptUri.toString()}?v=${timestamp}"></script>
   <script nonce="${nonce}">
     window.addEventListener('error', (e) => {
       console.error('Webview error:', e.error);

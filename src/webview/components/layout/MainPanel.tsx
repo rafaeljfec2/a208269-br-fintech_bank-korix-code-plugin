@@ -3,15 +3,15 @@
  * Main content area with tabs
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useStore } from '../../store';
 import trIcon from '../../assets/tr-icon.svg';
 import TerminalPanel from '../terminal/TerminalPanel';
-
-type Tab = 'chat' | 'timeline' | 'terminal';
+import SettingsPanel from '../settings/SettingsPanel';
 
 export default function MainPanel() {
-  const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const activeTab = useStore((state) => state.activeTab);
+  const setActiveTab = useStore((state) => state.setActiveTab);
 
   const messages = useStore((state) => state.messages);
   const streamingContent = useStore((state) => state.streamingContent);
@@ -20,11 +20,22 @@ export default function MainPanel() {
   const isExecuting = useStore((state) => state.isExecuting);
 
   const hasContent = messages.length > 0 || isStreaming;
+  const shouldShowTabs = hasContent || activeTab === 'settings' || activeTab === 'terminal';
+
+  // Debug: log estado
+  React.useEffect(() => {
+    console.log('[MainPanel] State:', {
+      activeTab,
+      hasContent,
+      messagesCount: messages.length,
+      shouldShowTabs,
+    });
+  }, [activeTab, hasContent, messages.length, shouldShowTabs]);
 
   return (
     <div className="h-full w-full flex flex-col bg-[var(--vscode-editor-background)]">
-      {/* Tabs - Show only when there's content */}
-      {hasContent && (
+      {/* Tabs - Show when there's content, or when terminal/settings is active */}
+      {shouldShowTabs && (
         <div className="flex items-center gap-1 px-4 border-b border-[var(--vscode-panel-border)]">
           <TabButton
             label="Chat"
@@ -41,6 +52,11 @@ export default function MainPanel() {
             label="Terminal"
             active={activeTab === 'terminal'}
             onClick={() => setActiveTab('terminal')}
+          />
+          <TabButton
+            label="Settings"
+            active={activeTab === 'settings'}
+            onClick={() => setActiveTab('settings')}
           />
         </div>
       )}
@@ -149,11 +165,17 @@ export default function MainPanel() {
 
           {/* Terminal Tab */}
           {activeTab === 'terminal' && <TerminalPanel />}
+
+          {/* Settings Tab */}
+          {activeTab === 'settings' && <SettingsPanel />}
         </>
       )}
 
       {/* Terminal Tab - Always accessible even without messages */}
       {!hasContent && activeTab === 'terminal' && <TerminalPanel />}
+
+      {/* Settings Tab - Always accessible */}
+      {!hasContent && activeTab === 'settings' && <SettingsPanel />}
     </div>
   );
 }

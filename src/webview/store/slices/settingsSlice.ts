@@ -5,17 +5,21 @@
 import type { StateCreator } from 'zustand';
 import type { Mode } from '../../../core/types';
 
+export type ActiveTab = 'chat' | 'timeline' | 'terminal' | 'settings';
+
 export interface SettingsSlice {
   readonly mode: Mode;
   readonly model: string;
   readonly provider: string;
   readonly sessionId: string;
+  readonly activeTab: ActiveTab;
 
   // Actions
   readonly setMode: (mode: Mode) => void;
   readonly setModel: (model: string) => void;
   readonly setProvider: (provider: string) => void;
   readonly setSessionId: (sessionId: string) => void;
+  readonly setActiveTab: (tab: ActiveTab) => void;
 }
 
 export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
@@ -23,6 +27,7 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
   model: 'claude-sonnet-4-6',
   provider: 'anthropic',
   sessionId: '',
+  activeTab: 'chat',
 
   setMode: (mode) =>
     set(() => ({
@@ -43,4 +48,12 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
     set(() => ({
       sessionId,
     })),
+
+  setActiveTab: (tab) => {
+    console.log('[SettingsSlice] setActiveTab called with:', tab);
+    set(() => ({
+      activeTab: tab,
+    }));
+    console.log('[SettingsSlice] activeTab updated to:', tab);
+  },
 });

@@ -26,3 +26,4 @@ export type { Message } from './slices/chatSlice';
 export type { TimelineItem } from './slices/timelineSlice';
 export type { RuntimeMetrics } from './slices/runtimeSlice';
 export type { TerminalSession } from './slices/terminalSlice';
+export type { ActiveTab } from './slices/settingsSlice';

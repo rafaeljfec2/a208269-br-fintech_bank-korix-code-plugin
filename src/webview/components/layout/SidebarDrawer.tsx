@@ -28,6 +28,7 @@ interface SidebarDrawerProps {
 export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
   const mode = useStore((state) => state.mode);
   const setMode = useStore((state) => state.setMode);
+  const setActiveTab = useStore((state) => state.setActiveTab);
 
   if (!isOpen) return null;
 
@@ -179,7 +180,14 @@ export default function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
 
         {/* Footer */}
         <div className="border-t border-[var(--vscode-panel-border)] px-3 py-2">
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--vscode-list-hoverBackground)] rounded-sm text-xs">
+          <button
+            onClick={() => {
+              console.log('[SidebarDrawer] Settings button clicked, changing tab to settings');
+              setActiveTab('settings');
+              onClose(); // Fecha drawer após clicar
+            }}
+            className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--vscode-list-hoverBackground)] rounded-sm text-xs"
+          >
             <span style={{ fontSize: '14px' }}>⚙️</span>
             <span>Settings</span>
           </button>

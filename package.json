@@ -97,7 +97,8 @@
             "anthropic",
             "openai",
             "ollama",
-            "openrouter"
+            "openrouter",
+            "litellm"
           ],
           "default": "anthropic",
           "description": "LLM provider to use"
@@ -116,6 +117,56 @@
           ],
           "default": "claude-sonnet-4-6",
           "description": "Anthropic model to use"
+        },
+        "korix.litellm.model": {
+          "type": "string",
+          "default": "anthropic/claude-opus-4-7",
+          "description": "LiteLLM model to use (e.g., anthropic/claude-opus-4-7)"
+        },
+        "korix.litellm.baseUrl": {
+          "type": "string",
+          "default": "https://litellm.int.thomsonreuters.com",
+          "description": "LiteLLM base URL"
+        },
+        "korix.openai.model": {
+          "type": "string",
+          "default": "gpt-4-turbo",
+          "description": "OpenAI model to use"
+        },
+        "korix.openai.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI base URL (optional, for custom endpoints)"
+        },
+        "korix.ollama.model": {
+          "type": "string",
+          "default": "llama3.2",
+          "description": "Ollama model to use"
+        },
+        "korix.ollama.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama base URL"
+        },
+        "korix.openrouter.model": {
+          "type": "string",
+          "default": "anthropic/claude-opus-4-7",
+          "description": "OpenRouter model to use"
+        },
+        "korix.openrouter.baseUrl": {
+          "type": "string",
+          "default": "https://openrouter.ai/api/v1",
+          "description": "OpenRouter base URL"
+        },
+        "korix.maxTokens": {
+          "type": "number",
+          "default": 4096,
+          "description": "Maximum tokens per request"
+        },
+        "korix.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "description": "Temperature for model responses (0-1)"
         },
         "korix.maxIterations": {
           "type": "number",
