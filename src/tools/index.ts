@@ -2,22 +2,26 @@
  * Tool registration - register all available tools
  */
 
-import { globalToolRegistry, type Tool } from '../harness/toolRegistry';
-import { ReadFileTool, WriteFileTool, ListDirectoryTool } from './filesystem';
-import { RunCommandTool } from './terminal';
-import { EditFileTool } from './edit';
-import { GitStatusTool } from './git/gitStatus';
-import { GitDiffTool } from './git/gitDiff';
-import { ChangedFilesTool } from './git/changedFiles';
-import { GrepTool } from './search/grep';
-import { FindReferencesTool } from './search/findReferences';
-import { FindSymbolsTool } from './search/findSymbols';
-import { FileChunksTool } from './filesystem/fileChunks';
-import { SearchFilesTool } from './filesystem/searchFiles';
-import { ProblemsTool } from './diagnostics/problems';
-import { WorkspaceGraphTool } from './workspace/workspaceGraph';
-import { GetDiagnosticsTool, GetOpenFilesTool, GetCurrentFileTool } from './workspace';
-import { getLogger } from '../telemetry/logger';
+import { globalToolRegistry, type Tool } from "../harness/toolRegistry";
+import { ReadFileTool, WriteFileTool, ListDirectoryTool } from "./filesystem";
+import { RunCommandTool } from "./terminal";
+import { EditFileTool } from "./edit";
+import { GitStatusTool } from "./git/gitStatus";
+import { GitDiffTool } from "./git/gitDiff";
+import { ChangedFilesTool } from "./git/changedFiles";
+import { GrepTool } from "./search/grep";
+import { FindReferencesTool } from "./search/findReferences";
+import { FindSymbolsTool } from "./search/findSymbols";
+import { FileChunksTool } from "./filesystem/fileChunks";
+import { SearchFilesTool } from "./filesystem/searchFiles";
+import { ProblemsTool } from "./diagnostics/problems";
+import { WorkspaceGraphTool } from "./workspace/workspaceGraph";
+import {
+  GetDiagnosticsTool,
+  GetOpenFilesTool,
+  GetCurrentFileTool,
+} from "./workspace";
+import { getLogger } from "../telemetry/logger";
 
 export function registerAllTools(): void {
   const logger = getLogger();
@@ -52,8 +56,8 @@ export function registerAllTools(): void {
 
   for (const tool of tools) {
     globalToolRegistry.register(tool);
-    logger.debug('Tool registered', { name: tool.name });
+    logger.debug("Tool registered", { name: tool.name });
   }
 
-  logger.info('All tools registered', { count: tools.length });
+  logger.info("All tools registered", { count: tools.length });
 }

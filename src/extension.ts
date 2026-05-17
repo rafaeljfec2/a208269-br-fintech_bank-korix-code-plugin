@@ -8,7 +8,11 @@ import type { Logger } from "./telemetry/logger";
 import type { ContextEngine } from "./context/contextEngine";
 import type { TerminalSessionManager } from "./terminal/session";
 import { registerAllTools } from "./tools";
-import { createContainer, setGlobalContainer, getGlobalContainer } from "./di/container";
+import {
+  createContainer,
+  setGlobalContainer,
+  getGlobalContainer,
+} from "./di/container";
 import { configureContainer } from "./di/bindings";
 import { TOKENS } from "./di/tokens";
 
@@ -23,7 +27,8 @@ export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("Korix Code");
 
   // Create and configure DI container
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  const workspaceRoot =
+    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
   const container = createContainer();
   configureContainer(container, context, workspaceRoot);
   setGlobalContainer(container);
@@ -135,7 +140,9 @@ export async function deactivate() {
 
     // Dispose Terminal System
     try {
-      const sessionManager = container.get<TerminalSessionManager>(TOKENS.SessionManager);
+      const sessionManager = container.get<TerminalSessionManager>(
+        TOKENS.SessionManager,
+      );
       sessionManager.dispose();
     } catch {
       // Session manager may not be initialized

@@ -2,38 +2,38 @@
  * DI Bindings configuration
  */
 
-import * as vscode from 'vscode';
-import type { Container } from './container';
-import { TOKENS } from './tokens';
-import { initializeLogger, type Logger } from '../telemetry/logger';
-import { WorkspaceIndexer } from '../context/indexing/workspaceIndexer';
-import { HeuristicRanker } from '../context/ranking/heuristicRanker';
-import { ContextBuilder } from '../context/retrieval/contextBuilder';
-import { ContextEngine } from '../context/contextEngine';
-import { TerminalSessionManager } from '../terminal/session';
-import { CommandRunner } from '../terminal/commandRunner';
-import { PatchParser } from '../patch/parser';
-import { PatchValidator } from '../patch/validation';
-import { RollbackManager } from '../patch/rollback';
-import { PatchApplier } from '../patch/applier';
-import { globalToolRegistry } from '../harness/toolRegistry';
-import { PermissionManager } from '../harness/permissions';
-import { ProviderRegistry } from '../providers/registry';
-import { ProviderConfigManager } from '../providers/config';
-import { RuntimeEventEmitter } from '../core/runtime/runtimeEvents';
-import { RuntimeMetrics } from '../core/runtime/runtimeMetrics';
-import { RuntimeStateManager } from '../core/runtime/runtimeStateManager';
-import { CheckpointManager } from '../core/runtime/checkpoints';
-import { RecoveryManager } from '../core/runtime/recovery';
-import { IterationGuard } from '../core/runtime/iterationGuard';
-import { CancellationManager } from '../core/runtime/cancellation';
-import { TaskQueue } from '../core/runtime/taskQueue';
+import * as vscode from "vscode";
+import type { Container } from "./container";
+import { TOKENS } from "./tokens";
+import { initializeLogger, type Logger } from "../telemetry/logger";
+import { WorkspaceIndexer } from "../context/indexing/workspaceIndexer";
+import { HeuristicRanker } from "../context/ranking/heuristicRanker";
+import { ContextBuilder } from "../context/retrieval/contextBuilder";
+import { ContextEngine } from "../context/contextEngine";
+import { TerminalSessionManager } from "../terminal/session";
+import { CommandRunner } from "../terminal/commandRunner";
+import { PatchParser } from "../patch/parser";
+import { PatchValidator } from "../patch/validation";
+import { RollbackManager } from "../patch/rollback";
+import { PatchApplier } from "../patch/applier";
+import { globalToolRegistry } from "../harness/toolRegistry";
+import { PermissionManager } from "../harness/permissions";
+import { ProviderRegistry } from "../providers/registry";
+import { ProviderConfigManager } from "../providers/config";
+import { RuntimeEventEmitter } from "../core/runtime/runtimeEvents";
+import { RuntimeMetrics } from "../core/runtime/runtimeMetrics";
+import { RuntimeStateManager } from "../core/runtime/runtimeStateManager";
+import { CheckpointManager } from "../core/runtime/checkpoints";
+import { RecoveryManager } from "../core/runtime/recovery";
+import { IterationGuard } from "../core/runtime/iterationGuard";
+import { CancellationManager } from "../core/runtime/cancellation";
+import { TaskQueue } from "../core/runtime/taskQueue";
 // ExecutionEngine and AgentLoop created on-demand, not pre-bound
 
 export function configureContainer(
   container: Container,
   context: vscode.ExtensionContext,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): void {
   // Configuration values
   container.bindValue(TOKENS.ExtensionContext, context);
@@ -41,7 +41,7 @@ export function configureContainer(
 
   // Logger (singleton)
   container.bindSingleton(TOKENS.Logger, () => {
-    const outputChannel = vscode.window.createOutputChannel('Korix Code');
+    const outputChannel = vscode.window.createOutputChannel("Korix Code");
     return initializeLogger({ outputChannel });
   });
 
@@ -49,10 +49,16 @@ export function configureContainer(
   container.bindValue(TOKENS.ToolRegistry, globalToolRegistry);
 
   // Permission Manager (singleton)
-  container.bindSingleton(TOKENS.PermissionManager, () => new PermissionManager());
+  container.bindSingleton(
+    TOKENS.PermissionManager,
+    () => new PermissionManager(),
+  );
 
   // Provider Registry (singleton)
-  container.bindSingleton(TOKENS.ProviderRegistry, () => new ProviderRegistry());
+  container.bindSingleton(
+    TOKENS.ProviderRegistry,
+    () => new ProviderRegistry(),
+  );
 
   // Provider Config Manager (singleton)
   container.bindSingleton(TOKENS.ProviderConfigManager, (c) => {
@@ -61,7 +67,10 @@ export function configureContainer(
   });
 
   // Context services (singletons)
-  container.bindSingleton(TOKENS.WorkspaceIndexer, () => new WorkspaceIndexer());
+  container.bindSingleton(
+    TOKENS.WorkspaceIndexer,
+    () => new WorkspaceIndexer(),
+  );
 
   container.bindSingleton(TOKENS.HeuristicRanker, (c) => {
     const indexer = c.get<WorkspaceIndexer>(TOKENS.WorkspaceIndexer);
@@ -77,7 +86,10 @@ export function configureContainer(
   container.bindSingleton(TOKENS.ContextEngine, () => new ContextEngine());
 
   // Terminal services (singletons)
-  container.bindSingleton(TOKENS.SessionManager, () => new TerminalSessionManager());
+  container.bindSingleton(
+    TOKENS.SessionManager,
+    () => new TerminalSessionManager(),
+  );
   container.bindSingleton(TOKENS.CommandRunner, (c) => {
     const sessionManager = c.get<TerminalSessionManager>(TOKENS.SessionManager);
     const logger = c.get<Logger>(TOKENS.Logger);
@@ -104,9 +116,15 @@ export function configureContainer(
   });
 
   // Runtime services
-  container.bindSingleton(TOKENS.RuntimeEventEmitter, () => new RuntimeEventEmitter());
+  container.bindSingleton(
+    TOKENS.RuntimeEventEmitter,
+    () => new RuntimeEventEmitter(),
+  );
 
-  container.bindSingleton(TOKENS.RuntimeStateManager, () => new RuntimeStateManager());
+  container.bindSingleton(
+    TOKENS.RuntimeStateManager,
+    () => new RuntimeStateManager(),
+  );
 
   container.bindSingleton(TOKENS.CheckpointManager, (c) => {
     const logger = c.get<Logger>(TOKENS.Logger);
@@ -138,7 +156,9 @@ export function configureContainer(
 
   container.bind(TOKENS.RecoveryManager, (c) => {
     const logger = c.get<Logger>(TOKENS.Logger);
-    const checkpointManager = c.get<CheckpointManager>(TOKENS.CheckpointManager);
+    const checkpointManager = c.get<CheckpointManager>(
+      TOKENS.CheckpointManager,
+    );
     const eventEmitter = c.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
     return new RecoveryManager(logger, checkpointManager, eventEmitter);
   });

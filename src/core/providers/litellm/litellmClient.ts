@@ -6,7 +6,10 @@
  */
 
 import type { Transport } from "../transport/httpTransport";
-import type { AnthropicMessagesRequest, AnthropicStreamEvent } from "./litellmTypes";
+import type {
+  AnthropicMessagesRequest,
+  AnthropicStreamEvent,
+} from "./litellmTypes";
 import type { CorrelationContext } from "../types";
 import { SSEParser, parseStreamChunk } from "./litellmParser";
 import { detectBudgetError } from "./litellmErrors";
@@ -124,4 +127,3 @@ export class LiteLLMClient {
     }
   }
 }
-

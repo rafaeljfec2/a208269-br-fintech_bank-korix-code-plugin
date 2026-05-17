@@ -19,16 +19,10 @@ export class TracingTransport implements Transport {
   ): Promise<Response> {
     const headers = {
       ...options.headers,
-      ...(correlation
-        ? this.buildTracingHeaders(correlation)
-        : {}),
+      ...(correlation ? this.buildTracingHeaders(correlation) : {}),
     };
 
-    return this.inner.request(
-      url,
-      { ...options, headers },
-      signal,
-    );
+    return this.inner.request(url, { ...options, headers }, signal);
   }
 
   private buildTracingHeaders(

@@ -5,14 +5,14 @@
  * NO dependencies except core/types.
  */
 
-import type { Message, ExecutionContext } from '../types';
+import type { Message, ExecutionContext } from "../types";
 
 /**
  * Task to be executed by the agent runtime
  */
 export interface Task {
   readonly id: string;
-  readonly type: 'user_request' | 'scheduled' | 'retry';
+  readonly type: "user_request" | "scheduled" | "retry";
   readonly priority: number; // Higher = more urgent
   readonly prompt: string;
   readonly context: ExecutionContext;
@@ -27,7 +27,7 @@ export interface StepResult {
   hadToolCalls: boolean;
   hadThinking: boolean;
   tokenCount: number;
-  stopReason?: 'end_turn' | 'max_tokens' | 'stop_sequence';
+  stopReason?: "end_turn" | "max_tokens" | "stop_sequence";
   error?: string;
   recoverable: boolean;
 }
@@ -93,7 +93,7 @@ export interface RuntimeCheckpoint {
  * Operation executed during runtime
  */
 export interface Operation {
-  readonly type: 'tool_call' | 'file_write' | 'file_edit' | 'command_run';
+  readonly type: "tool_call" | "file_write" | "file_edit" | "command_run";
   readonly toolName?: string;
   readonly toolInput?: unknown;
   readonly filePath?: string;
@@ -173,7 +173,7 @@ export interface WorkspaceStateSnapshot {
 /**
  * Retry strategy types
  */
-export type RetryStrategy = 'exponential' | 'linear' | 'immediate';
+export type RetryStrategy = "exponential" | "linear" | "immediate";
 
 /**
  * Retry configuration
@@ -188,7 +188,7 @@ export interface RetryConfig {
 /**
  * Recovery action types
  */
-export type RecoveryActionType = 'retry' | 'rollback' | 'fail';
+export type RecoveryActionType = "retry" | "rollback" | "fail";
 
 /**
  * Recovery action
@@ -215,6 +215,10 @@ export interface ProgressMarker {
  */
 export interface GuardResult {
   readonly shouldStop: boolean;
-  readonly reason?: 'max_iterations' | 'stalled' | 'duplicate_tools' | 'no_progress';
+  readonly reason?:
+    | "max_iterations"
+    | "stalled"
+    | "duplicate_tools"
+    | "no_progress";
   readonly message?: string;
 }

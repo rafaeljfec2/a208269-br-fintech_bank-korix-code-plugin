@@ -2,12 +2,12 @@
  * Context builder - constructs final context window from ranked files
  */
 
-import * as vscode from 'vscode';
-import { getLogger } from '../../telemetry/logger';
-import type { WorkspaceIndexer } from '../indexing/workspaceIndexer';
-import type { HeuristicRanker } from '../ranking/heuristicRanker';
-import { TokenBudget } from '../tokenBudget';
-import type { ContextItem, ContextWindow } from '../types';
+import * as vscode from "vscode";
+import { getLogger } from "../../telemetry/logger";
+import type { WorkspaceIndexer } from "../indexing/workspaceIndexer";
+import type { HeuristicRanker } from "../ranking/heuristicRanker";
+import { TokenBudget } from "../tokenBudget";
+import type { ContextItem, ContextWindow } from "../types";
 
 export interface ContextBuildOptions {
   currentFile?: string;
@@ -19,14 +19,14 @@ export interface ContextBuildOptions {
 export class ContextBuilder {
   constructor(
     _indexer: WorkspaceIndexer,
-    private ranker: HeuristicRanker
+    private ranker: HeuristicRanker,
   ) {}
 
   async build(options: ContextBuildOptions): Promise<ContextWindow> {
     const logger = getLogger();
     const budget = new TokenBudget(options.tokenBudget ?? 180000);
 
-    logger.info('Building context window', {
+    logger.info("Building context window", {
       currentFile: options.currentFile,
       hasSelection: !!options.userSelection,
       symbolCount: options.mentionedSymbols?.length ?? 0,
@@ -50,7 +50,7 @@ export class ContextBuilder {
         const tokenCount = budget.estimateTokens(content);
 
         if (!budget.canFit(content)) {
-          logger.debug('File exceeds remaining budget, skipping', {
+          logger.debug("File exceeds remaining budget, skipping", {
             file,
             tokens: tokenCount,
             remaining: budget.getRemaining(),
@@ -67,14 +67,14 @@ export class ContextBuilder {
           tokenCount,
         });
 
-        logger.debug('Added file to context', {
+        logger.debug("Added file to context", {
           file,
           score,
-          reasons: reasons.join(', '),
+          reasons: reasons.join(", "),
           tokens: tokenCount,
         });
       } catch (error) {
-        logger.warn('Failed to read file for context', {
+        logger.warn("Failed to read file for context", {
           file,
           error: (error as Error).message,
         });
@@ -89,7 +89,7 @@ export class ContextBuilder {
       budget: budget.getBudget(),
     };
 
-    logger.info('Context window built', {
+    logger.info("Context window built", {
       fileCount: items.length,
       totalTokens: contextWindow.totalTokens,
       utilization: `${budget.getUtilization().toFixed(1)}%`,
@@ -101,22 +101,22 @@ export class ContextBuilder {
   formatForProvider(contextWindow: ContextWindow): string {
     const parts: string[] = [];
 
-    parts.push('# Workspace Context\n');
+    parts.push("# Workspace Context\n");
 
     for (const item of contextWindow.items) {
       parts.push(`\n## File: ${item.file}\n`);
-      parts.push('```\n');
+      parts.push("```\n");
       parts.push(item.content);
-      parts.push('\n```\n');
+      parts.push("\n```\n");
     }
 
     parts.push(`\n# Context Statistics\n`);
     parts.push(`- Files included: ${contextWindow.items.length}\n`);
     parts.push(`- Total tokens: ${contextWindow.totalTokens}\n`);
     parts.push(
-      `- Budget utilization: ${((contextWindow.totalTokens / contextWindow.budget) * 100).toFixed(1)}%\n`
+      `- Budget utilization: ${((contextWindow.totalTokens / contextWindow.budget) * 100).toFixed(1)}%\n`,
     );
 
-    return parts.join('');
+    return parts.join("");
   }
 }

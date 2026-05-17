@@ -2,10 +2,10 @@
  * Settings slice - user preferences and config
  */
 
-import type { StateCreator } from 'zustand';
-import type { Mode } from '../../../core/types';
+import type { StateCreator } from "zustand";
+import type { Mode } from "../../../core/types";
 
-export type ActiveTab = 'chat' | 'timeline' | 'terminal' | 'settings';
+export type ActiveTab = "chat" | "timeline" | "terminal" | "settings";
 
 export interface SettingsSlice {
   readonly mode: Mode;
@@ -23,11 +23,11 @@ export interface SettingsSlice {
 }
 
 export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
-  mode: 'ask',
-  model: 'claude-sonnet-4-6',
-  provider: 'anthropic',
-  sessionId: '',
-  activeTab: 'chat',
+  mode: "ask",
+  model: "claude-sonnet-4-6",
+  provider: "anthropic",
+  sessionId: "",
+  activeTab: "chat",
 
   setMode: (mode) =>
     set(() => ({
@@ -50,10 +50,10 @@ export const createSettingsSlice: StateCreator<SettingsSlice> = (set) => ({
     })),
 
   setActiveTab: (tab) => {
-    console.log('[SettingsSlice] setActiveTab called with:', tab);
+    console.log("[SettingsSlice] setActiveTab called with:", tab);
     set(() => ({
       activeTab: tab,
     }));
-    console.log('[SettingsSlice] activeTab updated to:', tab);
+    console.log("[SettingsSlice] activeTab updated to:", tab);
   },
 });

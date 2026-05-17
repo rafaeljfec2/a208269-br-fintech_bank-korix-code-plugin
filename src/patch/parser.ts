@@ -2,9 +2,9 @@
  * Patch parser - parses KORIX_PATCH format
  */
 
-import { getLogger } from '../telemetry/logger';
-import type { Patch, PatchError } from './types';
-import { PatchErrorReason as Reason } from './types';
+import { getLogger } from "../telemetry/logger";
+import type { Patch, PatchError } from "./types";
+import { PatchErrorReason as Reason } from "./types";
 
 export class PatchParser {
   private readonly patchRegex =
@@ -24,8 +24,8 @@ export class PatchParser {
 
       if (!file?.trim()) {
         errors.push({
-          file: '<unknown>',
-          error: 'File attribute is required',
+          file: "<unknown>",
+          error: "File attribute is required",
           reason: Reason.PARSE_ERROR,
         });
         continue;
@@ -34,7 +34,7 @@ export class PatchParser {
       if (!search) {
         errors.push({
           file: file.trim(),
-          error: 'SEARCH block cannot be empty',
+          error: "SEARCH block cannot be empty",
           reason: Reason.PARSE_ERROR,
         });
         continue;
@@ -43,25 +43,25 @@ export class PatchParser {
       patches.push({
         file: file.trim(),
         search: this.normalizeWhitespace(search),
-        replace: this.normalizeWhitespace(replace ?? ''),
+        replace: this.normalizeWhitespace(replace ?? ""),
       });
 
-      logger.debug('Parsed patch', {
+      logger.debug("Parsed patch", {
         file: file.trim(),
-        searchLines: search.split('\n').length,
-        replaceLines: (replace ?? '').split('\n').length,
+        searchLines: search.split("\n").length,
+        replaceLines: (replace ?? "").split("\n").length,
       });
     }
 
     if (matchCount === 0) {
       errors.push({
-        file: '<unknown>',
-        error: 'No valid KORIX_PATCH blocks found',
+        file: "<unknown>",
+        error: "No valid KORIX_PATCH blocks found",
         reason: Reason.PARSE_ERROR,
       });
     }
 
-    logger.info('Patch parsing complete', {
+    logger.info("Patch parsing complete", {
       patches: patches.length,
       errors: errors.length,
     });
@@ -71,9 +71,9 @@ export class PatchParser {
 
   private normalizeWhitespace(text: string): string {
     return text
-      .split('\n')
+      .split("\n")
       .map((line) => line.trimEnd())
-      .join('\n')
+      .join("\n")
       .trim();
   }
 
@@ -81,15 +81,15 @@ export class PatchParser {
     const errors: string[] = [];
 
     if (!patch.file) {
-      errors.push('File path is required');
+      errors.push("File path is required");
     }
 
     if (!patch.search) {
-      errors.push('SEARCH block is required');
+      errors.push("SEARCH block is required");
     }
 
     if (patch.search === patch.replace) {
-      errors.push('SEARCH and REPLACE are identical - no changes to apply');
+      errors.push("SEARCH and REPLACE are identical - no changes to apply");
     }
 
     return {

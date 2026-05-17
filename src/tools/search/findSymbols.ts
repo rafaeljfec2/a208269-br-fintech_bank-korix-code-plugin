@@ -9,25 +9,28 @@
  * - Fuzzy matching built-in
  */
 
-import * as vscode from 'vscode';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import * as vscode from "vscode";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const FindSymbolsSchema = z.object({
-  query: z.string().describe('Symbol name pattern (supports fuzzy matching)'),
-  kind: z.enum([
-    'function',
-    'class',
-    'interface',
-    'variable',
-    'constant',
-    'method',
-    'property',
-    'enum',
-    'module',
-    'all',
-  ]).optional().describe('Symbol kind filter (default: all)'),
-  maxResults: z.number().optional().describe('Maximum results (default: 100)'),
+  query: z.string().describe("Symbol name pattern (supports fuzzy matching)"),
+  kind: z
+    .enum([
+      "function",
+      "class",
+      "interface",
+      "variable",
+      "constant",
+      "method",
+      "property",
+      "enum",
+      "module",
+      "all",
+    ])
+    .optional()
+    .describe("Symbol kind filter (default: all)"),
+  maxResults: z.number().optional().describe("Maximum results (default: 100)"),
 });
 
 type FindSymbolsInput = z.infer<typeof FindSymbolsSchema>;
@@ -53,8 +56,8 @@ interface Symbol {
  * VSCode LSP provides fuzzy matching automatically
  */
 export const FindSymbolsTool: Tool<FindSymbolsInput, Symbol[]> = {
-  name: 'FindSymbols',
-  description: 'Find symbols in workspace using LSP (fuzzy matching)',
+  name: "FindSymbols",
+  description: "Find symbols in workspace using LSP (fuzzy matching)",
   schema: FindSymbolsSchema,
 
   allowedInMode(_mode): boolean {
@@ -63,7 +66,7 @@ export const FindSymbolsTool: Tool<FindSymbolsInput, Symbol[]> = {
 
   async execute(
     input: FindSymbolsInput,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<ToolResult<Symbol[]>> {
     const startTime = Date.now();
 
@@ -98,10 +101,9 @@ export const FindSymbolsTool: Tool<FindSymbolsInput, Symbol[]> = {
  */
 async function findSymbols(input: FindSymbolsInput): Promise<Symbol[]> {
   // Execute workspace symbol provider
-  const symbolInfos = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
-    'vscode.executeWorkspaceSymbolProvider',
-    input.query
-  );
+  const symbolInfos = await vscode.commands.executeCommand<
+    vscode.SymbolInformation[]
+  >("vscode.executeWorkspaceSymbolProvider", input.query);
 
   if (!symbolInfos || symbolInfos.length === 0) {
     return [];
@@ -110,10 +112,10 @@ async function findSymbols(input: FindSymbolsInput): Promise<Symbol[]> {
   // Filter by kind if specified
   let filtered = symbolInfos;
 
-  if (input.kind && input.kind !== 'all') {
+  if (input.kind && input.kind !== "all") {
     const targetKind = symbolKindFromString(input.kind);
     if (targetKind !== undefined) {
-      filtered = symbolInfos.filter(s => s.kind === targetKind);
+      filtered = symbolInfos.filter((s) => s.kind === targetKind);
     }
   }
 
@@ -122,7 +124,7 @@ async function findSymbols(input: FindSymbolsInput): Promise<Symbol[]> {
   const limited = filtered.slice(0, maxResults);
 
   // Convert to structured format
-  const symbols: Symbol[] = limited.map(symbolInfo => ({
+  const symbols: Symbol[] = limited.map((symbolInfo) => ({
     name: symbolInfo.name,
     kind: vscode.SymbolKind[symbolInfo.kind],
     file: symbolInfo.location.uri.fsPath,
@@ -139,23 +141,23 @@ async function findSymbols(input: FindSymbolsInput): Promise<Symbol[]> {
  */
 function symbolKindFromString(kind: string): vscode.SymbolKind | undefined {
   switch (kind) {
-    case 'function':
+    case "function":
       return vscode.SymbolKind.Function;
-    case 'class':
+    case "class":
       return vscode.SymbolKind.Class;
-    case 'interface':
+    case "interface":
       return vscode.SymbolKind.Interface;
-    case 'variable':
+    case "variable":
       return vscode.SymbolKind.Variable;
-    case 'constant':
+    case "constant":
       return vscode.SymbolKind.Constant;
-    case 'method':
+    case "method":
       return vscode.SymbolKind.Method;
-    case 'property':
+    case "property":
       return vscode.SymbolKind.Property;
-    case 'enum':
+    case "enum":
       return vscode.SymbolKind.Enum;
-    case 'module':
+    case "module":
       return vscode.SymbolKind.Module;
     default:
       return undefined;

@@ -2,19 +2,51 @@
  * MainPanel - Active conversation chat area
  */
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useStore } from '../../store';
 import trIcon from '../../assets/tr-icon.svg';
 import ChatMessage from '../chat/ChatMessage';
 import MarkdownContent from '../chat/MarkdownContent';
 import StreamingIndicator from '../chat/StreamingIndicator';
+import SettingsPanel from '../settings/SettingsPanel';
 
 export default function MainPanel() {
   // Use selectors separados para evitar re-renders desnecessários
   const conversations = useStore((state) => state.conversations);
   const activeChatId = useStore((state) => state.activeChatId);
+  const activeTab = useStore((state) => state.activeTab);
+
+  // Refs para auto-scroll
+  const containerRef = useRef<HTMLDivElement>(null);
+  const streamingRef = useRef<HTMLDivElement>(null);
 
   const activeChat = activeChatId ? conversations[activeChatId] : null;
+
+  // Auto-scroll durante streaming
+  useEffect(() => {
+    // Durante streaming, scroll para o elemento de streaming
+    if (activeChat?.isStreaming && streamingRef.current) {
+      streamingRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end'
+      });
+    }
+
+    // Após streaming terminar, scroll para o final do container
+    if (!activeChat?.isStreaming && activeChat?.messages.length > 0) {
+      setTimeout(() => {
+        containerRef.current?.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
+    }
+  }, [activeChat?.isStreaming, activeChat?.streamingContent, activeChat?.messages.length]);
+
+  // Renderizar SettingsPanel quando activeTab === 'settings'
+  if (activeTab === 'settings') {
+    return <SettingsPanel />;
+  }
 
   // Empty state - no active conversation
   if (!activeChat) {
@@ -38,28 +70,20 @@ export default function MainPanel() {
 
   // Render active conversation
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-[var(--vscode-editor-background)]">
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-[var(--vscode-editor-background)]"
+    >
       {/* Messages */}
       {activeChat.messages.map((msg) => (
         <ChatMessage key={msg.id} message={msg} />
       ))}
 
-      {/* Streaming content */}
+      {/* Streaming content - sem avatar, sem header, COM REF para auto-scroll */}
       {activeChat.isStreaming && activeChat.streamingContent && (
-        <div className="flex gap-3 px-4 py-3">
-          <div className="w-7 h-7 rounded-full bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] flex items-center justify-center text-xs font-semibold flex-shrink-0">
-            K
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-2 text-xs opacity-60">
-              <span>Korix</span>
-              <span>just now</span>
-            </div>
-            <div className="text-sm leading-relaxed">
-              <MarkdownContent content={activeChat.streamingContent} />
-              <StreamingIndicator />
-            </div>
-          </div>
+        <div ref={streamingRef} className="px-4 py-3">
+          <MarkdownContent content={activeChat.streamingContent} />
+          <StreamingIndicator />
         </div>
       )}
     </div>

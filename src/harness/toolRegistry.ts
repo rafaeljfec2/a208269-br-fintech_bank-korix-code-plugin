@@ -165,7 +165,14 @@ export class ToolRegistry {
       const cachedResult = this.cache.get<TOutput>(name, validationResult.data);
       if (cachedResult) {
         cached = true;
-        this.recordMetric(name, startTime, true, cached, input, cachedResult.data);
+        this.recordMetric(
+          name,
+          startTime,
+          true,
+          cached,
+          input,
+          cachedResult.data,
+        );
         return {
           ...cachedResult,
           metadata: {
@@ -199,12 +206,28 @@ export class ToolRegistry {
         this.cache.set(name, validationResult.data, finalResult);
       }
 
-      this.recordMetric(name, startTime, result.success, cached, input, result.data, result.error);
+      this.recordMetric(
+        name,
+        startTime,
+        result.success,
+        cached,
+        input,
+        result.data,
+        result.error,
+      );
 
       return finalResult;
     } catch (error) {
       const err = error as Error;
-      this.recordMetric(name, startTime, false, cached, input, null, err.message);
+      this.recordMetric(
+        name,
+        startTime,
+        false,
+        cached,
+        input,
+        null,
+        err.message,
+      );
       return {
         success: false,
         error: err.message,
@@ -298,7 +321,7 @@ export class ToolRegistry {
    * Check if tool is a write tool (should not be cached)
    */
   private isWriteTool(name: string): boolean {
-    const writeTools = ['WriteFile', 'EditFile', 'RunCommand', 'DeleteFile'];
+    const writeTools = ["WriteFile", "EditFile", "RunCommand", "DeleteFile"];
     return writeTools.includes(name);
   }
 
@@ -315,8 +338,10 @@ export class ToolRegistry {
     error?: string,
   ): void {
     const duration = Date.now() - startTime;
-    const inputSize = Buffer.byteLength(JSON.stringify(input), 'utf-8');
-    const outputSize = output ? Buffer.byteLength(JSON.stringify(output), 'utf-8') : 0;
+    const inputSize = Buffer.byteLength(JSON.stringify(input), "utf-8");
+    const outputSize = output
+      ? Buffer.byteLength(JSON.stringify(output), "utf-8")
+      : 0;
 
     this.metrics.record({
       tool,

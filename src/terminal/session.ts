@@ -2,12 +2,15 @@
  * Terminal session management - persistent shell sessions
  */
 
-import { getLogger } from '../telemetry/logger';
-import { PTYManager } from './pty';
-import type { TerminalOptions, TerminalSession } from './types';
+import { getLogger } from "../telemetry/logger";
+import { PTYManager } from "./pty";
+import type { TerminalOptions, TerminalSession } from "./types";
 
 export class TerminalSessionManager {
-  private sessions = new Map<string, { session: TerminalSession; pty: PTYManager }>();
+  private sessions = new Map<
+    string,
+    { session: TerminalSession; pty: PTYManager }
+  >();
   private sessionCounter = 0;
 
   createSession(options: TerminalOptions = {}): string {
@@ -27,7 +30,7 @@ export class TerminalSessionManager {
 
     this.sessions.set(sessionId, { session, pty });
 
-    logger.info('Terminal session created', {
+    logger.info("Terminal session created", {
       sessionId,
       cwd: session.cwd,
       totalSessions: this.sessions.size,
@@ -36,7 +39,9 @@ export class TerminalSessionManager {
     return sessionId;
   }
 
-  getSession(sessionId: string): { session: TerminalSession; pty: PTYManager } | undefined {
+  getSession(
+    sessionId: string,
+  ): { session: TerminalSession; pty: PTYManager } | undefined {
     return this.sessions.get(sessionId);
   }
 
@@ -56,7 +61,7 @@ export class TerminalSessionManager {
     const entry = this.sessions.get(sessionId);
 
     if (entry) {
-      logger.info('Killing terminal session', { sessionId });
+      logger.info("Killing terminal session", { sessionId });
       entry.pty.kill();
       this.sessions.delete(sessionId);
     }
@@ -64,7 +69,7 @@ export class TerminalSessionManager {
 
   killAllSessions(): void {
     const logger = getLogger();
-    logger.info('Killing all terminal sessions', { count: this.sessions.size });
+    logger.info("Killing all terminal sessions", { count: this.sessions.size });
 
     for (const [sessionId, entry] of this.sessions.entries()) {
       entry.pty.kill();
@@ -84,7 +89,7 @@ export class TerminalSessionManager {
     }
 
     if (toKill.length > 0) {
-      logger.info('Cleaning up idle sessions', { count: toKill.length });
+      logger.info("Cleaning up idle sessions", { count: toKill.length });
       for (const sessionId of toKill) {
         this.killSession(sessionId);
       }
@@ -109,7 +114,7 @@ export function initializeSessionManager(): TerminalSessionManager {
 
 export function getSessionManager(): TerminalSessionManager {
   if (!globalSessionManager) {
-    throw new Error('Session manager not initialized');
+    throw new Error("Session manager not initialized");
   }
   return globalSessionManager;
 }

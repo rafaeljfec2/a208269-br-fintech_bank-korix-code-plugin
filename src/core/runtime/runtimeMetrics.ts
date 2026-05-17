@@ -2,8 +2,11 @@
  * Runtime metrics collection
  */
 
-import type { Logger } from '../../telemetry/logger';
-import type { RuntimeMetricsSnapshot, RuntimeEventRecord } from './runtimeTypes';
+import type { Logger } from "../../telemetry/logger";
+import type {
+  RuntimeMetricsSnapshot,
+  RuntimeEventRecord,
+} from "./runtimeTypes";
 
 export class RuntimeMetrics {
   private totalTokens = 0;
@@ -15,7 +18,8 @@ export class RuntimeMetrics {
   private eventTimeline: RuntimeEventRecord[] = [];
   private readonly startTime: number;
 
-  constructor(private readonly _logger: Logger) { // Reserved for future logging
+  constructor(private readonly _logger: Logger) {
+    // Reserved for future logging
     this.startTime = Date.now();
   }
 

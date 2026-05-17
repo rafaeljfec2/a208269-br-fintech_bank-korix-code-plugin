@@ -8,13 +8,13 @@
  * - Single-threaded design (VSCode Extension Host is single-threaded)
  */
 
-import type { ExecutionContext, Message, Mode } from '../types';
-import { RuntimeState } from './runtimeState';
-import type { RuntimeStateSnapshot } from './runtimeTypes';
+import type { ExecutionContext, Message, Mode } from "../types";
+import { RuntimeState } from "./runtimeState";
+import type { RuntimeStateSnapshot } from "./runtimeTypes";
 
 export class RuntimeStateManager {
   private currentState: RuntimeState | null = null;
-  private currentMode: Mode = 'ask';
+  private currentMode: Mode = "ask";
   private currentSessionId: string | null = null;
 
   /**
@@ -24,7 +24,7 @@ export class RuntimeStateManager {
   initialize(context: ExecutionContext, maxIterations = 25): void {
     if (this.isExecuting()) {
       throw new Error(
-        'Cannot initialize RuntimeState while execution is active. Call stopExecution() first.',
+        "Cannot initialize RuntimeState while execution is active. Call stopExecution() first.",
       );
     }
 
@@ -39,7 +39,7 @@ export class RuntimeStateManager {
    */
   private getState(): RuntimeState {
     if (!this.currentState) {
-      throw new Error('RuntimeState not initialized. Call initialize() first.');
+      throw new Error("RuntimeState not initialized. Call initialize() first.");
     }
     return this.currentState;
   }

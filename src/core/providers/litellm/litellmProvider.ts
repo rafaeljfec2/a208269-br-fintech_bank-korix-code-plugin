@@ -164,7 +164,7 @@ export class LiteLLMProvider implements AIProvider {
    * - https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prefill-claudes-response
    */
   private stripTrailingAssistant(
-    messages: readonly AnthropicMessage[]
+    messages: readonly AnthropicMessage[],
   ): readonly AnthropicMessage[] {
     if (messages.length === 0) {
       return messages;
@@ -173,7 +173,7 @@ export class LiteLLMProvider implements AIProvider {
     let lastIndex = messages.length - 1;
 
     // Remove ALL trailing assistant messages
-    while (lastIndex >= 0 && messages[lastIndex].role === 'assistant') {
+    while (lastIndex >= 0 && messages[lastIndex].role === "assistant") {
       lastIndex--;
     }
 
@@ -192,30 +192,33 @@ export class LiteLLMProvider implements AIProvider {
   private validateMessages(messages: readonly AnthropicMessage[]): void {
     // Validação 1: Array não pode estar vazio
     if (messages.length === 0) {
-      throw new Error('[LiteLLM] Messages array cannot be empty');
+      throw new Error("[LiteLLM] Messages array cannot be empty");
     }
 
     // Validação 2: Primeira mensagem deve ser 'user'
-    if (messages[0].role !== 'user') {
+    if (messages[0].role !== "user") {
       throw new Error(
-        `[LiteLLM] First message must be from user, got: ${messages[0].role}`
+        `[LiteLLM] First message must be from user, got: ${messages[0].role}`,
       );
     }
 
     // Validação 3: Última mensagem deve ser 'user' (Claude 4.6+ requirement)
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role !== 'user') {
+    if (lastMessage.role !== "user") {
       throw new Error(
         `[LiteLLM] Last message must be from user, got: ${lastMessage.role}. ` +
-        `This prevents "assistant message prefill" errors on Claude 4.6+.`
+          `This prevents "assistant message prefill" errors on Claude 4.6+.`,
       );
     }
 
     // Validação 4: Sem dupla sequência assistant → assistant
     for (let i = 0; i < messages.length - 1; i++) {
-      if (messages[i].role === 'assistant' && messages[i + 1].role === 'assistant') {
+      if (
+        messages[i].role === "assistant" &&
+        messages[i + 1].role === "assistant"
+      ) {
         throw new Error(
-          `[LiteLLM] Invalid sequence: assistant followed by assistant at index ${i}`
+          `[LiteLLM] Invalid sequence: assistant followed by assistant at index ${i}`,
         );
       }
     }
@@ -234,7 +237,7 @@ export class LiteLLMProvider implements AIProvider {
       if (msg.role === "tool") {
         const toolResultBlock: AnthropicContentBlock = {
           type: "tool_result",
-          tool_use_id: msg.metadata?.toolCallId as string | undefined ?? "",
+          tool_use_id: (msg.metadata?.toolCallId as string | undefined) ?? "",
           content: msg.content,
         };
 

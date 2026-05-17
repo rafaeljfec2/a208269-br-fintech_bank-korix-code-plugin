@@ -3,7 +3,7 @@
  * Extension (Node.js) ↔ Webview (Browser)
  */
 
-import type { RuntimeEvent } from '../core/runtime/runtimeEvents';
+import type { RuntimeEvent } from "../core/runtime/runtimeEvents";
 
 // ============================================================
 // Extension → Webview Messages
@@ -11,7 +11,7 @@ import type { RuntimeEvent } from '../core/runtime/runtimeEvents';
 
 export interface InitPayload {
   readonly sessionId: string;
-  readonly mode: 'ask' | 'plan' | 'agent';
+  readonly mode: "ask" | "plan" | "agent";
   readonly model: string;
   readonly isExecuting: boolean;
   readonly workspaceRoot?: string;
@@ -32,7 +32,7 @@ export interface TerminalSessionCreatedPayload {
 }
 
 export interface ModeChangedPayload {
-  readonly mode: 'ask' | 'plan' | 'agent';
+  readonly mode: "ask" | "plan" | "agent";
 }
 
 export interface SettingsLoadedPayload {
@@ -55,14 +55,26 @@ export interface SettingsSavedPayload {
 }
 
 export type ExtensionToWebviewMessage =
-  | { readonly type: 'init'; readonly payload: InitPayload }
-  | { readonly type: 'runtime_event'; readonly payload: RuntimeEventPayload }
-  | { readonly type: 'terminal_output'; readonly payload: TerminalOutputPayload }
-  | { readonly type: 'terminal_session_created'; readonly payload: TerminalSessionCreatedPayload }
-  | { readonly type: 'mode_changed'; readonly payload: ModeChangedPayload }
-  | { readonly type: 'settings_loaded'; readonly payload: SettingsLoadedPayload }
-  | { readonly type: 'connection_test_result'; readonly payload: ConnectionTestResultPayload }
-  | { readonly type: 'settings_saved'; readonly payload: SettingsSavedPayload };
+  | { readonly type: "init"; readonly payload: InitPayload }
+  | { readonly type: "runtime_event"; readonly payload: RuntimeEventPayload }
+  | {
+      readonly type: "terminal_output";
+      readonly payload: TerminalOutputPayload;
+    }
+  | {
+      readonly type: "terminal_session_created";
+      readonly payload: TerminalSessionCreatedPayload;
+    }
+  | { readonly type: "mode_changed"; readonly payload: ModeChangedPayload }
+  | {
+      readonly type: "settings_loaded";
+      readonly payload: SettingsLoadedPayload;
+    }
+  | {
+      readonly type: "connection_test_result";
+      readonly payload: ConnectionTestResultPayload;
+    }
+  | { readonly type: "settings_saved"; readonly payload: SettingsSavedPayload };
 
 // ============================================================
 // Webview → Extension Messages
@@ -70,16 +82,19 @@ export type ExtensionToWebviewMessage =
 
 export interface SendMessagePayload {
   readonly content: string;
-  readonly messages?: readonly { role: 'user' | 'assistant' | 'system'; content: string }[];
+  readonly messages?: readonly {
+    role: "user" | "assistant" | "system";
+    content: string;
+  }[];
 }
 
 export interface ChangeModePayload {
-  readonly mode: 'ask' | 'plan' | 'agent';
+  readonly mode: "ask" | "plan" | "agent";
 }
 
 export interface ApproveToolPayload {
   readonly toolCallId: string;
-  readonly approval: 'once' | 'always' | 'reject';
+  readonly approval: "once" | "always" | "reject";
 }
 
 export interface TerminalInputPayload {
@@ -96,7 +111,12 @@ export interface RestoreCheckpointPayload {
 }
 
 export interface SaveSettingsPayload {
-  readonly provider: 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm';
+  readonly provider:
+    | "anthropic"
+    | "openai"
+    | "ollama"
+    | "openrouter"
+    | "litellm";
   readonly apiKey?: string;
   readonly model?: string;
   readonly baseUrl?: string;
@@ -111,24 +131,41 @@ export interface TestConnectionPayload {
 }
 
 export type WebviewToExtensionMessage =
-  | { readonly type: 'send_message'; readonly payload: SendMessagePayload }
-  | { readonly type: 'change_mode'; readonly payload: ChangeModePayload }
-  | { readonly type: 'approve_tool'; readonly payload: ApproveToolPayload }
-  | { readonly type: 'terminal_input'; readonly payload: TerminalInputPayload }
-  | { readonly type: 'create_terminal'; readonly payload: CreateTerminalPayload }
-  | { readonly type: 'restore_checkpoint'; readonly payload: RestoreCheckpointPayload }
-  | { readonly type: 'save_settings'; readonly payload: SaveSettingsPayload }
-  | { readonly type: 'test_connection'; readonly payload: TestConnectionPayload }
-  | { readonly type: 'load_settings'; readonly payload: Record<string, never> };
+  | { readonly type: "send_message"; readonly payload: SendMessagePayload }
+  | { readonly type: "change_mode"; readonly payload: ChangeModePayload }
+  | { readonly type: "approve_tool"; readonly payload: ApproveToolPayload }
+  | { readonly type: "terminal_input"; readonly payload: TerminalInputPayload }
+  | {
+      readonly type: "create_terminal";
+      readonly payload: CreateTerminalPayload;
+    }
+  | {
+      readonly type: "restore_checkpoint";
+      readonly payload: RestoreCheckpointPayload;
+    }
+  | { readonly type: "save_settings"; readonly payload: SaveSettingsPayload }
+  | {
+      readonly type: "test_connection";
+      readonly payload: TestConnectionPayload;
+    }
+  | { readonly type: "load_settings"; readonly payload: Record<string, never> };
 
 // ============================================================
 // Helper Type Guards
 // ============================================================
 
-export function isExtensionMessage(msg: unknown): msg is ExtensionToWebviewMessage {
-  return typeof msg === 'object' && msg !== null && 'type' in msg && 'payload' in msg;
+export function isExtensionMessage(
+  msg: unknown,
+): msg is ExtensionToWebviewMessage {
+  return (
+    typeof msg === "object" && msg !== null && "type" in msg && "payload" in msg
+  );
 }
 
-export function isWebviewMessage(msg: unknown): msg is WebviewToExtensionMessage {
-  return typeof msg === 'object' && msg !== null && 'type' in msg && 'payload' in msg;
+export function isWebviewMessage(
+  msg: unknown,
+): msg is WebviewToExtensionMessage {
+  return (
+    typeof msg === "object" && msg !== null && "type" in msg && "payload" in msg
+  );
 }

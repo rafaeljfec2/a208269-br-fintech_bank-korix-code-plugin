@@ -2,9 +2,14 @@
  * Workspace indexer - incremental file indexing
  */
 
-import * as vscode from 'vscode';
-import { getLogger } from '../../telemetry/logger';
-import type { FileInfo, SymbolInfo, ImportInfo, WorkspaceIndex } from '../types';
+import * as vscode from "vscode";
+import { getLogger } from "../../telemetry/logger";
+import type {
+  FileInfo,
+  SymbolInfo,
+  ImportInfo,
+  WorkspaceIndex,
+} from "../types";
 
 export class WorkspaceIndexer {
   private index: WorkspaceIndex;
@@ -22,12 +27,12 @@ export class WorkspaceIndexer {
 
   async initialize(): Promise<void> {
     const logger = getLogger();
-    logger.info('Initializing workspace indexer');
+    logger.info("Initializing workspace indexer");
 
     await this.indexWorkspace();
     this.setupFileWatcher();
 
-    logger.info('Workspace indexer initialized', {
+    logger.info("Workspace indexer initialized", {
       fileCount: this.index.files.size,
       symbolCount: Array.from(this.index.symbols.values()).flat().length,
       importCount: this.index.imports.length,
@@ -44,12 +49,12 @@ export class WorkspaceIndexer {
 
     try {
       const files = await vscode.workspace.findFiles(
-        '**/*.{ts,tsx,js,jsx,py,go,rs,java,cpp,c,h}',
-        '**/node_modules/**',
-        1000
+        "**/*.{ts,tsx,js,jsx,py,go,rs,java,cpp,c,h}",
+        "**/node_modules/**",
+        1000,
       );
 
-      logger.info('Found files to index', { count: files.length });
+      logger.info("Found files to index", { count: files.length });
 
       for (const file of files) {
         await this.indexFile(file);
@@ -57,7 +62,7 @@ export class WorkspaceIndexer {
 
       this.index.lastIndexed = Date.now();
     } catch (error) {
-      logger.error('Failed to index workspace', error);
+      logger.error("Failed to index workspace", error);
     } finally {
       this.indexing = false;
     }
@@ -81,16 +86,18 @@ export class WorkspaceIndexer {
       await this.extractImports(uri, document);
     } catch (error) {
       const logger = getLogger();
-      logger.warn('Failed to index file', { file: uri.fsPath, error });
+      logger.warn("Failed to index file", { file: uri.fsPath, error });
     }
   }
 
-  private async extractSymbols(uri: vscode.Uri, _document: vscode.TextDocument): Promise<void> {
+  private async extractSymbols(
+    uri: vscode.Uri,
+    _document: vscode.TextDocument,
+  ): Promise<void> {
     try {
-      const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-        'vscode.executeDocumentSymbolProvider',
-        uri
-      );
+      const symbols = await vscode.commands.executeCommand<
+        vscode.DocumentSymbol[]
+      >("vscode.executeDocumentSymbolProvider", uri);
 
       if (!symbols) {
         return;
@@ -98,7 +105,10 @@ export class WorkspaceIndexer {
 
       const symbolInfos: SymbolInfo[] = [];
 
-      const processSymbol = (symbol: vscode.DocumentSymbol, container?: string): void => {
+      const processSymbol = (
+        symbol: vscode.DocumentSymbol,
+        container?: string,
+      ): void => {
         symbolInfos.push({
           name: symbol.name,
           kind: vscode.SymbolKind[symbol.kind],
@@ -127,7 +137,10 @@ export class WorkspaceIndexer {
     }
   }
 
-  private async extractImports(uri: vscode.Uri, document: vscode.TextDocument): Promise<void> {
+  private async extractImports(
+    uri: vscode.Uri,
+    document: vscode.TextDocument,
+  ): Promise<void> {
     const text = document.getText();
     const importRegexes = [
       // TypeScript/JavaScript
@@ -146,7 +159,8 @@ export class WorkspaceIndexer {
           continue;
         }
 
-        const isExternal = !importPath.startsWith('.') && !importPath.startsWith('/');
+        const isExternal =
+          !importPath.startsWith(".") && !importPath.startsWith("/");
 
         this.index.imports.push({
           source: uri.fsPath,
@@ -161,24 +175,26 @@ export class WorkspaceIndexer {
     const logger = getLogger();
 
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(
-      '**/*.{ts,tsx,js,jsx,py,go,rs,java,cpp,c,h}'
+      "**/*.{ts,tsx,js,jsx,py,go,rs,java,cpp,c,h}",
     );
 
     this.fileWatcher.onDidCreate(async (uri) => {
-      logger.debug('File created', { file: uri.fsPath });
+      logger.debug("File created", { file: uri.fsPath });
       await this.indexFile(uri);
     });
 
     this.fileWatcher.onDidChange(async (uri) => {
-      logger.debug('File changed', { file: uri.fsPath });
+      logger.debug("File changed", { file: uri.fsPath });
       await this.indexFile(uri);
     });
 
     this.fileWatcher.onDidDelete((uri) => {
-      logger.debug('File deleted', { file: uri.fsPath });
+      logger.debug("File deleted", { file: uri.fsPath });
       this.index.files.delete(uri.fsPath);
       this.index.symbols.delete(uri.fsPath);
-      this.index.imports = this.index.imports.filter((imp) => imp.source !== uri.fsPath);
+      this.index.imports = this.index.imports.filter(
+        (imp) => imp.source !== uri.fsPath,
+      );
     });
   }
 

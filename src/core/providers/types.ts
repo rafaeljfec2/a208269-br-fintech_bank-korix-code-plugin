@@ -15,11 +15,11 @@ export type { ToolDefinition };
  * OBRIGATÓRIO em todos eventos e logs
  */
 export interface CorrelationContext {
-  readonly correlationId: string;     // UUID único por request
-  readonly sessionId: string;         // VSCode session ID
-  readonly agentRunId?: string;       // AgentLoop run ID
-  readonly iterationId?: number;      // Iteration number
-  readonly requestId?: string;        // Provider request ID (se disponível)
+  readonly correlationId: string; // UUID único por request
+  readonly sessionId: string; // VSCode session ID
+  readonly agentRunId?: string; // AgentLoop run ID
+  readonly iterationId?: number; // Iteration number
+  readonly requestId?: string; // Provider request ID (se disponível)
 }
 
 /**
@@ -55,10 +55,10 @@ export interface ThinkingEvent {
  */
 export interface ToolCallDeltaEvent {
   readonly type: "tool_call_delta";
-  readonly index: number;              // Tool call index no array (OpenAI streaming)
-  readonly id?: string;                // Tool call ID (pode vir no primeiro delta)
-  readonly name?: string;              // Tool name (pode vir no primeiro delta)
-  readonly argumentsChunk?: string;    // Fragmento de JSON arguments
+  readonly index: number; // Tool call index no array (OpenAI streaming)
+  readonly id?: string; // Tool call ID (pode vir no primeiro delta)
+  readonly name?: string; // Tool name (pode vir no primeiro delta)
+  readonly argumentsChunk?: string; // Fragmento de JSON arguments
   readonly timestamp: number;
   readonly correlation: CorrelationContext;
 }
@@ -72,7 +72,7 @@ export interface ToolCallCompleteEvent {
   readonly index: number;
   readonly id: string;
   readonly name: string;
-  readonly arguments: string;          // JSON string completo
+  readonly arguments: string; // JSON string completo
   readonly timestamp: number;
   readonly correlation: CorrelationContext;
 }
@@ -93,7 +93,7 @@ export interface UsageEvent {
  */
 export interface FinishEvent {
   readonly type: "finish";
-  readonly reason: string;             // Normalizado: "stop", "max_tokens", "tool_calls", "error"
+  readonly reason: string; // Normalizado: "stop", "max_tokens", "tool_calls", "error"
   readonly timestamp: number;
   readonly correlation: CorrelationContext;
 }

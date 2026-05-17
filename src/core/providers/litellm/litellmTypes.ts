@@ -9,9 +9,9 @@
  * LiteLLM configuration
  */
 export interface LiteLLMConfig {
-  readonly apiBase: string;              // https://litellm.int.thomsonreuters.com (NO trailing slash!)
+  readonly apiBase: string; // https://litellm.int.thomsonreuters.com (NO trailing slash!)
   readonly apiKey: string;
-  readonly model: string;                // anthropic/claude-sonnet-4-6 (vendor prefix REQUIRED)
+  readonly model: string; // anthropic/claude-sonnet-4-6 (vendor prefix REQUIRED)
   readonly timeoutMs: number;
   readonly retryPolicy: RetryPolicy;
   readonly circuitBreakerPolicy: CircuitBreakerPolicy;
@@ -23,8 +23,8 @@ export interface LiteLLMConfig {
  */
 export interface RetryPolicy {
   readonly maxAttempts: number;
-  readonly baseDelay: number;            // ms
-  readonly maxDelay: number;             // ms
+  readonly baseDelay: number; // ms
+  readonly maxDelay: number; // ms
   readonly retryableStatuses: readonly number[];
 }
 
@@ -32,10 +32,10 @@ export interface RetryPolicy {
  * Circuit breaker policy
  */
 export interface CircuitBreakerPolicy {
-  readonly failureThreshold: number;     // Falhas consecutivas para abrir
-  readonly successThreshold: number;     // Sucessos consecutivos para fechar
-  readonly openDuration: number;         // ms em estado OPEN
-  readonly halfOpenMaxRequests: number;  // Requests permitidos em HALF_OPEN
+  readonly failureThreshold: number; // Falhas consecutivas para abrir
+  readonly successThreshold: number; // Sucessos consecutivos para fechar
+  readonly openDuration: number; // ms em estado OPEN
+  readonly halfOpenMaxRequests: number; // Requests permitidos em HALF_OPEN
 }
 
 /**
@@ -81,8 +81,8 @@ export interface AnthropicTool {
 
 // Mantém aliases para compatibilidade
 export type LiteLLMRequest = AnthropicMessagesRequest;
-export type OpenAIMessage = AnthropicMessage;  // Deprecated: use AnthropicMessage
-export type OpenAITool = AnthropicTool;        // Deprecated: use AnthropicTool
+export type OpenAIMessage = AnthropicMessage; // Deprecated: use AnthropicMessage
+export type OpenAITool = AnthropicTool; // Deprecated: use AnthropicTool
 
 /**
  * Anthropic Messages API streaming events
@@ -180,8 +180,8 @@ export interface SSEEvent {
  * Circuit breaker states
  */
 export enum CircuitState {
-  CLOSED = "CLOSED",       // Normal operation
-  OPEN = "OPEN",           // Failing fast
+  CLOSED = "CLOSED", // Normal operation
+  OPEN = "OPEN", // Failing fast
   HALF_OPEN = "HALF_OPEN", // Testing recovery
 }
 

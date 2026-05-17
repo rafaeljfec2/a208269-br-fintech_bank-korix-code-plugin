@@ -4,7 +4,12 @@
 
 import type { Message } from "../core/types";
 
-export type ProviderType = "anthropic" | "openai" | "ollama" | "openrouter" | "litellm";
+export type ProviderType =
+  | "anthropic"
+  | "openai"
+  | "ollama"
+  | "openrouter"
+  | "litellm";
 
 export interface ProviderConfig {
   type: ProviderType;

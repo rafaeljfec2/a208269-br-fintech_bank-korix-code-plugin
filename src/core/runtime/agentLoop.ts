@@ -15,18 +15,18 @@
  * - CheckpointManager (snapshots)
  */
 
-import type { Logger } from '../../telemetry/logger';
-import type { ExecutionContext } from '../types';
-import { ExecutionEngine } from './executionEngine';
-import { CheckpointManager } from './checkpoints';
-import { RecoveryManager } from './recovery';
-import { IterationGuard } from './iterationGuard';
-import { CancellationManager } from './cancellation';
-import { RuntimeMetrics } from './runtimeMetrics';
-import { RuntimeEventEmitter } from './runtimeEvents';
-import { RuntimeState } from './runtimeState';
-import type { AgentLoopResult } from './runtimeTypes';
-import type { RuntimeEvent } from './runtimeEvents';
+import type { Logger } from "../../telemetry/logger";
+import type { ExecutionContext } from "../types";
+import { ExecutionEngine } from "./executionEngine";
+import { CheckpointManager } from "./checkpoints";
+import { RecoveryManager } from "./recovery";
+import { IterationGuard } from "./iterationGuard";
+import { CancellationManager } from "./cancellation";
+import { RuntimeMetrics } from "./runtimeMetrics";
+import { RuntimeEventEmitter } from "./runtimeEvents";
+import { RuntimeState } from "./runtimeState";
+import type { AgentLoopResult } from "./runtimeTypes";
+import type { RuntimeEvent } from "./runtimeEvents";
 
 export class AgentLoop {
   constructor(
@@ -43,7 +43,10 @@ export class AgentLoop {
   async *run(
     initialMessage: string,
     context: ExecutionContext,
-    previousMessages?: readonly { role: 'user' | 'assistant' | 'system'; content: string }[],
+    previousMessages?: readonly {
+      role: "user" | "assistant" | "system";
+      content: string;
+    }[],
   ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
     const state = new RuntimeState(context, 25);
 
@@ -60,7 +63,7 @@ export class AgentLoop {
 
     // Add initial user message
     state.addMessage({
-      role: 'user',
+      role: "user",
       content: initialMessage,
       timestamp: Date.now(),
     });
@@ -71,13 +74,13 @@ export class AgentLoop {
     try {
       while (!completed) {
         this.cancellationManager.checkCancellation();
-        
+
         const execution = state.getExecution();
         const iterationStartTime = Date.now();
 
         // Emit iteration start
         yield {
-          type: 'iteration_start',
+          type: "iteration_start",
           iteration: execution.currentIteration,
           timestamp: iterationStartTime,
         };
@@ -85,7 +88,9 @@ export class AgentLoop {
         // Check guards
         const guardResult = this.iterationGuard.checkIteration(state);
         if (guardResult.shouldStop) {
-          this.logger.info('Guard triggered stop', { reason: guardResult.reason });
+          this.logger.info("Guard triggered stop", {
+            reason: guardResult.reason,
+          });
           completed = true;
           break;
         }
@@ -94,7 +99,9 @@ export class AgentLoop {
         let stepResult;
         try {
           stepResult = await this.engine.step(state);
-          this.recoveryManager.resetAttempts(`iteration_${execution.currentIteration}`);
+          this.recoveryManager.resetAttempts(
+            `iteration_${execution.currentIteration}`,
+          );
         } catch (error) {
           // Handle error via recovery
           const recoveryAction = await this.recoveryManager.handleError(
@@ -105,7 +112,7 @@ export class AgentLoop {
 
           await this.recoveryManager.executeRecovery(recoveryAction, state);
 
-          if (recoveryAction.action === 'fail') {
+          if (recoveryAction.action === "fail") {
             throw error;
           }
 
@@ -124,7 +131,7 @@ export class AgentLoop {
           this.metrics.recordCheckpoint();
 
           yield {
-            type: 'checkpoint_created',
+            type: "checkpoint_created",
             checkpointId,
             iteration: execution.currentIteration,
             filesChanged: workspace.modifiedFiles.size,
@@ -148,7 +155,7 @@ export class AgentLoop {
 
         // Emit iteration complete
         yield {
-          type: 'iteration_complete',
+          type: "iteration_complete",
           iteration: execution.currentIteration,
           hadToolCalls: stepResult.hadToolCalls,
           duration: Date.now() - iterationStartTime,
@@ -157,7 +164,9 @@ export class AgentLoop {
 
         // Check completion
         // Accept both 'end_turn' (standard) and 'stop' (LiteLLM format)
-        const isEndTurn = stepResult.stopReason === 'end_turn' || stepResult.stopReason === 'stop';
+        const isEndTurn =
+          stepResult.stopReason === "end_turn" ||
+          stepResult.stopReason === "stop";
         if (isEndTurn && !stepResult.hadToolCalls) {
           completed = true;
         }
@@ -166,9 +175,9 @@ export class AgentLoop {
       // Success
       state.stopExecution();
       const metricsSnapshot = this.metrics.finalize();
-      
+
       yield {
-        type: 'execution_complete',
+        type: "execution_complete",
         success: true,
         iterations: state.getExecution().currentIteration,
         metrics: metricsSnapshot,
@@ -188,7 +197,7 @@ export class AgentLoop {
       const err = error as Error;
 
       yield {
-        type: 'execution_complete',
+        type: "execution_complete",
         success: false,
         iterations: state.getExecution().currentIteration,
         metrics: metricsSnapshot,

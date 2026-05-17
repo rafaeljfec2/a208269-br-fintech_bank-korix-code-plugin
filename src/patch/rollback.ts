@@ -2,16 +2,16 @@
  * Rollback mechanism for patches
  */
 
-import * as vscode from 'vscode';
-import { getLogger } from '../telemetry/logger';
-import type { RollbackPoint, AppliedPatch } from './types';
+import * as vscode from "vscode";
+import { getLogger } from "../telemetry/logger";
+import type { RollbackPoint, AppliedPatch } from "./types";
 
 export class RollbackManager {
   private rollbackPoints: Map<string, RollbackPoint> = new Map();
 
   async createRollbackPoint(
     patches: AppliedPatch[],
-    fileBackups: Map<string, string>
+    fileBackups: Map<string, string>,
   ): Promise<string> {
     const logger = getLogger();
     const id = this.generateId();
@@ -25,7 +25,7 @@ export class RollbackManager {
 
     this.rollbackPoints.set(id, rollbackPoint);
 
-    logger.info('Rollback point created', {
+    logger.info("Rollback point created", {
       id,
       patchCount: patches.length,
       fileCount: fileBackups.size,
@@ -39,28 +39,28 @@ export class RollbackManager {
     const rollbackPoint = this.rollbackPoints.get(id);
 
     if (!rollbackPoint) {
-      logger.error('Rollback point not found', { id });
+      logger.error("Rollback point not found", { id });
       return false;
     }
 
     try {
       for (const [filePath, backup] of rollbackPoint.fileBackups.entries()) {
         const uri = vscode.Uri.file(filePath);
-        await vscode.workspace.fs.writeFile(uri, Buffer.from(backup, 'utf-8'));
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(backup, "utf-8"));
 
-        logger.debug('File restored', { file: filePath });
+        logger.debug("File restored", { file: filePath });
       }
 
       this.rollbackPoints.delete(id);
 
-      logger.info('Rollback complete', {
+      logger.info("Rollback complete", {
         id,
         filesRestored: rollbackPoint.fileBackups.size,
       });
 
       return true;
     } catch (error) {
-      logger.error('Rollback failed', {
+      logger.error("Rollback failed", {
         id,
         error: (error as Error).message,
       });
@@ -78,7 +78,7 @@ export class RollbackManager {
 
   listRollbackPoints(): RollbackPoint[] {
     return Array.from(this.rollbackPoints.values()).sort(
-      (a, b) => b.timestamp - a.timestamp
+      (a, b) => b.timestamp - a.timestamp,
     );
   }
 

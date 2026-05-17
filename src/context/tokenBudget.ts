@@ -2,7 +2,7 @@
  * Token budget management for context window
  */
 
-import { getLogger } from '../telemetry/logger';
+import { getLogger } from "../telemetry/logger";
 
 export class TokenBudget {
   private readonly budget: number;
@@ -52,7 +52,7 @@ export class TokenBudget {
 
   logStatus(): void {
     const logger = getLogger();
-    logger.debug('Token budget status', {
+    logger.debug("Token budget status", {
       used: this.used,
       budget: this.budget,
       remaining: this.getRemaining(),

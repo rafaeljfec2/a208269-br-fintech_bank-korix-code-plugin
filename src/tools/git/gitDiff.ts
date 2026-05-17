@@ -9,15 +9,21 @@
  * - commit: git diff <range>
  */
 
-import { spawn } from 'child_process';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import { spawn } from "child_process";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const GitDiffSchema = z.object({
-  type: z.enum(['staged', 'unstaged', 'commit']).describe('Type of diff'),
-  commitRange: z.string().optional().describe('Commit range for commit diff (e.g., "HEAD~3..HEAD")'),
-  files: z.array(z.string()).optional().describe('Specific files to diff'),
-  contextLines: z.number().optional().describe('Number of context lines (default: 3)'),
+  type: z.enum(["staged", "unstaged", "commit"]).describe("Type of diff"),
+  commitRange: z
+    .string()
+    .optional()
+    .describe('Commit range for commit diff (e.g., "HEAD~3..HEAD")'),
+  files: z.array(z.string()).optional().describe("Specific files to diff"),
+  contextLines: z
+    .number()
+    .optional()
+    .describe("Number of context lines (default: 3)"),
 });
 
 type GitDiffInput = z.infer<typeof GitDiffSchema>;
@@ -39,8 +45,8 @@ interface GitDiffResult {
  * 4. Return unified diff + stats
  */
 export const GitDiffTool: Tool<GitDiffInput, GitDiffResult> = {
-  name: 'GitDiff',
-  description: 'Get git diffs (staged, unstaged, or commit range)',
+  name: "GitDiff",
+  description: "Get git diffs (staged, unstaged, or commit range)",
   schema: GitDiffSchema,
 
   allowedInMode(_mode): boolean {
@@ -49,7 +55,7 @@ export const GitDiffTool: Tool<GitDiffInput, GitDiffResult> = {
 
   async execute(
     input: GitDiffInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<ToolResult<GitDiffResult>> {
     const startTime = Date.now();
 
@@ -84,18 +90,18 @@ export const GitDiffTool: Tool<GitDiffInput, GitDiffResult> = {
  */
 async function executeGitDiff(
   input: GitDiffInput,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<GitDiffResult> {
   return new Promise((resolve, reject) => {
     // Build git diff arguments
-    const args: string[] = ['diff'];
+    const args: string[] = ["diff"];
 
     // Add type-specific flags
-    if (input.type === 'staged') {
-      args.push('--staged');
-    } else if (input.type === 'commit') {
+    if (input.type === "staged") {
+      args.push("--staged");
+    } else if (input.type === "commit") {
       if (!input.commitRange) {
-        reject(new Error('commitRange required for commit diff'));
+        reject(new Error("commitRange required for commit diff"));
         return;
       }
       args.push(input.commitRange);
@@ -107,8 +113,8 @@ async function executeGitDiff(
     }
 
     // Add stats
-    args.push('--numstat');
-    args.push('--');
+    args.push("--numstat");
+    args.push("--");
 
     // Add specific files if provided
     if (input.files && input.files.length > 0) {
@@ -116,20 +122,20 @@ async function executeGitDiff(
     }
 
     // Execute git diff
-    const git = spawn('git', args, { cwd: workspaceRoot });
+    const git = spawn("git", args, { cwd: workspaceRoot });
 
-    let stdout = '';
-    let stderr = '';
+    let stdout = "";
+    let stderr = "";
 
-    git.stdout.on('data', (data: Buffer) => {
+    git.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
 
-    git.stderr.on('data', (data: Buffer) => {
+    git.stderr.on("data", (data: Buffer) => {
       stderr += data.toString();
     });
 
-    git.on('close', (code) => {
+    git.on("close", (code) => {
       if (code === 0) {
         // Parse output
         const result = parseDiffOutput(stdout);
@@ -139,7 +145,7 @@ async function executeGitDiff(
       }
     });
 
-    git.on('error', (error) => {
+    git.on("error", (error) => {
       reject(error);
     });
   });
@@ -149,7 +155,7 @@ async function executeGitDiff(
  * Parse git diff output
  */
 function parseDiffOutput(output: string): GitDiffResult {
-  const lines = output.split('\n');
+  const lines = output.split("\n");
 
   let filesChanged = 0;
   let insertions = 0;
@@ -161,8 +167,8 @@ function parseDiffOutput(output: string): GitDiffResult {
     const numstatMatch = /^(\d+|-)\s+(\d+|-)\s+(.+)$/.exec(line);
     if (numstatMatch?.[1] && numstatMatch[2]) {
       filesChanged++;
-      const ins = numstatMatch[1] === '-' ? 0 : parseInt(numstatMatch[1], 10);
-      const del = numstatMatch[2] === '-' ? 0 : parseInt(numstatMatch[2], 10);
+      const ins = numstatMatch[1] === "-" ? 0 : parseInt(numstatMatch[1], 10);
+      const del = numstatMatch[2] === "-" ? 0 : parseInt(numstatMatch[2], 10);
       insertions += ins;
       deletions += del;
     } else {
@@ -172,7 +178,7 @@ function parseDiffOutput(output: string): GitDiffResult {
   }
 
   return {
-    diff: diffLines.join('\n'),
+    diff: diffLines.join("\n"),
     filesChanged,
     insertions,
     deletions,

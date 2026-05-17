@@ -2,10 +2,10 @@
  * Patch validation - pre and post application checks
  */
 
-import * as vscode from 'vscode';
-import * as path from 'path';
-import { getLogger } from '../telemetry/logger';
-import type { Patch, ValidationResult } from './types';
+import * as vscode from "vscode";
+import * as path from "path";
+import { getLogger } from "../telemetry/logger";
+import type { Patch, ValidationResult } from "./types";
 
 export class PatchValidator {
   constructor(private workspaceRoot: string) {}
@@ -30,7 +30,7 @@ export class PatchValidator {
     try {
       const uri = vscode.Uri.file(absolutePath);
       const content = await vscode.workspace.fs.readFile(uri);
-      const text = Buffer.from(content).toString('utf-8');
+      const text = Buffer.from(content).toString("utf-8");
 
       const searchCount = this.countOccurrences(text, patch.search);
 
@@ -38,15 +38,15 @@ export class PatchValidator {
         errors.push(`SEARCH block not found in ${patch.file}`);
       } else if (searchCount > 1) {
         errors.push(
-          `SEARCH block appears ${searchCount} times in ${patch.file} - must be unique`
+          `SEARCH block appears ${searchCount} times in ${patch.file} - must be unique`,
         );
       }
 
       if (patch.search.length > 10000) {
-        warnings.push('Very large SEARCH block - may be slow to apply');
+        warnings.push("Very large SEARCH block - may be slow to apply");
       }
 
-      logger.debug('Validation complete', {
+      logger.debug("Validation complete", {
         file: patch.file,
         searchCount,
         valid: errors.length === 0,
@@ -64,7 +64,7 @@ export class PatchValidator {
 
   async validateAfterApply(
     patch: Patch,
-    filePath: string
+    filePath: string,
   ): Promise<ValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -72,17 +72,17 @@ export class PatchValidator {
     try {
       const uri = vscode.Uri.file(filePath);
       const content = await vscode.workspace.fs.readFile(uri);
-      const text = Buffer.from(content).toString('utf-8');
+      const text = Buffer.from(content).toString("utf-8");
 
       const replaceCount = this.countOccurrences(text, patch.replace);
 
       if (replaceCount === 0) {
-        errors.push('REPLACE block not found in file after applying patch');
+        errors.push("REPLACE block not found in file after applying patch");
       }
 
       const searchCount = this.countOccurrences(text, patch.search);
       if (searchCount > 0) {
-        errors.push('SEARCH block still exists in file after applying patch');
+        errors.push("SEARCH block still exists in file after applying patch");
       }
     } catch (error) {
       errors.push(`Post-validation failed: ${(error as Error).message}`);
@@ -113,12 +113,12 @@ export class PatchValidator {
 
   async checkForConflicts(
     filePath: string,
-    expectedContent: string
+    expectedContent: string,
   ): Promise<boolean> {
     try {
       const uri = vscode.Uri.file(filePath);
       const content = await vscode.workspace.fs.readFile(uri);
-      const currentContent = Buffer.from(content).toString('utf-8');
+      const currentContent = Buffer.from(content).toString("utf-8");
 
       return currentContent !== expectedContent;
     } catch {

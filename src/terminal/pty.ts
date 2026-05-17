@@ -2,10 +2,10 @@
  * PTY wrapper for terminal spawning and I/O
  */
 
-import * as pty from 'node-pty';
-import * as os from 'os';
-import { getLogger } from '../telemetry/logger';
-import type { TerminalOptions } from './types';
+import * as pty from "node-pty";
+import * as os from "os";
+import { getLogger } from "../telemetry/logger";
+import type { TerminalOptions } from "./types";
 
 export class PTYManager {
   private pty: pty.IPty | null = null;
@@ -16,14 +16,15 @@ export class PTYManager {
   spawn(options: TerminalOptions = {}): void {
     const logger = getLogger();
 
-    const shell = options.shell ?? (os.platform() === 'win32' ? 'powershell.exe' : 'bash');
+    const shell =
+      options.shell ?? (os.platform() === "win32" ? "powershell.exe" : "bash");
     const cwd = options.cwd ?? process.cwd();
     const env = { ...process.env, ...options.env };
 
-    logger.debug('Spawning PTY', { shell, cwd });
+    logger.debug("Spawning PTY", { shell, cwd });
 
     this.pty = pty.spawn(shell, [], {
-      name: 'xterm-color',
+      name: "xterm-color",
       cols: 80,
       rows: 30,
       cwd,
@@ -39,26 +40,26 @@ export class PTYManager {
 
     this.pty.onExit((e) => {
       const exitCode = e.exitCode;
-      logger.debug('PTY process exited', { pid: this.pty?.pid, exitCode });
+      logger.debug("PTY process exited", { pid: this.pty?.pid, exitCode });
       if (this.onExitCallback) {
         this.onExitCallback(exitCode);
       }
     });
 
-    logger.info('PTY spawned', { pid: this.pty.pid, shell });
+    logger.info("PTY spawned", { pid: this.pty.pid, shell });
   }
 
   write(command: string): void {
     if (!this.pty) {
-      throw new Error('PTY not spawned');
+      throw new Error("PTY not spawned");
     }
 
     const logger = getLogger();
-    logger.debug('Writing to PTY', { command });
+    logger.debug("Writing to PTY", { command });
 
     this.pty.write(command);
-    if (!command.endsWith('\n')) {
-      this.pty.write('\n');
+    if (!command.endsWith("\n")) {
+      this.pty.write("\n");
     }
   }
 
@@ -71,7 +72,7 @@ export class PTYManager {
   }
 
   getOutput(): string {
-    return this.outputBuffer.join('');
+    return this.outputBuffer.join("");
   }
 
   clearOutput(): void {
@@ -88,7 +89,7 @@ export class PTYManager {
     const logger = getLogger();
 
     if (this.pty) {
-      logger.debug('Killing PTY', { pid: this.pty.pid });
+      logger.debug("Killing PTY", { pid: this.pty.pid });
       this.pty.kill();
       this.pty = null;
     }

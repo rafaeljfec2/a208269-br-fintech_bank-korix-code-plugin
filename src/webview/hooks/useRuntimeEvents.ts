@@ -2,10 +2,10 @@
  * Hook to process runtime events from extension
  */
 
-import { useEffect } from 'react';
-import { useStore } from '../store';
-import type { ExtensionToWebviewMessage } from '../../shared/protocol';
-import type { ToolExecution } from '../store/slices/chatSlice';
+import { useEffect } from "react";
+import { useStore } from "../store";
+import type { ExtensionToWebviewMessage } from "../../shared/protocol";
+import type { ToolExecution } from "../store/slices/chatSlice";
 
 export function useRuntimeEvents() {
   // Track current message tools (scoped to current message)
@@ -17,7 +17,7 @@ export function useRuntimeEvents() {
       const store = useStore.getState();
       const message = event.data;
 
-      if (message.type === 'init') {
+      if (message.type === "init") {
         const { mode, model, isExecuting } = message.payload;
         store.setMode(mode);
         store.setModel(model);
@@ -25,63 +25,66 @@ export function useRuntimeEvents() {
         return;
       }
 
-      if (message.type === 'runtime_event') {
+      if (message.type === "runtime_event") {
         const runtimeEvent = message.payload.event;
 
         switch (runtimeEvent.type) {
-          case 'iteration_start': {
+          case "iteration_start": {
             const event = runtimeEvent;
             store.setIteration(event.iteration);
             store.setExecuting(true);
             store.addTimelineEvent({
-              type: 'iteration',
+              type: "iteration",
               description: `Iteration ${event.iteration} started`,
-              status: 'pending',
+              status: "pending",
             });
             break;
           }
 
-          case 'iteration_complete': {
+          case "iteration_complete": {
             const event = runtimeEvent;
             store.addTimelineEvent({
-              type: 'iteration',
+              type: "iteration",
               description: `Iteration ${event.iteration} completed`,
-              status: 'success',
+              status: "success",
               metadata: { hadToolCalls: event.hadToolCalls },
             });
             break;
           }
 
-          case 'token': {
+          case "token": {
             const event = runtimeEvent;
             // Garantir que há conversa ativa antes de processar streaming
             let chatId = useStore.getState().activeChatId;
             if (!chatId) {
-              chatId = useStore.getState().createChat('Nova conversa');
+              chatId = useStore.getState().createChat("Nova conversa");
             }
             store.appendStreamingToken(chatId, event.content);
             break;
           }
 
-          case 'thinking':
+          case "thinking":
             store.addTimelineEvent({
-              type: 'thinking',
-              description: 'Reasoning...',
-              status: 'pending',
+              type: "thinking",
+              description: "Reasoning...",
+              status: "pending",
             });
             break;
 
-          case 'tool_call': {
+          case "tool_call": {
             const event = runtimeEvent;
 
             // Add to timeline (existing behavior)
             store.addTimelineEvent({
-              type: 'tool',
+              type: "tool",
               description: `Tool: ${event.name}`,
-              status: 'pending',
+              status: "pending",
               metadata: { toolName: event.name, input: event.input },
             });
-            store.updateMetrics({ toolCallCount: (useStore.getState().metrics.toolCallCount ?? 0) + 1 });
+            store.updateMetrics({
+              toolCallCount:
+                (useStore.getState().metrics.toolCallCount ?? 0) + 1,
+            });
 
             // NEW: Add pending tool to current message metadata
             const chatId = useStore.getState().activeChatId;
@@ -90,7 +93,7 @@ export function useRuntimeEvents() {
                 id: event.id,
                 name: event.name,
                 description: `${event.name}`,
-                status: 'pending',
+                status: "pending",
                 duration: 0,
                 timestamp: event.timestamp,
               };
@@ -107,29 +110,34 @@ export function useRuntimeEvents() {
             break;
           }
 
-          case 'tool_result': {
+          case "tool_result": {
             const event = runtimeEvent;
 
             // Add to timeline (existing behavior)
             store.addTimelineEvent({
-              type: 'tool',
+              type: "tool",
               description: `Tool ${event.name} completed`,
-              status: event.success ? 'success' : 'error',
+              status: event.success ? "success" : "error",
               metadata: { toolName: event.name },
             });
 
             // NEW: Update tool status and duration in message metadata
             const chatId = useStore.getState().activeChatId;
             if (chatId) {
-              const toolIndex = currentMessageTools.findIndex(t => t.id === event.id);
+              const toolIndex = currentMessageTools.findIndex(
+                (t) => t.id === event.id,
+              );
               if (toolIndex !== -1) {
                 currentMessageTools[toolIndex] = {
                   ...currentMessageTools[toolIndex],
-                  status: event.success ? 'success' : 'error',
+                  status: event.success ? "success" : "error",
                   duration: event.duration,
                 };
 
-                const totalDuration = currentMessageTools.reduce((sum, t) => sum + t.duration, 0);
+                const totalDuration = currentMessageTools.reduce(
+                  (sum, t) => sum + t.duration,
+                  0,
+                );
 
                 store.updateActiveMessageMetadata(chatId, {
                   execution: {
@@ -143,7 +151,7 @@ export function useRuntimeEvents() {
             break;
           }
 
-          case 'done': {
+          case "done": {
             const chatId = useStore.getState().activeChatId;
             if (chatId) {
               store.finalizeStreaming(chatId);
@@ -155,19 +163,19 @@ export function useRuntimeEvents() {
             break;
           }
 
-          case 'execution_complete': {
+          case "execution_complete": {
             const event = runtimeEvent;
             const chatId = useStore.getState().activeChatId;
 
             // Add status card if successful
             if (event.success && chatId) {
               store.addMessage(chatId, {
-                role: 'assistant',
-                content: '',
+                role: "assistant",
+                content: "",
                 metadata: {
                   statusCard: {
-                    type: 'completed',
-                    title: 'Concluído com sucesso',
+                    type: "completed",
+                    title: "Concluído com sucesso",
                     subtitle: `${event.iterations} iterações, ${event.metrics.totalToolCalls} ferramentas`,
                   },
                 },
@@ -176,7 +184,7 @@ export function useRuntimeEvents() {
             break;
           }
 
-          case 'error': {
+          case "error": {
             const event = runtimeEvent;
             const chatId = useStore.getState().activeChatId;
             if (chatId) {
@@ -184,31 +192,31 @@ export function useRuntimeEvents() {
             }
             store.setExecuting(false);
             store.addTimelineEvent({
-              type: 'error',
+              type: "error",
               description: event.error,
-              status: 'error',
+              status: "error",
               metadata: { error: event.error },
             });
             break;
           }
 
-          case 'checkpoint_created': {
+          case "checkpoint_created": {
             const event = runtimeEvent;
             store.addTimelineEvent({
-              type: 'checkpoint',
-              description: 'Checkpoint created',
-              status: 'success',
+              type: "checkpoint",
+              description: "Checkpoint created",
+              status: "success",
               metadata: { checkpointId: event.checkpointId },
             });
             break;
           }
 
-          case 'checkpoint_restored': {
+          case "checkpoint_restored": {
             const event = runtimeEvent;
             store.addTimelineEvent({
-              type: 'checkpoint',
-              description: 'Checkpoint restored',
-              status: 'success',
+              type: "checkpoint",
+              description: "Checkpoint restored",
+              status: "success",
               metadata: { checkpointId: event.checkpointId },
             });
             break;
@@ -216,18 +224,18 @@ export function useRuntimeEvents() {
         }
       }
 
-      if (message.type === 'terminal_session_created') {
+      if (message.type === "terminal_session_created") {
         const { sessionId, shellPath } = message.payload;
         store.createSession(sessionId, shellPath);
       }
 
-      if (message.type === 'terminal_output') {
+      if (message.type === "terminal_output") {
         const { sessionId, data } = message.payload;
         store.appendOutput(sessionId, data);
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []); // Array vazio - listener registrado apenas uma vez
 }

@@ -3,10 +3,10 @@
  * Manages terminal sessions and forwards PTY output to webview
  */
 
-import * as vscode from 'vscode';
-import type { TerminalSessionManager } from '../../terminal/session';
-import type { Logger } from '../../telemetry/logger';
-import type { ExtensionToWebviewMessage } from '../../shared/protocol';
+import * as vscode from "vscode";
+import type { TerminalSessionManager } from "../../terminal/session";
+import type { Logger } from "../../telemetry/logger";
+import type { ExtensionToWebviewMessage } from "../../shared/protocol";
 
 export class TerminalBridge {
   constructor(
@@ -19,7 +19,7 @@ export class TerminalBridge {
    * Create a new terminal session and setup PTY forwarding
    */
   createSession(shellPath?: string): string {
-    this.logger.info('Creating terminal session', { shellPath });
+    this.logger.info("Creating terminal session", { shellPath });
 
     const sessionId = this.terminalManager.createSession({
       cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
@@ -28,14 +28,16 @@ export class TerminalBridge {
 
     const session = this.terminalManager.getSession(sessionId);
     if (!session) {
-      this.logger.error('Failed to retrieve created terminal session', { sessionId });
-      throw new Error('Failed to create terminal session');
+      this.logger.error("Failed to retrieve created terminal session", {
+        sessionId,
+      });
+      throw new Error("Failed to create terminal session");
     }
 
     // Setup PTY output forwarding
     session.pty.onData((data: string) => {
       const message: ExtensionToWebviewMessage = {
-        type: 'terminal_output',
+        type: "terminal_output",
         payload: {
           sessionId,
           data,
@@ -47,26 +49,29 @@ export class TerminalBridge {
           // Success
         },
         (error) => {
-          this.logger.error('Failed to forward terminal output', error);
+          this.logger.error("Failed to forward terminal output", error);
         },
       );
     });
 
     // Notify webview of new session
     const sessionCreatedMsg: ExtensionToWebviewMessage = {
-      type: 'terminal_session_created',
+      type: "terminal_session_created",
       payload: {
         sessionId,
-        shellPath: shellPath ?? 'default',
+        shellPath: shellPath ?? "default",
       },
     };
 
     this.webview.postMessage(sessionCreatedMsg).then(
       () => {
-        this.logger.info('Terminal session created', { sessionId });
+        this.logger.info("Terminal session created", { sessionId });
       },
       (error) => {
-        this.logger.error('Failed to notify webview of terminal creation', error);
+        this.logger.error(
+          "Failed to notify webview of terminal creation",
+          error,
+        );
       },
     );
 
@@ -79,7 +84,7 @@ export class TerminalBridge {
   write(sessionId: string, data: string): void {
     const session = this.terminalManager.getSession(sessionId);
     if (!session) {
-      this.logger.error('Terminal session not found', { sessionId });
+      this.logger.error("Terminal session not found", { sessionId });
       return;
     }
 
@@ -90,7 +95,7 @@ export class TerminalBridge {
    * Kill a terminal session
    */
   kill(sessionId: string): void {
-    this.logger.info('Killing terminal session', { sessionId });
+    this.logger.info("Killing terminal session", { sessionId });
     this.terminalManager.killSession(sessionId);
   }
 
@@ -98,6 +103,8 @@ export class TerminalBridge {
    * Get active session IDs
    */
   getActiveSessions(): string[] {
-    return this.terminalManager.getActiveSessions().map((session) => session.id);
+    return this.terminalManager
+      .getActiveSessions()
+      .map((session) => session.id);
   }
 }

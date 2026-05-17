@@ -42,3 +42,185 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  width: 250px;
+  min-width: 200px;
+  max-width: 500px;
+  background-color: var(--vscode-sideBar-background);
+  border-right: 1px solid var(--vscode-sideBar-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding: 12px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--vscode-sideBarTitle-foreground);
+  border-bottom: 1px solid var(--vscode-sideBar-border);
+}
+
+/* ===== Session Item (adapted from VSCode) ===== */
+.session-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  margin: 0 6px 2px 6px;
+  transition: background-color 0.1s;
+}
+
+.session-item:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.session-item.active {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.session-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.session-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-title {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.session-toolbar {
+  display: flex;
+  gap: 4px;
+}
+
+.session-toolbar button {
+  background: none;
+  border: none;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  opacity: 0.7;
+  transition: opacity 0.1s, background-color 0.1s;
+}
+
+.session-toolbar button:hover {
+  opacity: 1;
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.session-details-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.session-preview {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.session-time {
+  flex-shrink: 0;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Resize Handle ===== */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  transition: background-color 0.1s;
+  position: relative;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+  background-color: var(--vscode-sash-hoverBorder);
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+}
+
+/* ===== Chat Font Size + Cleartype ===== */
+/* Aplicar cleartype (font smoothing) globalmente */
+body, .vscode-body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Reduzir fonte do chat de text-sm (14px) para 12px */
+.session-item {
+  font-size: 12px; /* Já usa 12px - manter */
+}
+
+/* Mensagens do chat - reduzir de 14px para 12px */
+.prose.prose-sm {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.5;
+}
+
+.prose.prose-sm p,
+.prose.prose-sm li {
+  font-size: 0.75rem; /* 12px */
+}
+
+/* Code blocks inline - reduzir */
+.prose.prose-sm code:not([class*="language-"]) {
+  font-size: 0.7rem; /* 11.2px - 10% menor que texto normal */
+}
+
+/* ===== Ocultar Scrollbar mas Manter Scroll ===== */
+/* Para navegadores WebKit (Chrome, Safari, Edge) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Para Firefox */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+/* Para IE e Edge legacy */
+.no-scrollbar {
+  -ms-overflow-style: none;
+}

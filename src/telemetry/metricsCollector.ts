@@ -8,8 +8,12 @@
  * - Cache efficiency monitoring
  */
 
-import type { ToolMetrics, AggregatedMetrics, GlobalMetrics } from '../tools/registry/ToolMetrics';
-import type { ToolCache } from '../tools/registry/ToolCache';
+import type {
+  ToolMetrics,
+  AggregatedMetrics,
+  GlobalMetrics,
+} from "../tools/registry/ToolMetrics";
+import type { ToolCache } from "../tools/registry/ToolCache";
 
 export interface MetricsDashboard {
   readonly timestamp: number;
@@ -50,7 +54,7 @@ export interface MetricsDashboard {
 export class MetricsCollector {
   constructor(
     private readonly toolMetrics: ToolMetrics,
-    private readonly toolCache: ToolCache
+    private readonly toolCache: ToolCache,
   ) {}
 
   /**
@@ -140,7 +144,7 @@ export class MetricsCollector {
         errorRate: metrics.failures / metrics.invocations,
         failures: metrics.failures,
       }))
-      .filter(t => t.failures > 0)
+      .filter((t) => t.failures > 0)
       .sort((a, b) => b.errorRate - a.errorRate)
       .slice(0, 10);
 
@@ -157,7 +161,7 @@ export class MetricsCollector {
   /**
    * Get metrics timeline since timestamp
    */
-  getTimeline(since: number): ReturnType<ToolMetrics['getTimeline']> {
+  getTimeline(since: number): ReturnType<ToolMetrics["getTimeline"]> {
     return this.toolMetrics.getTimeline(since);
   }
 

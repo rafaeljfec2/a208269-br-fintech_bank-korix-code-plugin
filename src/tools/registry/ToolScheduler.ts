@@ -8,7 +8,7 @@
  * - Cancellation propagation via AbortController
  */
 
-import type { ToolResult } from '../../harness/toolRegistry';
+import type { ToolResult } from "../../harness/toolRegistry";
 
 export interface ScheduledTask<T = unknown> {
   readonly id: string;
@@ -75,7 +75,11 @@ export class ToolScheduler {
    */
   async schedule<T>(
     task: ScheduledTask<T>,
-    executor: (tool: string, input: unknown, signal?: AbortSignal) => Promise<ToolResult<T>>
+    executor: (
+      tool: string,
+      input: unknown,
+      signal?: AbortSignal,
+    ) => Promise<ToolResult<T>>,
   ): Promise<TaskResult<T>> {
     // Check for cycles in dependencies
     if (task.dependencies && task.dependencies.length > 0) {
@@ -110,17 +114,25 @@ export class ToolScheduler {
    */
   async scheduleMany<T>(
     tasks: readonly ScheduledTask<T>[],
-    executor: (tool: string, input: unknown, signal?: AbortSignal) => Promise<ToolResult<T>>
+    executor: (
+      tool: string,
+      input: unknown,
+      signal?: AbortSignal,
+    ) => Promise<ToolResult<T>>,
   ): Promise<TaskResult<T>[]> {
     // Validate dependency graph (detect cycles)
     for (const task of tasks) {
       if (task.dependencies && task.dependencies.length > 0) {
-        this.detectCycles(task.id, task.dependencies, new Set(tasks.map(t => t.id)));
+        this.detectCycles(
+          task.id,
+          task.dependencies,
+          new Set(tasks.map((t) => t.id)),
+        );
       }
     }
 
     // Schedule all tasks
-    const promises = tasks.map(task => this.schedule(task, executor));
+    const promises = tasks.map((task) => this.schedule(task, executor));
 
     // Wait for all to complete
     return Promise.all(promises);
@@ -170,8 +182,14 @@ export class ToolScheduler {
       tasksCompleted: this.stats.completed,
       tasksFailed: this.stats.failed,
       tasksCancelled: this.stats.cancelled,
-      avgWaitTime: this.stats.completed > 0 ? this.stats.totalWaitTime / this.stats.completed : 0,
-      avgExecutionTime: this.stats.completed > 0 ? this.stats.totalExecutionTime / this.stats.completed : 0,
+      avgWaitTime:
+        this.stats.completed > 0
+          ? this.stats.totalWaitTime / this.stats.completed
+          : 0,
+      avgExecutionTime:
+        this.stats.completed > 0
+          ? this.stats.totalExecutionTime / this.stats.completed
+          : 0,
     };
   }
 
@@ -194,7 +212,11 @@ export class ToolScheduler {
    */
   private async tryExecute<T>(
     taskId: string,
-    executor: (tool: string, input: unknown, signal?: AbortSignal) => Promise<ToolResult<T>>
+    executor: (
+      tool: string,
+      input: unknown,
+      signal?: AbortSignal,
+    ) => Promise<ToolResult<T>>,
   ): Promise<void> {
     const queued = this.queue.get(taskId);
     if (!queued) {
@@ -205,7 +227,9 @@ export class ToolScheduler {
 
     // Check if all dependencies are completed
     if (task.dependencies && task.dependencies.length > 0) {
-      const allCompleted = task.dependencies.every(depId => this.completed.has(depId));
+      const allCompleted = task.dependencies.every((depId) =>
+        this.completed.has(depId),
+      );
       if (!allCompleted) {
         // Wait for dependencies
         return;
@@ -292,7 +316,7 @@ export class ToolScheduler {
   private detectCycles(
     taskId: string,
     dependencies: readonly string[],
-    allTaskIds?: Set<string>
+    allTaskIds?: Set<string>,
   ): void {
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
@@ -331,7 +355,9 @@ export class ToolScheduler {
     // Check each dependency
     for (const depId of dependencies) {
       if (hasCycle(depId)) {
-        throw new Error(`Cycle detected in task dependencies: ${taskId} -> ${depId}`);
+        throw new Error(
+          `Cycle detected in task dependencies: ${taskId} -> ${depId}`,
+        );
       }
     }
   }
@@ -348,7 +374,9 @@ export class ToolScheduler {
         break;
       }
 
-      signal.addEventListener('abort', () => controller.abort(), { once: true });
+      signal.addEventListener("abort", () => controller.abort(), {
+        once: true,
+      });
     }
 
     return controller.signal;

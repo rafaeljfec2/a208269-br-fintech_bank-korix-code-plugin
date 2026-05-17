@@ -48,7 +48,11 @@ export class Tracer {
    * @param metadata Optional metadata
    * @returns Span ID
    */
-  startSpan(tool: string, parentId?: string, metadata?: Record<string, unknown>): string {
+  startSpan(
+    tool: string,
+    parentId?: string,
+    metadata?: Record<string, unknown>,
+  ): string {
     const spanId = this.generateSpanId();
 
     const span: Span = {
@@ -139,7 +143,7 @@ export class Tracer {
     const totalDuration = rootSpan.duration ?? 0;
 
     // Check if trace succeeded
-    const success = traceSpans.every(s => s.success !== false);
+    const success = traceSpans.every((s) => s.success !== false);
 
     return {
       rootSpanId,
@@ -153,8 +157,10 @@ export class Tracer {
    * Get all traces
    */
   getAllTraces(): Trace[] {
-    const rootSpans = Array.from(this.spans.values()).filter(s => !s.parentId);
-    return rootSpans.map(s => this.getTrace(s.id)).filter(t => t !== null);
+    const rootSpans = Array.from(this.spans.values()).filter(
+      (s) => !s.parentId,
+    );
+    return rootSpans.map((s) => this.getTrace(s.id)).filter((t) => t !== null);
   }
 
   /**
@@ -162,8 +168,8 @@ export class Tracer {
    */
   getActiveSpans(): Span[] {
     return Array.from(this.activeSpans)
-      .map(id => this.spans.get(id))
-      .filter(s => s !== undefined);
+      .map((id) => this.spans.get(id))
+      .filter((s) => s !== undefined);
   }
 
   /**

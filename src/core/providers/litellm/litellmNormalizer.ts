@@ -87,10 +87,7 @@ export class LiteLLMNormalizer {
         // Erro da API
         events.push({
           type: "error",
-          error: new ProviderError(
-            event.error.message,
-            event.error.type,
-          ),
+          error: new ProviderError(event.error.message, event.error.type),
           timestamp,
           correlation,
         });

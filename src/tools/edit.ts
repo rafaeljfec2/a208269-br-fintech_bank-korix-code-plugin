@@ -2,17 +2,14 @@
  * Edit tool - applies code patches using KORIX_PATCH format
  */
 
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../harness/toolRegistry';
-import type { PatchApplier } from '../patch/applier';
-import { getGlobalContainer } from '../di/container';
-import { TOKENS } from '../di/tokens';
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../harness/toolRegistry";
+import type { PatchApplier } from "../patch/applier";
+import { getGlobalContainer } from "../di/container";
+import { TOKENS } from "../di/tokens";
 
 const EditFileInputSchema = z.object({
-  patches: z
-    .string()
-    .min(1)
-    .describe('Patches in KORIX_PATCH format'),
+  patches: z.string().min(1).describe("Patches in KORIX_PATCH format"),
 });
 
 type EditFileInput = z.infer<typeof EditFileInputSchema>;
@@ -25,7 +22,7 @@ interface EditFileOutput {
 }
 
 export const EditFileTool: Tool<EditFileInput, EditFileOutput> = {
-  name: 'EditFile',
+  name: "EditFile",
   description: `Apply code patches using KORIX_PATCH format.
 
 Format:
@@ -43,8 +40,8 @@ All patches are applied atomically with automatic rollback on failure.`,
 
   schema: EditFileInputSchema,
 
-  allowedInMode(mode: 'ask' | 'plan' | 'agent'): boolean {
-    return mode === 'agent';
+  allowedInMode(mode: "ask" | "plan" | "agent"): boolean {
+    return mode === "agent";
   },
 
   requiresApproval(_input: EditFileInput, _context: ToolContext): boolean {
@@ -53,7 +50,7 @@ All patches are applied atomically with automatic rollback on failure.`,
 
   async execute(
     input: EditFileInput,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<ToolResult<EditFileOutput>> {
     const startTime = Date.now();
 
@@ -65,7 +62,7 @@ All patches are applied atomically with automatic rollback on failure.`,
       const output: EditFileOutput = {
         appliedCount: result.appliedPatches.length,
         errorCount: result.errors.length,
-        rollbackId: '',
+        rollbackId: "",
       };
 
       if (result.errors.length > 0) {
@@ -76,7 +73,9 @@ All patches are applied atomically with automatic rollback on failure.`,
       }
 
       if (result.appliedPatches.length > 0) {
-        const rollbackPoints = applier.getRollbackManager().listRollbackPoints();
+        const rollbackPoints = applier
+          .getRollbackManager()
+          .listRollbackPoints();
         const latestRollback = rollbackPoints[0];
         if (latestRollback) {
           output.rollbackId = latestRollback.id;
@@ -86,7 +85,7 @@ All patches are applied atomically with automatic rollback on failure.`,
       return {
         success: result.success,
         data: output,
-        error: result.success ? undefined : 'Some patches failed to apply',
+        error: result.success ? undefined : "Some patches failed to apply",
         metadata: {
           duration: Date.now() - startTime,
           approved: true,

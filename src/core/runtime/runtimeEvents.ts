@@ -5,21 +5,21 @@
  * Event-driven architecture enables observability, debugging, and UI updates.
  */
 
-import { EventEmitter } from 'events';
-import * as vscode from 'vscode';
-import type { RuntimeMetricsSnapshot } from './runtimeTypes';
+import { EventEmitter } from "events";
+import * as vscode from "vscode";
+import type { RuntimeMetricsSnapshot } from "./runtimeTypes";
 
 /**
  * Lifecycle events
  */
 export interface IterationStartEvent {
-  readonly type: 'iteration_start';
+  readonly type: "iteration_start";
   readonly iteration: number;
   readonly timestamp: number;
 }
 
 export interface IterationCompleteEvent {
-  readonly type: 'iteration_complete';
+  readonly type: "iteration_complete";
   readonly iteration: number;
   readonly hadToolCalls: boolean;
   readonly duration: number;
@@ -27,7 +27,7 @@ export interface IterationCompleteEvent {
 }
 
 export interface ExecutionCompleteEvent {
-  readonly type: 'execution_complete';
+  readonly type: "execution_complete";
   readonly success: boolean;
   readonly iterations: number;
   readonly metrics: RuntimeMetricsSnapshot;
@@ -38,19 +38,19 @@ export interface ExecutionCompleteEvent {
  * Provider events (streaming)
  */
 export interface TokenEvent {
-  readonly type: 'token';
+  readonly type: "token";
   readonly content: string;
   readonly timestamp: number;
 }
 
 export interface ThinkingEvent {
-  readonly type: 'thinking';
+  readonly type: "thinking";
   readonly content: string;
   readonly timestamp: number;
 }
 
 export interface DoneEvent {
-  readonly type: 'done';
+  readonly type: "done";
   readonly stopReason?: string;
   readonly usage?: {
     readonly inputTokens: number;
@@ -63,7 +63,7 @@ export interface DoneEvent {
  * Tool events
  */
 export interface ToolCallEvent {
-  readonly type: 'tool_call';
+  readonly type: "tool_call";
   readonly id: string;
   readonly name: string;
   readonly input: unknown;
@@ -71,7 +71,7 @@ export interface ToolCallEvent {
 }
 
 export interface ToolResultEvent {
-  readonly type: 'tool_result';
+  readonly type: "tool_result";
   readonly id: string;
   readonly name: string;
   readonly success: boolean;
@@ -81,7 +81,7 @@ export interface ToolResultEvent {
 }
 
 export interface ToolApprovalRequiredEvent {
-  readonly type: 'tool_approval_required';
+  readonly type: "tool_approval_required";
   readonly id: string;
   readonly name: string;
   readonly input: unknown;
@@ -89,14 +89,14 @@ export interface ToolApprovalRequiredEvent {
 }
 
 export interface ToolApprovedEvent {
-  readonly type: 'tool_approved';
+  readonly type: "tool_approved";
   readonly id: string;
   readonly name: string;
   readonly timestamp: number;
 }
 
 export interface ToolDeniedEvent {
-  readonly type: 'tool_denied';
+  readonly type: "tool_denied";
   readonly id: string;
   readonly name: string;
   readonly reason: string;
@@ -107,15 +107,15 @@ export interface ToolDeniedEvent {
  * Patch events
  */
 export interface PatchAppliedEvent {
-  readonly type: 'patch_applied';
+  readonly type: "patch_applied";
   readonly file: string;
   readonly lineNumber: number;
-  readonly operation: 'insert' | 'replace' | 'delete';
+  readonly operation: "insert" | "replace" | "delete";
   readonly timestamp: number;
 }
 
 export interface PatchFailedEvent {
-  readonly type: 'patch_failed';
+  readonly type: "patch_failed";
   readonly file: string;
   readonly error: string;
   readonly timestamp: number;
@@ -125,7 +125,7 @@ export interface PatchFailedEvent {
  * Checkpoint events
  */
 export interface CheckpointCreatedEvent {
-  readonly type: 'checkpoint_created';
+  readonly type: "checkpoint_created";
   readonly checkpointId: string;
   readonly iteration: number;
   readonly filesChanged: number;
@@ -133,7 +133,7 @@ export interface CheckpointCreatedEvent {
 }
 
 export interface CheckpointRestoredEvent {
-  readonly type: 'checkpoint_restored';
+  readonly type: "checkpoint_restored";
   readonly checkpointId: string;
   readonly iteration: number;
   readonly timestamp: number;
@@ -143,7 +143,7 @@ export interface CheckpointRestoredEvent {
  * Error & recovery events
  */
 export interface ErrorEvent {
-  readonly type: 'error';
+  readonly type: "error";
   readonly error: string;
   readonly iteration: number;
   readonly recoverable: boolean;
@@ -151,15 +151,15 @@ export interface ErrorEvent {
 }
 
 export interface RecoveryStartedEvent {
-  readonly type: 'recovery_started';
-  readonly action: 'retry' | 'rollback' | 'fail';
+  readonly type: "recovery_started";
+  readonly action: "retry" | "rollback" | "fail";
   readonly attempt: number;
   readonly timestamp: number;
 }
 
 export interface RecoveryCompleteEvent {
-  readonly type: 'recovery_complete';
-  readonly action: 'retry' | 'rollback' | 'fail';
+  readonly type: "recovery_complete";
+  readonly action: "retry" | "rollback" | "fail";
   readonly success: boolean;
   readonly timestamp: number;
 }
@@ -168,21 +168,21 @@ export interface RecoveryCompleteEvent {
  * Guard events (loop prevention)
  */
 export interface StallDetectedEvent {
-  readonly type: 'stall_detected';
+  readonly type: "stall_detected";
   readonly iteration: number;
   readonly timeSinceActivity: number;
   readonly timestamp: number;
 }
 
 export interface DuplicateToolDetectedEvent {
-  readonly type: 'duplicate_tool_detected';
+  readonly type: "duplicate_tool_detected";
   readonly toolName: string;
   readonly count: number;
   readonly timestamp: number;
 }
 
 export interface LoopWarningEvent {
-  readonly type: 'loop_warning';
+  readonly type: "loop_warning";
   readonly reason: string;
   readonly iteration: number;
   readonly timestamp: number;
@@ -192,20 +192,20 @@ export interface LoopWarningEvent {
  * Control events
  */
 export interface CancelledEvent {
-  readonly type: 'cancelled';
+  readonly type: "cancelled";
   readonly reason: string;
   readonly iteration: number;
   readonly timestamp: number;
 }
 
 export interface PausedEvent {
-  readonly type: 'paused';
+  readonly type: "paused";
   readonly iteration: number;
   readonly timestamp: number;
 }
 
 export interface ResumedEvent {
-  readonly type: 'resumed';
+  readonly type: "resumed";
   readonly iteration: number;
   readonly timestamp: number;
 }
@@ -255,7 +255,7 @@ export class RuntimeEventEmitter extends EventEmitter {
    * Emit a runtime event
    */
   emitEvent(event: RuntimeEvent): boolean {
-    return super.emit('event', event);
+    return super.emit("event", event);
   }
 
   /**
@@ -263,9 +263,9 @@ export class RuntimeEventEmitter extends EventEmitter {
    * Returns a Disposable that removes the listener when disposed
    */
   onEvent(listener: (event: RuntimeEvent) => void): vscode.Disposable {
-    this.on('event', listener);
+    this.on("event", listener);
     return new vscode.Disposable(() => {
-      this.off('event', listener);
+      this.off("event", listener);
     });
   }
 
@@ -273,7 +273,7 @@ export class RuntimeEventEmitter extends EventEmitter {
    * Listen to specific event types
    * Returns a Disposable that removes the listener when disposed
    */
-  onType<T extends RuntimeEvent['type']>(
+  onType<T extends RuntimeEvent["type"]>(
     type: T,
     listener: (event: Extract<RuntimeEvent, { type: T }>) => void,
   ): vscode.Disposable {

@@ -10,20 +10,33 @@
  * - Detailed file status
  */
 
-import { spawn } from 'child_process';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import { spawn } from "child_process";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const GitStatusSchema = z.object({
-  includeUntracked: z.boolean().optional().describe('Include untracked files (default: true)'),
-  includeIgnored: z.boolean().optional().describe('Include ignored files (default: false)'),
+  includeUntracked: z
+    .boolean()
+    .optional()
+    .describe("Include untracked files (default: true)"),
+  includeIgnored: z
+    .boolean()
+    .optional()
+    .describe("Include ignored files (default: false)"),
 });
 
 type GitStatusInput = z.infer<typeof GitStatusSchema>;
 
 interface FileStatus {
   readonly path: string;
-  readonly status: 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | 'untracked' | 'ignored';
+  readonly status:
+    | "modified"
+    | "added"
+    | "deleted"
+    | "renamed"
+    | "copied"
+    | "untracked"
+    | "ignored";
   readonly staged: boolean;
   readonly oldPath?: string; // For renames
 }
@@ -52,8 +65,8 @@ interface GitStatusResult {
  * Command: git status --porcelain=v2 --branch
  */
 export const GitStatusTool: Tool<GitStatusInput, GitStatusResult> = {
-  name: 'GitStatus',
-  description: 'Get git repository status with branch and file info',
+  name: "GitStatus",
+  description: "Get git repository status with branch and file info",
   schema: GitStatusSchema,
 
   allowedInMode(_mode): boolean {
@@ -62,7 +75,7 @@ export const GitStatusTool: Tool<GitStatusInput, GitStatusResult> = {
 
   async execute(
     input: GitStatusInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<ToolResult<GitStatusResult>> {
     const startTime = Date.now();
 
@@ -97,37 +110,37 @@ export const GitStatusTool: Tool<GitStatusInput, GitStatusResult> = {
  */
 async function executeGitStatus(
   input: GitStatusInput,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<GitStatusResult> {
   return new Promise((resolve, reject) => {
-    const args: string[] = ['status', '--porcelain=v2', '--branch'];
+    const args: string[] = ["status", "--porcelain=v2", "--branch"];
 
     // Include untracked files (default: true)
     if (input.includeUntracked ?? true) {
-      args.push('--untracked-files=normal');
+      args.push("--untracked-files=normal");
     } else {
-      args.push('--untracked-files=no');
+      args.push("--untracked-files=no");
     }
 
     // Include ignored files
     if (input.includeIgnored) {
-      args.push('--ignored=traditional');
+      args.push("--ignored=traditional");
     }
 
-    const git = spawn('git', args, { cwd: workspaceRoot });
+    const git = spawn("git", args, { cwd: workspaceRoot });
 
-    let stdout = '';
-    let stderr = '';
+    let stdout = "";
+    let stderr = "";
 
-    git.stdout.on('data', (data: Buffer) => {
+    git.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
 
-    git.stderr.on('data', (data: Buffer) => {
+    git.stderr.on("data", (data: Buffer) => {
       stderr += data.toString();
     });
 
-    git.on('close', (code) => {
+    git.on("close", (code) => {
       if (code === 0) {
         const result = parseGitStatus(stdout);
         resolve(result);
@@ -136,7 +149,7 @@ async function executeGitStatus(
       }
     });
 
-    git.on('error', (error) => {
+    git.on("error", (error) => {
       reject(error);
     });
   });
@@ -146,9 +159,9 @@ async function executeGitStatus(
  * Parse git status porcelain v2 output
  */
 function parseGitStatus(output: string): GitStatusResult {
-  const lines = output.split('\n');
+  const lines = output.split("\n");
 
-  let branch = 'main';
+  let branch = "main";
   let upstream: string | undefined;
   let ahead = 0;
   let behind = 0;
@@ -165,11 +178,11 @@ function parseGitStatus(output: string): GitStatusResult {
     }
 
     // Branch header (# branch.oid <commit> / # branch.head <branch>)
-    if (line.startsWith('# branch.head ')) {
-      branch = line.substring('# branch.head '.length);
-    } else if (line.startsWith('# branch.upstream ')) {
-      upstream = line.substring('# branch.upstream '.length);
-    } else if (line.startsWith('# branch.ab ')) {
+    if (line.startsWith("# branch.head ")) {
+      branch = line.substring("# branch.head ".length);
+    } else if (line.startsWith("# branch.upstream ")) {
+      upstream = line.substring("# branch.upstream ".length);
+    } else if (line.startsWith("# branch.ab ")) {
       // Format: # branch.ab +<ahead> -<behind>
       const match = /# branch\.ab \+(\d+) -(\d+)/.exec(line);
       if (match?.[1] && match[2]) {
@@ -178,7 +191,7 @@ function parseGitStatus(output: string): GitStatusResult {
       }
     }
     // Ordinary changed entries (1 <XY> ...)
-    else if (line.startsWith('1 ')) {
+    else if (line.startsWith("1 ")) {
       const fileStatus = parseOrdinaryEntry(line);
       if (fileStatus) {
         files.push(fileStatus);
@@ -186,13 +199,13 @@ function parseGitStatus(output: string): GitStatusResult {
         if (fileStatus.staged) {
           staged++;
         }
-        if (fileStatus.status === 'modified') {
+        if (fileStatus.status === "modified") {
           modified++;
         }
       }
     }
     // Renamed/copied entries (2 <XY> ...)
-    else if (line.startsWith('2 ')) {
+    else if (line.startsWith("2 ")) {
       const fileStatus = parseRenamedEntry(line);
       if (fileStatus) {
         files.push(fileStatus);
@@ -202,26 +215,26 @@ function parseGitStatus(output: string): GitStatusResult {
       }
     }
     // Untracked entries (? <path>)
-    else if (line.startsWith('? ')) {
+    else if (line.startsWith("? ")) {
       const path = line.substring(2);
       files.push({
         path,
-        status: 'untracked',
+        status: "untracked",
         staged: false,
       });
       untracked++;
     }
     // Ignored entries (! <path>)
-    else if (line.startsWith('! ')) {
+    else if (line.startsWith("! ")) {
       const path = line.substring(2);
       files.push({
         path,
-        status: 'ignored',
+        status: "ignored",
         staged: false,
       });
     }
     // Unmerged entries (u <XY> ...)
-    else if (line.startsWith('u ')) {
+    else if (line.startsWith("u ")) {
       conflicted++;
     }
   }
@@ -244,13 +257,13 @@ function parseGitStatus(output: string): GitStatusResult {
  */
 function parseOrdinaryEntry(line: string): FileStatus | null {
   // Format: 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
-  const parts = line.split(' ');
+  const parts = line.split(" ");
   if (parts.length < 9) {
     return null;
   }
 
   const xy = parts[1]; // Status codes
-  const path = parts.slice(8).join(' ');
+  const path = parts.slice(8).join(" ");
 
   if (!xy || xy.length < 2) {
     return null;
@@ -259,18 +272,18 @@ function parseOrdinaryEntry(line: string): FileStatus | null {
   const stagedChar = xy[0];
   const unstagedChar = xy[1];
 
-  let status: FileStatus['status'] = 'modified';
+  let status: FileStatus["status"] = "modified";
   let isStaged = false;
 
-  if (stagedChar === 'M' || unstagedChar === 'M') {
-    status = 'modified';
-    isStaged = stagedChar === 'M';
-  } else if (stagedChar === 'A' || unstagedChar === 'A') {
-    status = 'added';
-    isStaged = stagedChar === 'A';
-  } else if (stagedChar === 'D' || unstagedChar === 'D') {
-    status = 'deleted';
-    isStaged = stagedChar === 'D';
+  if (stagedChar === "M" || unstagedChar === "M") {
+    status = "modified";
+    isStaged = stagedChar === "M";
+  } else if (stagedChar === "A" || unstagedChar === "A") {
+    status = "added";
+    isStaged = stagedChar === "A";
+  } else if (stagedChar === "D" || unstagedChar === "D") {
+    status = "deleted";
+    isStaged = stagedChar === "D";
   }
 
   return {
@@ -285,7 +298,7 @@ function parseOrdinaryEntry(line: string): FileStatus | null {
  */
 function parseRenamedEntry(line: string): FileStatus | null {
   // Format: 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path><sep><origPath>
-  const parts = line.split(' ');
+  const parts = line.split(" ");
   if (parts.length < 10) {
     return null;
   }
@@ -295,16 +308,16 @@ function parseRenamedEntry(line: string): FileStatus | null {
     return null;
   }
 
-  const paths = parts.slice(9).join(' ');
-  const [path, oldPath] = paths.split('\t');
+  const paths = parts.slice(9).join(" ");
+  const [path, oldPath] = paths.split("\t");
 
-  const isRenamed = xy.includes('R');
-  const isCopied = xy.includes('C');
+  const isRenamed = xy.includes("R");
+  const isCopied = xy.includes("C");
 
   return {
-    path: path ?? '',
+    path: path ?? "",
     oldPath,
-    status: isRenamed ? 'renamed' : isCopied ? 'copied' : 'modified',
+    status: isRenamed ? "renamed" : isCopied ? "copied" : "modified",
     staged: true,
   };
 }

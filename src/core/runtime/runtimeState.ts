@@ -8,7 +8,7 @@
  * - Memory (short-term context, checkpoints)
  */
 
-import type { Message, ExecutionContext } from '../types';
+import type { Message, ExecutionContext } from "../types";
 import type {
   RuntimeStateSnapshot,
   ConversationStateSnapshot,
@@ -16,7 +16,7 @@ import type {
   WorkspaceStateSnapshot,
   MemorySnapshot,
   ToolCallRecord,
-} from './runtimeTypes';
+} from "./runtimeTypes";
 
 /**
  * Conversation state (immutable via getters)
@@ -28,7 +28,7 @@ class ConversationState {
 
   addMessage(message: Message): void {
     this.messages.push(message);
-    if (message.role === 'user') {
+    if (message.role === "user") {
       this.turnCount++;
     }
   }
@@ -110,7 +110,7 @@ class ExecutionState {
 class WorkspaceState {
   private readonly root: string;
   private currentFile?: string;
-  private selection?: ExecutionContext['selection'];
+  private selection?: ExecutionContext["selection"];
   private openFiles: string[] = [];
   private modifiedFiles = new Set<string>();
 

@@ -9,16 +9,19 @@
  * - Zero setup required
  */
 
-import * as vscode from 'vscode';
-import * as path from 'path';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import * as vscode from "vscode";
+import * as path from "path";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const FindReferencesSchema = z.object({
-  file: z.string().describe('File path (absolute or relative)'),
-  line: z.number().describe('Line number (0-indexed)'),
-  column: z.number().describe('Column number (0-indexed)'),
-  includeDeclaration: z.boolean().optional().describe('Include the declaration itself (default: true)'),
+  file: z.string().describe("File path (absolute or relative)"),
+  line: z.number().describe("Line number (0-indexed)"),
+  column: z.number().describe("Column number (0-indexed)"),
+  includeDeclaration: z
+    .boolean()
+    .optional()
+    .describe("Include the declaration itself (default: true)"),
 });
 
 type FindReferencesInput = z.infer<typeof FindReferencesSchema>;
@@ -43,8 +46,8 @@ interface Reference {
  * 5. Return structured references
  */
 export const FindReferencesTool: Tool<FindReferencesInput, Reference[]> = {
-  name: 'FindReferences',
-  description: 'Find all references to a symbol using LSP',
+  name: "FindReferences",
+  description: "Find all references to a symbol using LSP",
   schema: FindReferencesSchema,
 
   allowedInMode(_mode): boolean {
@@ -53,7 +56,7 @@ export const FindReferencesTool: Tool<FindReferencesInput, Reference[]> = {
 
   async execute(
     input: FindReferencesInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<ToolResult<Reference[]>> {
     const startTime = Date.now();
 
@@ -88,7 +91,7 @@ export const FindReferencesTool: Tool<FindReferencesInput, Reference[]> = {
  */
 async function findReferences(
   input: FindReferencesInput,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<Reference[]> {
   // Resolve absolute path
   const absolutePath = path.isAbsolute(input.file)
@@ -105,9 +108,9 @@ async function findReferences(
 
   // Execute reference provider
   const locations = await vscode.commands.executeCommand<vscode.Location[]>(
-    'vscode.executeReferenceProvider',
+    "vscode.executeReferenceProvider",
     uri,
-    position
+    position,
   );
 
   if (!locations || locations.length === 0) {
@@ -139,7 +142,12 @@ async function findReferences(
     // The first reference is often the declaration
     // We can filter by checking if it's in the same file at the same position
     return references.filter(
-      ref => !(ref.file === absolutePath && ref.line === input.line && ref.column === input.column)
+      (ref) =>
+        !(
+          ref.file === absolutePath &&
+          ref.line === input.line &&
+          ref.column === input.column
+        ),
     );
   }
 

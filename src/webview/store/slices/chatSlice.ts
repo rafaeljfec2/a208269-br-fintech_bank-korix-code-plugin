@@ -2,13 +2,13 @@
  * Chat slice - multiple conversations with streaming state
  */
 
-import type { StateCreator } from 'zustand';
+import type { StateCreator } from "zustand";
 
 export interface ToolExecution {
   readonly id: string;
   readonly name: string;
   readonly description: string;
-  readonly status: 'success' | 'error' | 'pending';
+  readonly status: "success" | "error" | "pending";
   readonly duration: number; // ms
   readonly timestamp: number;
 }
@@ -20,7 +20,7 @@ export interface MessageMetadata {
     readonly totalDuration: number;
   };
   readonly statusCard?: {
-    readonly type: 'plan_created' | 'completed' | 'error';
+    readonly type: "plan_created" | "completed" | "error";
     readonly title: string;
     readonly subtitle?: string;
     readonly action?: {
@@ -32,7 +32,7 @@ export interface MessageMetadata {
 
 export interface Message {
   readonly id: string;
-  readonly role: 'user' | 'assistant' | 'system';
+  readonly role: "user" | "assistant" | "system";
   readonly content: string;
   readonly timestamp: number;
   readonly isStreaming?: boolean;
@@ -51,27 +51,38 @@ export interface ChatSession {
 export interface ChatSlice {
   readonly conversations: Record<string, ChatSession>;
   readonly activeChatId: string | null;
+  readonly sidebarVisible: boolean;
+  readonly sidebarWidth: number;
 
   // Actions
   readonly createChat: (title?: string) => string;
   readonly switchChat: (chatId: string) => void;
   readonly closeChat: (chatId: string) => void;
   readonly updateChatTitle: (chatId: string, title: string) => void;
-  readonly addMessage: (chatId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
+  readonly addMessage: (
+    chatId: string,
+    message: Omit<Message, "id" | "timestamp">,
+  ) => void;
   readonly appendStreamingToken: (chatId: string, token: string) => void;
   readonly finalizeStreaming: (chatId: string) => void;
   readonly clearChat: (chatId: string) => void;
   readonly updateActiveMessageMetadata: (
     chatId: string,
-    metadata: Partial<MessageMetadata>
+    metadata: Partial<MessageMetadata>,
   ) => void;
+  readonly toggleSidebar: () => void;
+  readonly setSidebarWidth: (width: number) => void;
 }
 
-export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set) => ({
+export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
+  set,
+) => ({
   conversations: {},
   activeChatId: null,
+  sidebarVisible: false,
+  sidebarWidth: 250,
 
-  createChat: (title = 'Nova conversa') => {
+  createChat: (title = "Nova conversa") => {
     const chatId = crypto.randomUUID();
 
     set((state: ChatSlice) => ({
@@ -81,7 +92,7 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
           id: chatId,
           title,
           messages: [],
-          streamingContent: '',
+          streamingContent: "",
           isStreaming: false,
           createdAt: Date.now(),
         },
@@ -110,7 +121,7 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
       let newActiveChatId = state.activeChatId;
       if (state.activeChatId === chatId) {
         const remainingIds = Object.keys(remaining);
-        newActiveChatId = remainingIds.length > 0 ? remainingIds[0] : null;
+        newActiveChatId = remainingIds.length > 0 ? (remainingIds[0] ?? null) : null;
       }
 
       return {
@@ -195,12 +206,12 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
               ...chat.messages,
               {
                 id: crypto.randomUUID(),
-                role: 'assistant' as const,
+                role: "assistant" as const,
                 content: chat.streamingContent,
                 timestamp: Date.now(),
               },
             ],
-            streamingContent: '',
+            streamingContent: "",
             isStreaming: false,
           },
         },
@@ -218,7 +229,7 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
           [chatId]: {
             ...chat,
             messages: [],
-            streamingContent: '',
+            streamingContent: "",
             isStreaming: false,
           },
         },
@@ -231,7 +242,7 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
       if (!chat || chat.messages.length === 0) return state;
 
       const lastMessage = chat.messages[chat.messages.length - 1];
-      if (lastMessage.role !== 'assistant') return state;
+      if (!lastMessage || lastMessage.role !== "assistant") return state;
 
       return {
         conversations: {
@@ -241,10 +252,20 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
             messages: chat.messages.map((msg, i) =>
               i === chat.messages.length - 1
                 ? { ...msg, metadata: { ...msg.metadata, ...metadata } }
-                : msg
+                : msg,
             ),
           },
         },
       };
     }),
+
+  toggleSidebar: () =>
+    set((state: ChatSlice) => ({
+      sidebarVisible: !state.sidebarVisible,
+    })),
+
+  setSidebarWidth: (width) =>
+    set(() => ({
+      sidebarWidth: Math.max(200, Math.min(500, width)),
+    })),
 });

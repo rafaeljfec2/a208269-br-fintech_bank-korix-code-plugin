@@ -2,9 +2,13 @@
  * Command execution with streaming, timeout, and security
  */
 
-import type { Logger } from '../telemetry/logger';
-import type { TerminalSessionManager } from './session';
-import type { CommandResult, SecurityConfig, CommandDenylistPattern } from './types';
+import type { Logger } from "../telemetry/logger";
+import type { TerminalSessionManager } from "./session";
+import type {
+  CommandResult,
+  SecurityConfig,
+  CommandDenylistPattern,
+} from "./types";
 
 export class CommandRunner {
   private securityConfig: SecurityConfig = {
@@ -33,7 +37,7 @@ export class CommandRunner {
 
   constructor(
     private readonly sessionManager: TerminalSessionManager,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   async run(
@@ -43,11 +47,14 @@ export class CommandRunner {
       timeout?: number;
       cwd?: string;
       env?: Record<string, string>;
-    } = {}
+    } = {},
   ): Promise<CommandResult> {
     const startTime = Date.now();
 
-    this.logger.info('Running command', { command, sessionId: options.sessionId });
+    this.logger.info("Running command", {
+      command,
+      sessionId: options.sessionId,
+    });
 
     const validation = this.validateCommand(command);
     if (!validation.allowed) {
@@ -65,29 +72,28 @@ export class CommandRunner {
 
     const entry = this.sessionManager.getSession(sessionId);
     if (!entry) {
-      throw new Error('Failed to get session');
+      throw new Error("Failed to get session");
     }
 
     this.sessionManager.updateLastUsed(sessionId);
 
     const timeout = Math.min(
       options.timeout ?? this.securityConfig.defaultTimeout,
-      this.securityConfig.maxTimeout
+      this.securityConfig.maxTimeout,
     );
 
     return this.executeWithTimeout(entry.pty, command, timeout, startTime);
   }
 
   private async executeWithTimeout(
-    pty: import('./pty').PTYManager,
+    pty: import("./pty").PTYManager,
     command: string,
     timeout: number,
-    startTime: number
+    startTime: number,
   ): Promise<CommandResult> {
-
     return new Promise((resolve) => {
-      let stdout = '';
-      const stderr = '';
+      let stdout = "";
+      const stderr = "";
       let completed = false;
       let timeoutId: NodeJS.Timeout;
 
@@ -97,7 +103,10 @@ export class CommandRunner {
         pty.onExit(() => {});
       };
 
-      const finish = (timedOut: boolean, exitCode: number | null = null): void => {
+      const finish = (
+        timedOut: boolean,
+        exitCode: number | null = null,
+      ): void => {
         if (completed) {
           return;
         }
@@ -115,7 +124,7 @@ export class CommandRunner {
           duration,
         };
 
-        this.logger.info('Command completed', {
+        this.logger.info("Command completed", {
           command,
           duration,
           timedOut,
@@ -133,12 +142,12 @@ export class CommandRunner {
       });
 
       pty.onExit((exitCode) => {
-        this.logger.debug('Command process exited', { command, exitCode });
+        this.logger.debug("Command process exited", { command, exitCode });
         finish(false, exitCode);
       });
 
       timeoutId = setTimeout(() => {
-        this.logger.warn('Command timed out', { command, timeout });
+        this.logger.warn("Command timed out", { command, timeout });
         finish(true, null);
       }, timeout);
 
@@ -146,10 +155,14 @@ export class CommandRunner {
     });
   }
 
-  validateCommand(command: string): { allowed: boolean; reason?: string; requiresApproval?: boolean } {
+  validateCommand(command: string): {
+    allowed: boolean;
+    reason?: string;
+    requiresApproval?: boolean;
+  } {
     for (const pattern of this.securityConfig.denylist) {
       if (this.matchesPattern(command, pattern)) {
-        return { allowed: false, reason: 'Command matches denylist pattern' };
+        return { allowed: false, reason: "Command matches denylist pattern" };
       }
     }
 
@@ -162,8 +175,11 @@ export class CommandRunner {
     return { allowed: true, requiresApproval: false };
   }
 
-  private matchesPattern(command: string, pattern: CommandDenylistPattern): boolean {
-    if (typeof pattern === 'string') {
+  private matchesPattern(
+    command: string,
+    pattern: CommandDenylistPattern,
+  ): boolean {
+    if (typeof pattern === "string") {
       return command.includes(pattern);
     }
     return pattern.test(command);

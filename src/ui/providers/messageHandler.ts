@@ -4,27 +4,27 @@
  * Handles incoming webview messages and routes to commands
  */
 
-import * as vscode from 'vscode';
-import type { RuntimeEventEmitter } from '../../core/runtime/runtimeEvents';
-import type { TerminalSessionManager } from '../../terminal/session';
-import type { Container } from '../../di/container';
+import * as vscode from "vscode";
+import type { RuntimeEventEmitter } from "../../core/runtime/runtimeEvents";
+import type { TerminalSessionManager } from "../../terminal/session";
+import type { Container } from "../../di/container";
 import type {
   ExtensionToWebviewMessage,
   WebviewToExtensionMessage,
   InitPayload,
   SaveSettingsPayload,
   TestConnectionPayload,
-} from '../../shared/protocol';
-import { TOKENS } from '../../di/tokens';
-import type { Logger } from '../../telemetry/logger';
-import { TerminalBridge } from './terminalBridge';
-import type { RuntimeStateManager } from '../../core/runtime/runtimeStateManager';
-import type { ProviderConfigManager } from '../../providers/config';
-import type { CheckpointManager } from '../../core/runtime/checkpoints';
-import type { PermissionManager } from '../../harness/permissions';
-import { AgentLoopFactory } from './agentLoopFactory';
-import { ToolApprovalHandler } from './toolApprovalHandler';
-import { CheckpointHandler } from './checkpointHandler';
+} from "../../shared/protocol";
+import { TOKENS } from "../../di/tokens";
+import type { Logger } from "../../telemetry/logger";
+import { TerminalBridge } from "./terminalBridge";
+import type { RuntimeStateManager } from "../../core/runtime/runtimeStateManager";
+import type { ProviderConfigManager } from "../../providers/config";
+import type { CheckpointManager } from "../../core/runtime/checkpoints";
+import type { PermissionManager } from "../../harness/permissions";
+import { AgentLoopFactory } from "./agentLoopFactory";
+import { ToolApprovalHandler } from "./toolApprovalHandler";
+import { CheckpointHandler } from "./checkpointHandler";
 
 export class MessageHandler {
   private readonly logger: Logger;
@@ -44,14 +44,30 @@ export class MessageHandler {
     container: Container,
   ) {
     this.logger = container.get<Logger>(TOKENS.Logger);
-    this.eventEmitter = container.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
-    this.stateManager = container.get<RuntimeStateManager>(TOKENS.RuntimeStateManager);
-    this.configManager = container.get<ProviderConfigManager>(TOKENS.ProviderConfigManager);
-    this.checkpointManager = container.get<CheckpointManager>(TOKENS.CheckpointManager);
-    this.permissionManager = container.get<PermissionManager>(TOKENS.PermissionManager);
+    this.eventEmitter = container.get<RuntimeEventEmitter>(
+      TOKENS.RuntimeEventEmitter,
+    );
+    this.stateManager = container.get<RuntimeStateManager>(
+      TOKENS.RuntimeStateManager,
+    );
+    this.configManager = container.get<ProviderConfigManager>(
+      TOKENS.ProviderConfigManager,
+    );
+    this.checkpointManager = container.get<CheckpointManager>(
+      TOKENS.CheckpointManager,
+    );
+    this.permissionManager = container.get<PermissionManager>(
+      TOKENS.PermissionManager,
+    );
 
-    const terminalManager = container.get<TerminalSessionManager>(TOKENS.SessionManager);
-    this.terminalBridge = new TerminalBridge(webview, terminalManager, this.logger);
+    const terminalManager = container.get<TerminalSessionManager>(
+      TOKENS.SessionManager,
+    );
+    this.terminalBridge = new TerminalBridge(
+      webview,
+      terminalManager,
+      this.logger,
+    );
 
     // Initialize specialized handlers
     this.agentLoopFactory = new AgentLoopFactory(
@@ -61,7 +77,10 @@ export class MessageHandler {
       this.checkpointManager,
       this.permissionManager,
     );
-    this.toolApprovalHandler = new ToolApprovalHandler(this.logger, this.permissionManager);
+    this.toolApprovalHandler = new ToolApprovalHandler(
+      this.logger,
+      this.permissionManager,
+    );
     this.checkpointHandler = new CheckpointHandler(
       webview,
       this.logger,
@@ -77,7 +96,7 @@ export class MessageHandler {
   private setupEventForwarding(): void {
     const subscription = this.eventEmitter.onEvent((event) => {
       const message: ExtensionToWebviewMessage = {
-        type: 'runtime_event',
+        type: "runtime_event",
         payload: { event },
       };
 
@@ -86,13 +105,16 @@ export class MessageHandler {
           // Success - event forwarded
         },
         (error) => {
-          this.logger.error('Failed to forward runtime event to webview', error);
+          this.logger.error(
+            "Failed to forward runtime event to webview",
+            error,
+          );
         },
       );
     });
 
     this._disposables.push(subscription);
-    this.logger.info('Event forwarding setup complete');
+    this.logger.info("Event forwarding setup complete");
   }
 
   /**
@@ -101,21 +123,20 @@ export class MessageHandler {
   public async sendInitialState(): Promise<void> {
     const mode = this.stateManager.isInitialized()
       ? this.stateManager.getMode()
-      : 'ask';
+      : "ask";
 
     const sessionId = this.stateManager.getSessionId() ?? crypto.randomUUID();
 
     const isExecuting = this.stateManager.isExecuting();
 
     const providerType = vscode.workspace
-      .getConfiguration('korix')
-      .get<'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm'>(
-        'provider',
-        'anthropic',
-      );
+      .getConfiguration("korix")
+      .get<
+        "anthropic" | "openai" | "ollama" | "openrouter" | "litellm"
+      >("provider", "anthropic");
 
     const config = await this.configManager.getConfig(providerType);
-    const model = config?.model ?? 'claude-sonnet-4-6';
+    const model = config?.model ?? "claude-sonnet-4-6";
 
     const initPayload: InitPayload = {
       mode,
@@ -126,13 +147,13 @@ export class MessageHandler {
     };
 
     const message: ExtensionToWebviewMessage = {
-      type: 'init',
+      type: "init",
       payload: initPayload,
     };
 
     this.webview.postMessage(message).then(
       () => {
-        this.logger.info('Initial state sent to webview', {
+        this.logger.info("Initial state sent to webview", {
           mode,
           model,
           sessionId,
@@ -140,7 +161,7 @@ export class MessageHandler {
         });
       },
       (error) => {
-        this.logger.error('Failed to send initial state to webview', error);
+        this.logger.error("Failed to send initial state to webview", error);
       },
     );
   }
@@ -148,57 +169,59 @@ export class MessageHandler {
   /**
    * Handle incoming messages from webview
    */
-  public async handleMessage(message: WebviewToExtensionMessage): Promise<void> {
-    this.logger.debug('Received message from webview', { type: message.type });
+  public async handleMessage(
+    message: WebviewToExtensionMessage,
+  ): Promise<void> {
+    this.logger.debug("Received message from webview", { type: message.type });
 
     switch (message.type) {
-      case 'send_message':
+      case "send_message":
         await this.handleSendMessage(
           message.payload.content,
           message.payload.messages ?? [],
         );
         break;
 
-      case 'change_mode':
+      case "change_mode":
         await this.handleChangeMode(message.payload.mode);
         break;
 
-      case 'approve_tool':
+      case "approve_tool":
         await this.handleApproveTool(
           message.payload.toolCallId,
           message.payload.approval,
         );
         break;
 
-      case 'terminal_input':
+      case "terminal_input":
         await this.handleTerminalInput(
           message.payload.sessionId,
           message.payload.data,
         );
         break;
 
-      case 'create_terminal':
+      case "create_terminal":
         await this.handleCreateTerminal(message.payload.shellPath);
         break;
 
-      case 'restore_checkpoint':
+      case "restore_checkpoint":
         await this.handleRestoreCheckpoint(message.payload.checkpointId);
         break;
 
-      case 'load_settings':
+      case "load_settings":
         await this.handleLoadSettings();
         break;
 
-      case 'save_settings':
+      case "save_settings":
         await this.handleSaveSettings(message.payload);
         break;
 
-      case 'test_connection':
+      case "test_connection":
         await this.handleTestConnection(message.payload);
         break;
 
       default:
-        this.logger.warn('Unknown message type from webview', { message });
+        this.logger.warn("Unknown message type from webview", { message });
     }
   }
 
@@ -207,9 +230,12 @@ export class MessageHandler {
    */
   private async handleSendMessage(
     content: string,
-    previousMessages: readonly { role: 'user' | 'assistant' | 'system'; content: string }[],
+    previousMessages: readonly {
+      role: "user" | "assistant" | "system";
+      content: string;
+    }[],
   ): Promise<void> {
-    this.logger.info('User message received', {
+    this.logger.info("User message received", {
       length: content.length,
       historyLength: previousMessages.length,
       lastHistoryRole: previousMessages[previousMessages.length - 1]?.role,
@@ -218,11 +244,10 @@ export class MessageHandler {
     try {
       // Get provider config
       const providerType = vscode.workspace
-        .getConfiguration('korix')
-        .get<'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm'>(
-          'provider',
-          'anthropic',
-        );
+        .getConfiguration("korix")
+        .get<
+          "anthropic" | "openai" | "ollama" | "openrouter" | "litellm"
+        >("provider", "anthropic");
 
       const providerConfig = await this.configManager.getConfig(providerType);
       if (!providerConfig) {
@@ -233,7 +258,8 @@ export class MessageHandler {
       }
 
       // Create provider instance
-      const provider = await this.agentLoopFactory.createProvider(providerConfig);
+      const provider =
+        await this.agentLoopFactory.createProvider(providerConfig);
 
       // Create AgentLoop
       const agentLoop = this.agentLoopFactory.createAgentLoop(provider);
@@ -241,12 +267,12 @@ export class MessageHandler {
       // Get mode (use default if not initialized yet)
       const mode = this.stateManager.isInitialized()
         ? this.stateManager.getMode()
-        : 'ask';
+        : "ask";
 
       // Prepare execution context
       const context = {
         mode,
-        workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+        workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "",
         openFiles: [],
       };
 
@@ -264,17 +290,17 @@ export class MessageHandler {
       try {
         for await (const event of generator) {
           try {
-            this.logger.debug('Runtime event', { type: event.type });
+            this.logger.debug("Runtime event", { type: event.type });
             // Events are auto-forwarded via RuntimeEventEmitter subscription
           } catch (eventError) {
-            this.logger.error('Failed to process runtime event', eventError);
+            this.logger.error("Failed to process runtime event", eventError);
             // Continue iteration - don't let event processing errors stop the loop
           }
         }
 
-        this.logger.info('Agent loop completed successfully');
+        this.logger.info("Agent loop completed successfully");
       } catch (error) {
-        this.logger.error('Agent loop failed', error);
+        this.logger.error("Agent loop failed", error);
         vscode.window.showErrorMessage(
           `Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -282,7 +308,7 @@ export class MessageHandler {
         this.stateManager.stopExecution();
       }
     } catch (error) {
-      this.logger.error('Failed to initialize agent loop', error);
+      this.logger.error("Failed to initialize agent loop", error);
       this.stateManager.stopExecution();
       vscode.window.showErrorMessage(
         `Failed to start agent: ${error instanceof Error ? error.message : String(error)}`,
@@ -293,20 +319,22 @@ export class MessageHandler {
   /**
    * User switches mode (Ask/Plan/Agent)
    */
-  private async handleChangeMode(mode: 'ask' | 'plan' | 'agent'): Promise<void> {
-    this.logger.info('Mode change requested', { mode });
+  private async handleChangeMode(
+    mode: "ask" | "plan" | "agent",
+  ): Promise<void> {
+    this.logger.info("Mode change requested", { mode });
 
     // Update mode in RuntimeStateManager
     this.stateManager.setMode(mode);
 
     // Notify webview of mode change via event
     const message: ExtensionToWebviewMessage = {
-      type: 'mode_changed',
+      type: "mode_changed",
       payload: { mode },
     };
 
     await this.webview.postMessage(message);
-    this.logger.info('Mode changed successfully', { mode });
+    this.logger.info("Mode changed successfully", { mode });
   }
 
   /**
@@ -314,7 +342,7 @@ export class MessageHandler {
    */
   private async handleApproveTool(
     toolCallId: string,
-    approval: 'once' | 'always' | 'reject',
+    approval: "once" | "always" | "reject",
   ): Promise<void> {
     await this.toolApprovalHandler.handleApproveTool(toolCallId, approval);
   }
@@ -322,7 +350,10 @@ export class MessageHandler {
   /**
    * User types in terminal
    */
-  private async handleTerminalInput(sessionId: string, data: string): Promise<void> {
+  private async handleTerminalInput(
+    sessionId: string,
+    data: string,
+  ): Promise<void> {
     this.terminalBridge.write(sessionId, data);
   }
 
@@ -346,26 +377,27 @@ export class MessageHandler {
   private async handleLoadSettings(): Promise<void> {
     try {
       const providerType = vscode.workspace
-        .getConfiguration('korix')
-        .get<'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm'>(
-          'provider',
-          'anthropic',
-        );
+        .getConfiguration("korix")
+        .get<
+          "anthropic" | "openai" | "ollama" | "openrouter" | "litellm"
+        >("provider", "anthropic");
 
       const config = await this.configManager.getConfig(providerType);
-      const maxTokens = vscode.workspace.getConfiguration('korix').get<number>('maxTokens', 4096);
+      const maxTokens = vscode.workspace
+        .getConfiguration("korix")
+        .get<number>("maxTokens", 4096);
       const temperature = vscode.workspace
-        .getConfiguration('korix')
-        .get<number>('temperature', 0.7);
+        .getConfiguration("korix")
+        .get<number>("temperature", 0.7);
 
       // Check if API key exists (don't send the key itself)
       const hasApiKey = !!(await this.configManager.getApiKey(providerType));
 
       const message: ExtensionToWebviewMessage = {
-        type: 'settings_loaded',
+        type: "settings_loaded",
         payload: {
           provider: providerType,
-          model: config?.model ?? 'claude-sonnet-4-6',
+          model: config?.model ?? "claude-sonnet-4-6",
           baseUrl: config?.baseUrl,
           maxTokens,
           temperature,
@@ -374,18 +406,20 @@ export class MessageHandler {
       };
 
       await this.webview.postMessage(message);
-      this.logger.info('Settings loaded and sent to webview');
+      this.logger.info("Settings loaded and sent to webview");
     } catch (error) {
-      this.logger.error('Failed to load settings', error);
+      this.logger.error("Failed to load settings", error);
     }
   }
 
   /**
    * Save settings to workspace config and secrets
    */
-  private async handleSaveSettings(payload: SaveSettingsPayload): Promise<void> {
+  private async handleSaveSettings(
+    payload: SaveSettingsPayload,
+  ): Promise<void> {
     try {
-      const config = vscode.workspace.getConfiguration('korix');
+      const config = vscode.workspace.getConfiguration("korix");
 
       // Determinar target: Workspace se aberto, senão Global
       const configTarget = vscode.workspace.workspaceFolders
@@ -393,7 +427,7 @@ export class MessageHandler {
         : vscode.ConfigurationTarget.Global;
 
       // Save provider selection
-      await config.update('provider', payload.provider, configTarget);
+      await config.update("provider", payload.provider, configTarget);
 
       // Save API key to secrets (if provided)
       if (payload.apiKey) {
@@ -420,32 +454,31 @@ export class MessageHandler {
 
       // Save advanced settings
       if (payload.maxTokens !== undefined) {
-        await config.update('maxTokens', payload.maxTokens, configTarget);
+        await config.update("maxTokens", payload.maxTokens, configTarget);
       }
 
       if (payload.temperature !== undefined) {
-        await config.update(
-          'temperature',
-          payload.temperature,
-          configTarget,
-        );
+        await config.update("temperature", payload.temperature, configTarget);
       }
 
       // Notify success
       const message: ExtensionToWebviewMessage = {
-        type: 'settings_saved',
-        payload: { success: true, message: 'Settings saved successfully' },
+        type: "settings_saved",
+        payload: { success: true, message: "Settings saved successfully" },
       };
 
       await this.webview.postMessage(message);
-      this.logger.info('Settings saved successfully', { provider: payload.provider });
+      this.logger.info("Settings saved successfully", {
+        provider: payload.provider,
+      });
     } catch (error) {
-      this.logger.error('Failed to save settings', error);
+      this.logger.error("Failed to save settings", error);
       const message: ExtensionToWebviewMessage = {
-        type: 'settings_saved',
+        type: "settings_saved",
         payload: {
           success: false,
-          message: error instanceof Error ? error.message : 'Failed to save settings',
+          message:
+            error instanceof Error ? error.message : "Failed to save settings",
         },
       };
       await this.webview.postMessage(message);
@@ -455,28 +488,35 @@ export class MessageHandler {
   /**
    * Test connection to provider
    */
-  private async handleTestConnection(payload: TestConnectionPayload): Promise<void> {
+  private async handleTestConnection(
+    payload: TestConnectionPayload,
+  ): Promise<void> {
     try {
-      this.logger.info('Testing connection', { provider: payload.provider });
+      this.logger.info("Testing connection", { provider: payload.provider });
 
       // Create temporary config for testing
       const tempConfig = {
-        type: payload.provider as 'anthropic' | 'openai' | 'ollama' | 'openrouter' | 'litellm',
+        type: payload.provider as
+          | "anthropic"
+          | "openai"
+          | "ollama"
+          | "openrouter"
+          | "litellm",
         apiKey: payload.apiKey,
         baseUrl: payload.baseUrl,
-        model: 'test-model', // Placeholder for connection test
+        model: "test-model", // Placeholder for connection test
       };
 
       // Create provider instance
       const provider = await this.agentLoopFactory.createProvider(tempConfig);
 
       // Simple test: send a minimal message
-      const testPrompt = 'Hi';
+      const testPrompt = "Hi";
       let responseReceived = false;
 
       const input = {
         messages: [
-          { role: 'user' as const, content: testPrompt, timestamp: Date.now() },
+          { role: "user" as const, content: testPrompt, timestamp: Date.now() },
         ],
       };
 
@@ -489,31 +529,34 @@ export class MessageHandler {
 
       // Check if we get any response
       for await (const event of stream) {
-        if (event.type === 'token' || event.type === 'thinking') {
+        if (event.type === "token" || event.type === "thinking") {
           responseReceived = true;
           break; // Connection successful, stop streaming
         }
       }
 
       const message: ExtensionToWebviewMessage = {
-        type: 'connection_test_result',
+        type: "connection_test_result",
         payload: {
           success: responseReceived,
           message: responseReceived
-            ? 'Connection successful!'
-            : 'No response received from provider',
+            ? "Connection successful!"
+            : "No response received from provider",
         },
       };
 
       await this.webview.postMessage(message);
-      this.logger.info('Connection test completed', { success: responseReceived });
+      this.logger.info("Connection test completed", {
+        success: responseReceived,
+      });
     } catch (error) {
-      this.logger.error('Connection test failed', error);
+      this.logger.error("Connection test failed", error);
       const message: ExtensionToWebviewMessage = {
-        type: 'connection_test_result',
+        type: "connection_test_result",
         payload: {
           success: false,
-          message: error instanceof Error ? error.message : 'Connection test failed',
+          message:
+            error instanceof Error ? error.message : "Connection test failed",
         },
       };
       await this.webview.postMessage(message);
@@ -524,8 +567,8 @@ export class MessageHandler {
    * Cleanup resources
    */
   public dispose(): void {
-    this._disposables.forEach(d => d.dispose());
+    this._disposables.forEach((d) => d.dispose());
     this._disposables = [];
-    this.logger.info('MessageHandler disposed');
+    this.logger.info("MessageHandler disposed");
   }
 }

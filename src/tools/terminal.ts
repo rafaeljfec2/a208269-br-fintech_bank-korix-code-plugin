@@ -2,23 +2,26 @@
  * Terminal tool - RunCommand
  */
 
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../harness/toolRegistry';
-import type { CommandRunner } from '../terminal/commandRunner';
-import { getGlobalContainer } from '../di/container';
-import { TOKENS } from '../di/tokens';
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../harness/toolRegistry";
+import type { CommandRunner } from "../terminal/commandRunner";
+import { getGlobalContainer } from "../di/container";
+import { TOKENS } from "../di/tokens";
 
 const RunCommandInputSchema = z.object({
-  command: z.string().min(1).describe('Shell command to execute'),
-  sessionId: z.string().optional().describe('Session ID to reuse (optional)'),
-  timeout: z.number().optional().describe('Timeout in milliseconds (default: 30000)'),
-  cwd: z.string().optional().describe('Working directory (optional)'),
+  command: z.string().min(1).describe("Shell command to execute"),
+  sessionId: z.string().optional().describe("Session ID to reuse (optional)"),
+  timeout: z
+    .number()
+    .optional()
+    .describe("Timeout in milliseconds (default: 30000)"),
+  cwd: z.string().optional().describe("Working directory (optional)"),
 });
 
 type RunCommandInput = z.infer<typeof RunCommandInputSchema>;
 
 export const RunCommandTool: Tool<RunCommandInput, string> = {
-  name: 'RunCommand',
+  name: "RunCommand",
   description: `Execute a shell command in a persistent terminal session.
 
 Security:
@@ -34,7 +37,10 @@ Examples:
 
   schema: RunCommandInputSchema,
 
-  async execute(input: RunCommandInput, _context: ToolContext): Promise<ToolResult<string>> {
+  async execute(
+    input: RunCommandInput,
+    _context: ToolContext,
+  ): Promise<ToolResult<string>> {
     const container = getGlobalContainer();
     const commandRunner = container.get<CommandRunner>(TOKENS.CommandRunner);
 
@@ -43,7 +49,7 @@ Examples:
     if (!validation.allowed) {
       return {
         success: false,
-        error: validation.reason ?? 'Command not allowed',
+        error: validation.reason ?? "Command not allowed",
       };
     }
 
@@ -87,6 +93,6 @@ Examples:
   },
 
   allowedInMode(mode): boolean {
-    return mode === 'agent';
+    return mode === "agent";
   },
 };

@@ -5,7 +5,12 @@
 /**
  * Canonical finish reasons
  */
-export type CanonicalFinishReason = "stop" | "max_tokens" | "tool_calls" | "error" | "cancelled";
+export type CanonicalFinishReason =
+  | "stop"
+  | "max_tokens"
+  | "tool_calls"
+  | "error"
+  | "cancelled";
 
 /**
  * Normalize finish reason de diferentes vendors

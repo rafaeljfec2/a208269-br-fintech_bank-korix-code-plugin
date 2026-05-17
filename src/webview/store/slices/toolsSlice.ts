@@ -2,13 +2,18 @@
  * Tools slice - tool calls and approvals
  */
 
-import type { StateCreator } from 'zustand';
+import type { StateCreator } from "zustand";
 
 export interface ToolCall {
   readonly id: string;
   readonly name: string;
   readonly input: unknown;
-  readonly status: 'pending' | 'approved' | 'rejected' | 'executing' | 'completed';
+  readonly status:
+    | "pending"
+    | "approved"
+    | "rejected"
+    | "executing"
+    | "completed";
   readonly result?: unknown;
   readonly error?: string;
   readonly timestamp: number;
@@ -19,7 +24,7 @@ export interface PendingApproval {
   readonly toolName: string;
   readonly input: unknown;
   readonly description: string;
-  readonly riskLevel: 'low' | 'medium' | 'high';
+  readonly riskLevel: "low" | "medium" | "high";
   readonly timestamp: number;
 }
 
@@ -28,7 +33,7 @@ export interface ToolsSlice {
   readonly pendingApprovals: readonly PendingApproval[];
 
   // Actions
-  readonly addToolCall: (toolCall: Omit<ToolCall, 'timestamp'>) => void;
+  readonly addToolCall: (toolCall: Omit<ToolCall, "timestamp">) => void;
   readonly updateToolCall: (id: string, updates: Partial<ToolCall>) => void;
   readonly addPendingApproval: (approval: PendingApproval) => void;
   readonly removePendingApproval: (toolCallId: string) => void;

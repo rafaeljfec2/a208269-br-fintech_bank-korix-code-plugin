@@ -14,14 +14,20 @@
  * - Dependency analysis
  */
 
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
-import { getContextEngine } from '../../context/contextEngine';
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
+import { getContextEngine } from "../../context/contextEngine";
 
 const WorkspaceGraphSchema = z.object({
-  rootFile: z.string().optional().describe('Root file to start graph from'),
-  maxDepth: z.number().optional().describe('Maximum depth for graph traversal (default: 3)'),
-  includeSymbols: z.boolean().optional().describe('Include symbol relationships (default: true)'),
+  rootFile: z.string().optional().describe("Root file to start graph from"),
+  maxDepth: z
+    .number()
+    .optional()
+    .describe("Maximum depth for graph traversal (default: 3)"),
+  includeSymbols: z
+    .boolean()
+    .optional()
+    .describe("Include symbol relationships (default: true)"),
 });
 
 type WorkspaceGraphInput = z.infer<typeof WorkspaceGraphSchema>;
@@ -36,7 +42,11 @@ interface GraphNode {
 
 interface WorkspaceGraphResult {
   readonly nodes: readonly GraphNode[];
-  readonly edges: readonly { readonly from: string; readonly to: string; readonly type: string }[];
+  readonly edges: readonly {
+    readonly from: string;
+    readonly to: string;
+    readonly type: string;
+  }[];
   readonly totalFiles: number;
   readonly totalImports: number;
 }
@@ -50,9 +60,12 @@ interface WorkspaceGraphResult {
  * 3. If rootFile specified, BFS from root with maxDepth
  * 4. Return graph with nodes and edges
  */
-export const WorkspaceGraphTool: Tool<WorkspaceGraphInput, WorkspaceGraphResult> = {
-  name: 'WorkspaceGraph',
-  description: 'Build file relationship graph for context ranking',
+export const WorkspaceGraphTool: Tool<
+  WorkspaceGraphInput,
+  WorkspaceGraphResult
+> = {
+  name: "WorkspaceGraph",
+  description: "Build file relationship graph for context ranking",
   schema: WorkspaceGraphSchema,
 
   allowedInMode(_mode): boolean {
@@ -61,7 +74,7 @@ export const WorkspaceGraphTool: Tool<WorkspaceGraphInput, WorkspaceGraphResult>
 
   async execute(
     input: WorkspaceGraphInput,
-    _context: ToolContext
+    _context: ToolContext,
   ): Promise<ToolResult<WorkspaceGraphResult>> {
     const startTime = Date.now();
 
@@ -94,7 +107,9 @@ export const WorkspaceGraphTool: Tool<WorkspaceGraphInput, WorkspaceGraphResult>
 /**
  * Build workspace graph from index
  */
-async function buildWorkspaceGraph(input: WorkspaceGraphInput): Promise<WorkspaceGraphResult> {
+async function buildWorkspaceGraph(
+  input: WorkspaceGraphInput,
+): Promise<WorkspaceGraphResult> {
   const contextEngine = getContextEngine();
 
   // Access internal indexer (would need to expose via public API)

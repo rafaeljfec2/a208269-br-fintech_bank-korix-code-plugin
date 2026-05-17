@@ -2,19 +2,14 @@
  * Patch applier - atomic application of patches with rollback
  */
 
-import * as vscode from 'vscode';
-import * as path from 'path';
-import type { Logger } from '../telemetry/logger';
-import type { PatchParser } from './parser';
-import type { PatchValidator } from './validation';
-import type { RollbackManager } from './rollback';
-import type {
-  Patch,
-  PatchResult,
-  AppliedPatch,
-  PatchError,
-} from './types';
-import { PatchErrorReason } from './types';
+import * as vscode from "vscode";
+import * as path from "path";
+import type { Logger } from "../telemetry/logger";
+import type { PatchParser } from "./parser";
+import type { PatchValidator } from "./validation";
+import type { RollbackManager } from "./rollback";
+import type { Patch, PatchResult, AppliedPatch, PatchError } from "./types";
+import { PatchErrorReason } from "./types";
 
 export class PatchApplier {
   constructor(
@@ -22,13 +17,13 @@ export class PatchApplier {
     private readonly parser: PatchParser,
     private readonly validator: PatchValidator,
     private readonly rollbackManager: RollbackManager,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {}
 
   async applyPatches(content: string): Promise<PatchResult> {
     const startTime = Date.now();
 
-    this.logger.info('Starting patch application');
+    this.logger.info("Starting patch application");
 
     const { patches, errors } = this.parser.parse(content);
 
@@ -49,7 +44,7 @@ export class PatchApplier {
       if (!validation.valid) {
         allErrors.push({
           file: patch.file,
-          error: validation.errors.join(', '),
+          error: validation.errors.join(", "),
           reason: PatchErrorReason.VALIDATION_ERROR,
         });
         continue;
@@ -59,7 +54,7 @@ export class PatchApplier {
       if (!preValidation.valid) {
         allErrors.push({
           file: patch.file,
-          error: preValidation.errors.join(', '),
+          error: preValidation.errors.join(", "),
           reason: PatchErrorReason.VALIDATION_ERROR,
         });
         continue;
@@ -87,12 +82,12 @@ export class PatchApplier {
 
     const rollbackId = await this.rollbackManager.createRollbackPoint(
       appliedPatches,
-      fileBackups
+      fileBackups,
     );
 
     const duration = Date.now() - startTime;
 
-    this.logger.info('Patch application complete', {
+    this.logger.info("Patch application complete", {
       applied: appliedPatches.length,
       errors: allErrors.length,
       duration,
@@ -108,7 +103,7 @@ export class PatchApplier {
 
   private async applySinglePatch(
     patch: Patch,
-    filePath: string
+    filePath: string,
   ): Promise<{
     success: boolean;
     applied?: AppliedPatch;
@@ -117,7 +112,7 @@ export class PatchApplier {
     try {
       const uri = vscode.Uri.file(filePath);
       const content = await vscode.workspace.fs.readFile(uri);
-      const text = Buffer.from(content).toString('utf-8');
+      const text = Buffer.from(content).toString("utf-8");
 
       const searchIndex = text.indexOf(patch.search);
 
@@ -126,7 +121,7 @@ export class PatchApplier {
           success: false,
           error: {
             file: patch.file,
-            error: 'SEARCH block not found',
+            error: "SEARCH block not found",
             reason: PatchErrorReason.SEARCH_NOT_FOUND,
           },
         };
@@ -137,23 +132,23 @@ export class PatchApplier {
         patch.replace +
         text.substring(searchIndex + patch.search.length);
 
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(newText, 'utf-8'));
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(newText, "utf-8"));
 
-      const lineNumber = text.substring(0, searchIndex).split('\n').length;
+      const lineNumber = text.substring(0, searchIndex).split("\n").length;
 
       const postValidation = await this.validator.validateAfterApply(
         patch,
-        filePath
+        filePath,
       );
 
       if (!postValidation.valid) {
-        this.logger.warn('Post-validation failed', {
+        this.logger.warn("Post-validation failed", {
           file: patch.file,
           errors: postValidation.errors,
         });
       }
 
-      this.logger.debug('Patch applied', {
+      this.logger.debug("Patch applied", {
         file: patch.file,
         line: lineNumber,
       });
@@ -184,7 +179,7 @@ export class PatchApplier {
     try {
       const uri = vscode.Uri.file(filePath);
       const content = await vscode.workspace.fs.readFile(uri);
-      return Buffer.from(content).toString('utf-8');
+      return Buffer.from(content).toString("utf-8");
     } catch {
       return null;
     }

@@ -3,13 +3,13 @@
  * Replaces vanilla HTML sidebar with production-grade React app
  */
 
-import * as vscode from 'vscode';
-import { MessageHandler } from './messageHandler';
-import type { Container } from '../../di/container';
-import type { WebviewToExtensionMessage } from '../../shared/protocol';
+import * as vscode from "vscode";
+import { MessageHandler } from "./messageHandler";
+import type { Container } from "../../di/container";
+import type { WebviewToExtensionMessage } from "../../shared/protocol";
 
 export class KorixWebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'korix.chatView';
+  public static readonly viewType = "korix.chatView";
 
   private _view?: vscode.WebviewView;
   private _messageHandler?: MessageHandler;
@@ -38,7 +38,10 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
     this._messageHandler?.dispose();
 
     // Create message handler
-    this._messageHandler = new MessageHandler(webviewView.webview, this._container);
+    this._messageHandler = new MessageHandler(
+      webviewView.webview,
+      this._container,
+    );
 
     // Send initial state
     this._messageHandler.sendInitialState();
@@ -47,11 +50,13 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
     this._messageListener?.dispose();
 
     // Handle messages from webview
-    this._messageListener = webviewView.webview.onDidReceiveMessage((message: WebviewToExtensionMessage) => {
-      this._messageHandler?.handleMessage(message).catch((error) => {
-        console.error('Failed to handle webview message:', error);
-      });
-    });
+    this._messageListener = webviewView.webview.onDidReceiveMessage(
+      (message: WebviewToExtensionMessage) => {
+        this._messageHandler?.handleMessage(message).catch((error) => {
+          console.error("Failed to handle webview message:", error);
+        });
+      },
+    );
   }
 
   public dispose(): void {
@@ -64,10 +69,10 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
     const timestamp = Date.now();
 
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview.js'),
+      vscode.Uri.joinPath(this._extensionUri, "dist", "webview.js"),
     );
     const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview.css'),
+      vscode.Uri.joinPath(this._extensionUri, "dist", "webview.css"),
     );
 
     // Generate nonce for CSP
@@ -80,7 +85,7 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
       `script-src 'nonce-${nonce}'`,
       `img-src ${webview.cspSource} data:`,
       `font-src ${webview.cspSource}`,
-    ].join('; ');
+    ].join("; ");
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -121,8 +126,9 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
 }
 
 function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let text = "";
+  const possible =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < 32; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }

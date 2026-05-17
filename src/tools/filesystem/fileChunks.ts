@@ -9,17 +9,29 @@
  * - Configurable chunk size
  */
 
-import * as vscode from 'vscode';
-import * as path from 'path';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import * as vscode from "vscode";
+import * as path from "path";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const FileChunksSchema = z.object({
-  path: z.string().describe('File path (absolute or relative)'),
-  chunkSize: z.number().optional().describe('Chunk size in bytes (default: 65536 = 64KB)'),
-  startByte: z.number().optional().describe('Start reading from byte offset (default: 0)'),
-  endByte: z.number().optional().describe('Stop reading at byte offset (default: EOF)'),
-  encoding: z.enum(['utf-8', 'base64']).optional().describe('Encoding (default: utf-8)'),
+  path: z.string().describe("File path (absolute or relative)"),
+  chunkSize: z
+    .number()
+    .optional()
+    .describe("Chunk size in bytes (default: 65536 = 64KB)"),
+  startByte: z
+    .number()
+    .optional()
+    .describe("Start reading from byte offset (default: 0)"),
+  endByte: z
+    .number()
+    .optional()
+    .describe("Stop reading at byte offset (default: EOF)"),
+  encoding: z
+    .enum(["utf-8", "base64"])
+    .optional()
+    .describe("Encoding (default: utf-8)"),
 });
 
 type FileChunksInput = z.infer<typeof FileChunksSchema>;
@@ -44,8 +56,8 @@ interface FileChunk {
  * For multiple chunks, call repeatedly with updated startByte
  */
 export const FileChunksTool: Tool<FileChunksInput, FileChunk> = {
-  name: 'FileChunks',
-  description: 'Read large files incrementally in chunks',
+  name: "FileChunks",
+  description: "Read large files incrementally in chunks",
   schema: FileChunksSchema,
 
   allowedInMode(_mode): boolean {
@@ -54,7 +66,7 @@ export const FileChunksTool: Tool<FileChunksInput, FileChunk> = {
 
   async execute(
     input: FileChunksInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<ToolResult<FileChunk>> {
     const startTime = Date.now();
 
@@ -89,7 +101,7 @@ export const FileChunksTool: Tool<FileChunksInput, FileChunk> = {
  */
 async function readFileChunk(
   input: FileChunksInput,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<FileChunk> {
   // Resolve absolute path
   const absolutePath = path.isAbsolute(input.path)
@@ -105,9 +117,10 @@ async function readFileChunk(
   // Calculate chunk bounds
   const chunkSize = input.chunkSize ?? 65536; // 64KB default
   const startByte = input.startByte ?? 0;
-  const endByte = input.endByte !== undefined
-    ? Math.min(input.endByte, totalBytes)
-    : Math.min(startByte + chunkSize, totalBytes);
+  const endByte =
+    input.endByte !== undefined
+      ? Math.min(input.endByte, totalBytes)
+      : Math.min(startByte + chunkSize, totalBytes);
 
   // Read full file content (VSCode fs API doesn't support partial reads)
   // For true streaming, would need Node fs.createReadStream
@@ -118,10 +131,11 @@ async function readFileChunk(
   const chunkBuffer = content.slice(startByte, endByte);
 
   // Encode
-  const encoding = input.encoding ?? 'utf-8';
-  const chunk = encoding === 'base64'
-    ? Buffer.from(chunkBuffer).toString('base64')
-    : Buffer.from(chunkBuffer).toString('utf-8');
+  const encoding = input.encoding ?? "utf-8";
+  const chunk =
+    encoding === "base64"
+      ? Buffer.from(chunkBuffer).toString("base64")
+      : Buffer.from(chunkBuffer).toString("utf-8");
 
   const isComplete = endByte >= totalBytes;
 

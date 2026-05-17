@@ -2,13 +2,13 @@
  * Cancellation manager - AbortController wrapper
  */
 
-import type { Logger } from '../../telemetry/logger';
-import { RuntimeEventEmitter } from './runtimeEvents';
+import type { Logger } from "../../telemetry/logger";
+import { RuntimeEventEmitter } from "./runtimeEvents";
 
 export class CancellationError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'CancellationError';
+    this.name = "CancellationError";
   }
 }
 
@@ -32,19 +32,22 @@ export class CancellationManager {
   }
 
   async cancel(reason: string, currentIteration: number): Promise<void> {
-    this.logger.info('Cancelling execution', { reason, iteration: currentIteration });
+    this.logger.info("Cancelling execution", {
+      reason,
+      iteration: currentIteration,
+    });
     this.abortController.abort();
 
     for (const callback of this.cancellationCallbacks) {
       try {
         await callback();
       } catch (error) {
-        this.logger.error('Cleanup callback failed', error);
+        this.logger.error("Cleanup callback failed", error);
       }
     }
 
     this.eventEmitter.emitEvent({
-      type: 'cancelled',
+      type: "cancelled",
       reason,
       iteration: currentIteration,
       timestamp: Date.now(),
@@ -53,7 +56,7 @@ export class CancellationManager {
 
   checkCancellation(): void {
     if (this.abortController.signal.aborted) {
-      throw new CancellationError('Execution was cancelled');
+      throw new CancellationError("Execution was cancelled");
     }
   }
 

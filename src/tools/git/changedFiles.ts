@@ -9,22 +9,30 @@
  * - Recently modified files have higher relevance
  */
 
-import { spawn } from 'child_process';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import { spawn } from "child_process";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const ChangedFilesSchema = z.object({
-  baseBranch: z.string().optional().describe('Base branch to compare against (default: main)'),
-  includeUntracked: z.boolean().optional().describe('Include untracked files (default: true)'),
-  statusFilter: z.array(z.enum(['added', 'modified', 'deleted', 'renamed'])).optional()
-    .describe('Filter by file status'),
+  baseBranch: z
+    .string()
+    .optional()
+    .describe("Base branch to compare against (default: main)"),
+  includeUntracked: z
+    .boolean()
+    .optional()
+    .describe("Include untracked files (default: true)"),
+  statusFilter: z
+    .array(z.enum(["added", "modified", "deleted", "renamed"]))
+    .optional()
+    .describe("Filter by file status"),
 });
 
 type ChangedFilesInput = z.infer<typeof ChangedFilesSchema>;
 
 interface ChangedFile {
   readonly path: string;
-  readonly status: 'added' | 'modified' | 'deleted' | 'renamed';
+  readonly status: "added" | "modified" | "deleted" | "renamed";
   readonly oldPath?: string; // For renamed files
   readonly insertions?: number;
   readonly deletions?: number;
@@ -43,8 +51,8 @@ interface ChangedFile {
  * Command: git diff --name-status <base>...HEAD
  */
 export const ChangedFilesTool: Tool<ChangedFilesInput, ChangedFile[]> = {
-  name: 'ChangedFiles',
-  description: 'Get files changed since base branch for context ranking',
+  name: "ChangedFiles",
+  description: "Get files changed since base branch for context ranking",
   schema: ChangedFilesSchema,
 
   allowedInMode(_mode): boolean {
@@ -53,7 +61,7 @@ export const ChangedFilesTool: Tool<ChangedFilesInput, ChangedFile[]> = {
 
   async execute(
     input: ChangedFilesInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<ToolResult<ChangedFile[]>> {
     const startTime = Date.now();
 
@@ -88,10 +96,11 @@ export const ChangedFilesTool: Tool<ChangedFilesInput, ChangedFile[]> = {
  */
 async function getChangedFiles(
   input: ChangedFilesInput,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<ChangedFile[]> {
   // Detect base branch if not specified
-  const baseBranch = input.baseBranch ?? await detectBaseBranch(workspaceRoot);
+  const baseBranch =
+    input.baseBranch ?? (await detectBaseBranch(workspaceRoot));
 
   // Get changed files with status
   const changedFiles = await gitDiffNameStatus(baseBranch, workspaceRoot);
@@ -104,7 +113,7 @@ async function getChangedFiles(
 
   // Filter by status if specified
   if (input.statusFilter && input.statusFilter.length > 0) {
-    return changedFiles.filter(f => input.statusFilter!.includes(f.status));
+    return changedFiles.filter((f) => input.statusFilter!.includes(f.status));
   }
 
   return changedFiles;
@@ -115,16 +124,20 @@ async function getChangedFiles(
  */
 async function detectBaseBranch(workspaceRoot: string): Promise<string> {
   return new Promise((resolve) => {
-    const git = spawn('git', ['rev-parse', '--verify', 'main'], { cwd: workspaceRoot });
+    const git = spawn("git", ["rev-parse", "--verify", "main"], {
+      cwd: workspaceRoot,
+    });
 
-    git.on('close', (code) => {
+    git.on("close", (code) => {
       if (code === 0) {
-        resolve('main');
+        resolve("main");
       } else {
         // Try master
-        const gitMaster = spawn('git', ['rev-parse', '--verify', 'master'], { cwd: workspaceRoot });
-        gitMaster.on('close', (masterCode) => {
-          resolve(masterCode === 0 ? 'master' : 'main');
+        const gitMaster = spawn("git", ["rev-parse", "--verify", "master"], {
+          cwd: workspaceRoot,
+        });
+        gitMaster.on("close", (masterCode) => {
+          resolve(masterCode === 0 ? "master" : "main");
         });
       }
     });
@@ -136,24 +149,24 @@ async function detectBaseBranch(workspaceRoot: string): Promise<string> {
  */
 async function gitDiffNameStatus(
   baseBranch: string,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<ChangedFile[]> {
   return new Promise((resolve, reject) => {
-    const args = ['diff', '--name-status', `${baseBranch}...HEAD`];
-    const git = spawn('git', args, { cwd: workspaceRoot });
+    const args = ["diff", "--name-status", `${baseBranch}...HEAD`];
+    const git = spawn("git", args, { cwd: workspaceRoot });
 
-    let stdout = '';
-    let stderr = '';
+    let stdout = "";
+    let stderr = "";
 
-    git.stdout.on('data', (data: Buffer) => {
+    git.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
 
-    git.stderr.on('data', (data: Buffer) => {
+    git.stderr.on("data", (data: Buffer) => {
       stderr += data.toString();
     });
 
-    git.on('close', (code) => {
+    git.on("close", (code) => {
       if (code === 0) {
         const files = parseNameStatus(stdout);
         resolve(files);
@@ -162,7 +175,7 @@ async function gitDiffNameStatus(
       }
     });
 
-    git.on('error', (error) => {
+    git.on("error", (error) => {
       reject(error);
     });
   });
@@ -178,11 +191,11 @@ async function gitDiffNameStatus(
  * R100    old.txt new.txt (renamed)
  */
 function parseNameStatus(output: string): ChangedFile[] {
-  const lines = output.split('\n').filter(line => line.trim());
+  const lines = output.split("\n").filter((line) => line.trim());
   const files: ChangedFile[] = [];
 
   for (const line of lines) {
-    const parts = line.split('\t');
+    const parts = line.split("\t");
     if (parts.length < 2) {
       continue;
     }
@@ -194,17 +207,17 @@ function parseNameStatus(output: string): ChangedFile[] {
       continue;
     }
 
-    let status: ChangedFile['status'] = 'modified';
+    let status: ChangedFile["status"] = "modified";
     let oldPath: string | undefined;
 
-    if (statusCode.startsWith('A')) {
-      status = 'added';
-    } else if (statusCode.startsWith('M')) {
-      status = 'modified';
-    } else if (statusCode.startsWith('D')) {
-      status = 'deleted';
-    } else if (statusCode.startsWith('R')) {
-      status = 'renamed';
+    if (statusCode.startsWith("A")) {
+      status = "added";
+    } else if (statusCode.startsWith("M")) {
+      status = "modified";
+    } else if (statusCode.startsWith("D")) {
+      status = "deleted";
+    } else if (statusCode.startsWith("R")) {
+      status = "renamed";
       oldPath = parts[1];
       const newPath = parts[2];
       if (!newPath) {
@@ -231,32 +244,36 @@ function parseNameStatus(output: string): ChangedFile[] {
 /**
  * Get untracked files
  */
-async function getUntrackedFiles(workspaceRoot: string): Promise<ChangedFile[]> {
+async function getUntrackedFiles(
+  workspaceRoot: string,
+): Promise<ChangedFile[]> {
   return new Promise((resolve, reject) => {
-    const git = spawn('git', ['ls-files', '--others', '--exclude-standard'], { cwd: workspaceRoot });
+    const git = spawn("git", ["ls-files", "--others", "--exclude-standard"], {
+      cwd: workspaceRoot,
+    });
 
-    let stdout = '';
+    let stdout = "";
 
-    git.stdout.on('data', (data: Buffer) => {
+    git.stdout.on("data", (data: Buffer) => {
       stdout += data.toString();
     });
 
-    git.on('close', (code) => {
+    git.on("close", (code) => {
       if (code === 0) {
         const files: ChangedFile[] = stdout
-          .split('\n')
-          .filter(line => line.trim())
-          .map(path => ({
+          .split("\n")
+          .filter((line) => line.trim())
+          .map((path) => ({
             path,
-            status: 'added' as const,
+            status: "added" as const,
           }));
         resolve(files);
       } else {
-        reject(new Error('git ls-files failed'));
+        reject(new Error("git ls-files failed"));
       }
     });
 
-    git.on('error', (error) => {
+    git.on("error", (error) => {
       reject(error);
     });
   });

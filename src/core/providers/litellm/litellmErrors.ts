@@ -115,7 +115,10 @@ export class ToolCallParseError extends LiteLLMError {
 /**
  * Classify error from HTTP response or exception
  */
-export function classifyError(error: unknown, response?: Response): LiteLLMError {
+export function classifyError(
+  error: unknown,
+  response?: Response,
+): LiteLLMError {
   if (error instanceof LiteLLMError) {
     return error;
   }
@@ -169,7 +172,12 @@ export function classifyError(error: unknown, response?: Response): LiteLLMError
 
   if (error instanceof Error) {
     if (error.name === "AbortError") {
-      return new LiteLLMError("Request cancelled", "CANCELLED", undefined, error);
+      return new LiteLLMError(
+        "Request cancelled",
+        "CANCELLED",
+        undefined,
+        error,
+      );
     }
 
     if (error.name === "TypeError" && error.message.includes("fetch")) {
@@ -185,18 +193,10 @@ export function classifyError(error: unknown, response?: Response): LiteLLMError
       return new LiteLLMTimeoutError(error.message, error);
     }
 
-    return new LiteLLMError(
-      error.message,
-      "UNKNOWN",
-      undefined,
-      error,
-    );
+    return new LiteLLMError(error.message, "UNKNOWN", undefined, error);
   }
 
-  return new LiteLLMError(
-    "Unknown error occurred",
-    "UNKNOWN",
-  );
+  return new LiteLLMError("Unknown error occurred", "UNKNOWN");
 }
 
 /**

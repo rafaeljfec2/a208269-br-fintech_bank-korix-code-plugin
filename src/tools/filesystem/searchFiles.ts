@@ -10,17 +10,22 @@
  * - Parallel directory walking
  */
 
-import { spawn } from 'child_process';
-import { z } from 'zod';
-import type { Tool, ToolContext, ToolResult } from '../../harness/toolRegistry';
+import { spawn } from "child_process";
+import { z } from "zod";
+import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 
 const SearchFilesSchema = z.object({
-  pattern: z.string().describe('File name pattern (regex or glob)'),
-  searchType: z.enum(['name', 'content']).describe('Search by file name or content'),
-  includeHidden: z.boolean().optional().describe('Include hidden files'),
-  maxResults: z.number().optional().describe('Maximum results (default 100)'),
-  fileTypes: z.array(z.string()).optional().describe('File extensions to filter (e.g., ["ts", "js"])'),
-  excludePaths: z.array(z.string()).optional().describe('Paths to exclude'),
+  pattern: z.string().describe("File name pattern (regex or glob)"),
+  searchType: z
+    .enum(["name", "content"])
+    .describe("Search by file name or content"),
+  includeHidden: z.boolean().optional().describe("Include hidden files"),
+  maxResults: z.number().optional().describe("Maximum results (default 100)"),
+  fileTypes: z
+    .array(z.string())
+    .optional()
+    .describe('File extensions to filter (e.g., ["ts", "js"])'),
+  excludePaths: z.array(z.string()).optional().describe("Paths to exclude"),
 });
 
 type SearchFilesInput = z.infer<typeof SearchFilesSchema>;
@@ -44,8 +49,8 @@ interface FileMatch {
  * Content search: rg <pattern> --json
  */
 export const SearchFilesTool: Tool<SearchFilesInput, FileMatch[]> = {
-  name: 'SearchFiles',
-  description: 'Search for files by name or content using ripgrep',
+  name: "SearchFiles",
+  description: "Search for files by name or content using ripgrep",
   schema: SearchFilesSchema,
 
   allowedInMode(_mode): boolean {
@@ -54,7 +59,7 @@ export const SearchFilesTool: Tool<SearchFilesInput, FileMatch[]> = {
 
   async execute(
     input: SearchFilesInput,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<ToolResult<FileMatch[]>> {
     const startTime = Date.now();
 
@@ -65,7 +70,8 @@ export const SearchFilesTool: Tool<SearchFilesInput, FileMatch[]> = {
       if (!hasRipgrep) {
         return {
           success: false,
-          error: 'ripgrep (rg) not found. Please install: https://github.com/BurntSushi/ripgrep',
+          error:
+            "ripgrep (rg) not found. Please install: https://github.com/BurntSushi/ripgrep",
           metadata: {
             duration: Date.now() - startTime,
             approved: true,
@@ -104,10 +110,10 @@ export const SearchFilesTool: Tool<SearchFilesInput, FileMatch[]> = {
  */
 async function checkRipgrepAvailable(): Promise<boolean> {
   return new Promise((resolve) => {
-    const rg = spawn('rg', ['--version']);
+    const rg = spawn("rg", ["--version"]);
 
-    rg.on('error', () => resolve(false));
-    rg.on('close', (code) => resolve(code === 0));
+    rg.on("error", () => resolve(false));
+    rg.on("close", (code) => resolve(code === 0));
   });
 }
 
@@ -116,12 +122,12 @@ async function checkRipgrepAvailable(): Promise<boolean> {
  */
 async function searchWithRipgrep(
   input: SearchFilesInput,
-  workspaceRoot: string
+  workspaceRoot: string,
 ): Promise<FileMatch[]> {
   const maxResults = input.maxResults ?? 100;
   const matches: FileMatch[] = [];
 
-  if (input.searchType === 'name') {
+  if (input.searchType === "name") {
     // File name search: rg --files | rg <pattern>
     await searchFilesByName(input, workspaceRoot, maxResults, matches);
   } else {
@@ -141,44 +147,44 @@ async function searchFilesByName(
   input: SearchFilesInput,
   workspaceRoot: string,
   maxResults: number,
-  matches: FileMatch[]
+  matches: FileMatch[],
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const args: string[] = ['--files'];
+    const args: string[] = ["--files"];
 
     // Add file type filters
     if (input.fileTypes && input.fileTypes.length > 0) {
       for (const ext of input.fileTypes) {
-        args.push('--type-add', `custom:*.${ext}`, '--type', 'custom');
+        args.push("--type-add", `custom:*.${ext}`, "--type", "custom");
       }
     }
 
     // Include hidden files
     if (input.includeHidden) {
-      args.push('--hidden');
+      args.push("--hidden");
     }
 
     // Exclude paths
     if (input.excludePaths && input.excludePaths.length > 0) {
       for (const excludePath of input.excludePaths) {
-        args.push('--glob', `!${excludePath}`);
+        args.push("--glob", `!${excludePath}`);
       }
     }
 
-    const rgFiles = spawn('rg', args, { cwd: workspaceRoot });
-    const rgFilter = spawn('rg', [input.pattern], { cwd: workspaceRoot });
+    const rgFiles = spawn("rg", args, { cwd: workspaceRoot });
+    const rgFilter = spawn("rg", [input.pattern], { cwd: workspaceRoot });
 
     // Pipe rg --files to rg <pattern>
     rgFiles.stdout.pipe(rgFilter.stdin);
 
-    let output = '';
+    let output = "";
 
-    rgFilter.stdout.on('data', (data: Buffer) => {
+    rgFilter.stdout.on("data", (data: Buffer) => {
       output += data.toString();
 
       // Parse incrementally
-      const lines = output.split('\n');
-      output = lines.pop() ?? ''; // Keep incomplete line
+      const lines = output.split("\n");
+      output = lines.pop() ?? ""; // Keep incomplete line
 
       for (const line of lines) {
         if (line.trim() && matches.length < maxResults) {
@@ -193,7 +199,7 @@ async function searchFilesByName(
       }
     });
 
-    rgFilter.on('close', (code) => {
+    rgFilter.on("close", (code) => {
       // Process remaining output
       if (output.trim() && matches.length < maxResults) {
         matches.push({ path: output.trim() });
@@ -207,7 +213,7 @@ async function searchFilesByName(
       }
     });
 
-    rgFilter.on('error', (error) => {
+    rgFilter.on("error", (error) => {
       reject(error);
     });
   });
@@ -222,43 +228,43 @@ async function searchFilesByContent(
   input: SearchFilesInput,
   workspaceRoot: string,
   maxResults: number,
-  matches: FileMatch[]
+  matches: FileMatch[],
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const args: string[] = [input.pattern, '--json'];
+    const args: string[] = [input.pattern, "--json"];
 
     // Add file type filters
     if (input.fileTypes && input.fileTypes.length > 0) {
       for (const ext of input.fileTypes) {
-        args.push('--type-add', `custom:*.${ext}`, '--type', 'custom');
+        args.push("--type-add", `custom:*.${ext}`, "--type", "custom");
       }
     }
 
     // Include hidden files
     if (input.includeHidden) {
-      args.push('--hidden');
+      args.push("--hidden");
     }
 
     // Exclude paths
     if (input.excludePaths && input.excludePaths.length > 0) {
       for (const excludePath of input.excludePaths) {
-        args.push('--glob', `!${excludePath}`);
+        args.push("--glob", `!${excludePath}`);
       }
     }
 
     // Case insensitive by default
-    args.push('--ignore-case');
+    args.push("--ignore-case");
 
-    const rg = spawn('rg', args, { cwd: workspaceRoot });
+    const rg = spawn("rg", args, { cwd: workspaceRoot });
 
-    let output = '';
+    let output = "";
 
-    rg.stdout.on('data', (data: Buffer) => {
+    rg.stdout.on("data", (data: Buffer) => {
       output += data.toString();
 
       // Parse incrementally (JSON Lines format)
-      const lines = output.split('\n');
-      output = lines.pop() ?? '';
+      const lines = output.split("\n");
+      output = lines.pop() ?? "";
 
       for (const line of lines) {
         if (!line.trim()) {
@@ -275,7 +281,11 @@ async function searchFilesByContent(
             };
           };
 
-          if (json.type === 'match' && json.data && matches.length < maxResults) {
+          if (
+            json.type === "match" &&
+            json.data &&
+            matches.length < maxResults
+          ) {
             const path = json.data.path?.text;
             const lineNumber = json.data.line_number;
             const matchText = json.data.lines?.text?.trim();
@@ -300,7 +310,7 @@ async function searchFilesByContent(
       }
     });
 
-    rg.on('close', (code) => {
+    rg.on("close", (code) => {
       if (code === 0 || code === 1) {
         // 1 = no matches
         resolve();
@@ -309,7 +319,7 @@ async function searchFilesByContent(
       }
     });
 
-    rg.on('error', (error) => {
+    rg.on("error", (error) => {
       reject(error);
     });
   });

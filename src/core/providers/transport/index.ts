@@ -12,7 +12,10 @@ import { MetricsTransport } from "./metricsTransport";
 import type { Transport, TransportRequestOptions } from "./httpTransport";
 import type { AuthConfig } from "./authTransport";
 import type { RequestMetrics } from "./metricsTransport";
-import type { RetryPolicy, CircuitBreakerPolicy } from "../litellm/litellmTypes";
+import type {
+  RetryPolicy,
+  CircuitBreakerPolicy,
+} from "../litellm/litellmTypes";
 
 export {
   HttpTransport,
@@ -46,9 +49,12 @@ export class TransportBuilder {
     return this;
   }
 
-  withRetry(policy: RetryPolicy, logger?: {
-    warn: (message: string, context?: Record<string, unknown>) => void;
-  }): this {
+  withRetry(
+    policy: RetryPolicy,
+    logger?: {
+      warn: (message: string, context?: Record<string, unknown>) => void;
+    },
+  ): this {
     this.transport = new RetryTransport(this.transport, policy, logger);
     return this;
   }
@@ -60,7 +66,11 @@ export class TransportBuilder {
       info: (message: string, context?: Record<string, unknown>) => void;
     },
   ): this {
-    this.transport = new CircuitBreakerTransport(this.transport, policy, logger);
+    this.transport = new CircuitBreakerTransport(
+      this.transport,
+      policy,
+      logger,
+    );
     return this;
   }
 

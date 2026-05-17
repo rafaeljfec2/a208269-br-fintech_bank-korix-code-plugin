@@ -8,7 +8,7 @@
 import type { Transport, TransportRequestOptions } from "./httpTransport";
 
 export interface AuthConfig {
-  readonly header: string;     // "Authorization" para LiteLLM/proxies, "x-api-key" para Anthropic direto
+  readonly header: string; // "Authorization" para LiteLLM/proxies, "x-api-key" para Anthropic direto
   readonly token: string;
 }
 
@@ -36,10 +36,6 @@ export class AuthTransport implements Transport {
       headers[this.config.header] = this.config.token;
     }
 
-    return this.inner.request(
-      url,
-      { ...options, headers },
-      signal,
-    );
+    return this.inner.request(url, { ...options, headers }, signal);
   }
 }

@@ -9,8 +9,8 @@
  * - Cache hit/miss metrics
  */
 
-import * as crypto from 'crypto';
-import type { ToolResult } from '../../harness/toolRegistry';
+import * as crypto from "crypto";
+import type { ToolResult } from "../../harness/toolRegistry";
 
 export interface CacheEntry<T = unknown> {
   readonly key: string;
@@ -115,7 +115,11 @@ export class ToolCache {
     };
 
     // Promote to hot partition if accessed frequently
-    if (this.policy.enableHotCold && !node.isHot && node.entry.accessCount >= 3) {
+    if (
+      this.policy.enableHotCold &&
+      !node.isHot &&
+      node.entry.accessCount >= 3
+    ) {
       this.promoteToHot(node);
     }
 
@@ -131,7 +135,12 @@ export class ToolCache {
    * @param result Tool result
    * @param ttl Optional TTL override (milliseconds)
    */
-  set<T>(tool: string, input: unknown, result: ToolResult<T>, ttl?: number): void {
+  set<T>(
+    tool: string,
+    input: unknown,
+    result: ToolResult<T>,
+    ttl?: number,
+  ): void {
     const key = this.generateKey(tool, input);
 
     // Check if already cached
@@ -199,9 +208,7 @@ export class ToolCache {
 
     for (const [key, _node] of this.cache.entries()) {
       const matches =
-        typeof pattern === 'string'
-          ? key.includes(pattern)
-          : pattern.test(key);
+        typeof pattern === "string" ? key.includes(pattern) : pattern.test(key);
 
       if (matches) {
         toRemove.push(key);
@@ -271,9 +278,9 @@ export class ToolCache {
   private generateKey(tool: string, input: unknown): string {
     const inputStr = JSON.stringify(input);
     const hash = crypto
-      .createHash('sha256')
+      .createHash("sha256")
       .update(`${tool}:${inputStr}`)
-      .digest('hex');
+      .digest("hex");
 
     return `${tool}:${hash.slice(0, 16)}`;
   }
@@ -283,7 +290,7 @@ export class ToolCache {
    */
   private estimateSize(result: ToolResult): number {
     const str = JSON.stringify(result);
-    return Buffer.byteLength(str, 'utf-8');
+    return Buffer.byteLength(str, "utf-8");
   }
 
   /**

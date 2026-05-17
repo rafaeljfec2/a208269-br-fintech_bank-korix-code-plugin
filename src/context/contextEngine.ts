@@ -2,11 +2,14 @@
  * Context Engine - orchestrates indexing, ranking, and context building
  */
 
-import { getLogger } from '../telemetry/logger';
-import { WorkspaceIndexer } from './indexing/workspaceIndexer';
-import { HeuristicRanker } from './ranking/heuristicRanker';
-import { ContextBuilder, type ContextBuildOptions } from './retrieval/contextBuilder';
-import type { ContextWindow } from './types';
+import { getLogger } from "../telemetry/logger";
+import { WorkspaceIndexer } from "./indexing/workspaceIndexer";
+import { HeuristicRanker } from "./ranking/heuristicRanker";
+import {
+  ContextBuilder,
+  type ContextBuildOptions,
+} from "./retrieval/contextBuilder";
+import type { ContextWindow } from "./types";
 
 export class ContextEngine {
   private indexer: WorkspaceIndexer;
@@ -26,12 +29,12 @@ export class ContextEngine {
     }
 
     const logger = getLogger();
-    logger.info('Initializing Context Engine');
+    logger.info("Initializing Context Engine");
 
     await this.indexer.initialize();
     this.initialized = true;
 
-    logger.info('Context Engine initialized successfully');
+    logger.info("Context Engine initialized successfully");
   }
 
   async buildContext(options: ContextBuildOptions): Promise<ContextWindow> {
@@ -48,7 +51,7 @@ export class ContextEngine {
 
   dispose(): void {
     const logger = getLogger();
-    logger.info('Disposing Context Engine');
+    logger.info("Disposing Context Engine");
     this.indexer.dispose();
   }
 }
@@ -62,7 +65,7 @@ export function initializeContextEngine(): ContextEngine {
 
 export function getContextEngine(): ContextEngine {
   if (!globalContextEngine) {
-    throw new Error('Context Engine not initialized');
+    throw new Error("Context Engine not initialized");
   }
   return globalContextEngine;
 }

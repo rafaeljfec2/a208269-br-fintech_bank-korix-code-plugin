@@ -2,8 +2,8 @@
  * Hook to access VSCode API in webview
  */
 
-import { useCallback } from 'react';
-import type { WebviewToExtensionMessage } from '../../shared/protocol';
+import { useCallback } from "react";
+import type { WebviewToExtensionMessage } from "../../shared/protocol";
 
 declare const acquireVsCodeApi: () => {
   postMessage: (message: unknown) => void;

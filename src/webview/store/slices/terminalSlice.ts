@@ -2,7 +2,7 @@
  * Terminal slice - terminal sessions and output
  */
 
-import type { StateCreator } from 'zustand';
+import type { StateCreator } from "zustand";
 
 export interface TerminalSession {
   readonly id: string;
@@ -32,7 +32,7 @@ export const createTerminalSlice: StateCreator<TerminalSlice> = (set) => ({
         ...state.sessions,
         [id]: {
           id,
-          output: '',
+          output: "",
           cwd,
           createdAt: Date.now(),
         },

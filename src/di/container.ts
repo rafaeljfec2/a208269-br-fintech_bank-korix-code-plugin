@@ -95,7 +95,7 @@ export function setGlobalContainer(container: Container): void {
 
 export function getGlobalContainer(): Container {
   if (!globalContainer) {
-    throw new Error('Global container not initialized');
+    throw new Error("Global container not initialized");
   }
   return globalContainer;
 }

@@ -2,7 +2,12 @@
  * LiteLLM Provider Factory
  */
 
-import type { AIProvider, ProviderConfig, ProviderFactory, ProviderType } from "../../../providers/types";
+import type {
+  AIProvider,
+  ProviderConfig,
+  ProviderFactory,
+  ProviderType,
+} from "../../../providers/types";
 import { LiteLLMProvider } from "./litellmProvider";
 import { TransportBuilder } from "../transport";
 import { DEFAULT_LITELLM_CONFIG } from "./litellmTypes";
@@ -27,22 +32,28 @@ export class LiteLLMFactory implements ProviderFactory {
     // Build transport chain
     const transport = new TransportBuilder()
       .withAuth({
-        header: "Authorization",  // LiteLLM TR requer Bearer auth (não x-api-key)
+        header: "Authorization", // LiteLLM TR requer Bearer auth (não x-api-key)
         token: config.apiKey,
       })
       .withTimeout(DEFAULT_LITELLM_CONFIG.timeoutMs ?? 120000)
-      .withRetry(DEFAULT_LITELLM_CONFIG.retryPolicy ?? {
-        maxAttempts: 3,
-        baseDelay: 1000,
-        maxDelay: 10000,
-        retryableStatuses: [408, 429, 500, 502, 503, 504],
-      }, this.logger)
-      .withCircuitBreaker(DEFAULT_LITELLM_CONFIG.circuitBreakerPolicy ?? {
-        failureThreshold: 5,
-        successThreshold: 2,
-        openDuration: 60000,
-        halfOpenMaxRequests: 1,
-      }, this.logger)
+      .withRetry(
+        DEFAULT_LITELLM_CONFIG.retryPolicy ?? {
+          maxAttempts: 3,
+          baseDelay: 1000,
+          maxDelay: 10000,
+          retryableStatuses: [408, 429, 500, 502, 503, 504],
+        },
+        this.logger,
+      )
+      .withCircuitBreaker(
+        DEFAULT_LITELLM_CONFIG.circuitBreakerPolicy ?? {
+          failureThreshold: 5,
+          successThreshold: 2,
+          openDuration: 60000,
+          halfOpenMaxRequests: 1,
+        },
+        this.logger,
+      )
       .withTracing()
       .withMetrics((metric) => {
         this.logger?.info("LiteLLM request metric", {

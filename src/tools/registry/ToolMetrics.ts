@@ -93,7 +93,8 @@ export class ToolMetrics {
     }
 
     // Evict oldest if over limit (per-tool)
-    const perToolLimit = Math.floor(this.maxMetrics / this.perToolMetrics.size) || 100;
+    const perToolLimit =
+      Math.floor(this.maxMetrics / this.perToolMetrics.size) || 100;
     if (toolMetrics.length > perToolLimit) {
       toolMetrics.shift();
     }
@@ -127,16 +128,20 @@ export class ToolMetrics {
     }
 
     const totalInvocations = this.metrics.length;
-    const totalSuccesses = this.metrics.filter(m => m.success).length;
-    const totalFailures = this.metrics.filter(m => !m.success).length;
-    const totalCacheHits = this.metrics.filter(m => m.cached).length;
-    const totalCacheMisses = this.metrics.filter(m => !m.cached).length;
+    const totalSuccesses = this.metrics.filter((m) => m.success).length;
+    const totalFailures = this.metrics.filter((m) => !m.success).length;
+    const totalCacheHits = this.metrics.filter((m) => m.cached).length;
+    const totalCacheMisses = this.metrics.filter((m) => !m.cached).length;
 
-    const globalSuccessRate = totalInvocations > 0 ? totalSuccesses / totalInvocations : 0;
-    const globalCacheHitRate = totalInvocations > 0 ? totalCacheHits / totalInvocations : 0;
-    const avgDuration = totalInvocations > 0
-      ? this.metrics.reduce((sum, m) => sum + m.duration, 0) / totalInvocations
-      : 0;
+    const globalSuccessRate =
+      totalInvocations > 0 ? totalSuccesses / totalInvocations : 0;
+    const globalCacheHitRate =
+      totalInvocations > 0 ? totalCacheHits / totalInvocations : 0;
+    const avgDuration =
+      totalInvocations > 0
+        ? this.metrics.reduce((sum, m) => sum + m.duration, 0) /
+          totalInvocations
+        : 0;
 
     return {
       totalInvocations,
@@ -158,7 +163,7 @@ export class ToolMetrics {
    * @returns Array of metrics since timestamp
    */
   getTimeline(since: number): ToolMetric[] {
-    return this.metrics.filter(m => m.timestamp >= since);
+    return this.metrics.filter((m) => m.timestamp >= since);
   }
 
   /**
@@ -174,7 +179,7 @@ export class ToolMetrics {
       return [];
     }
 
-    return toolMetrics.filter(m => m.timestamp >= since);
+    return toolMetrics.filter((m) => m.timestamp >= since);
   }
 
   /**
@@ -214,24 +219,28 @@ export class ToolMetrics {
   /**
    * Aggregate metrics for a tool
    */
-  private aggregateMetrics(tool: string, metrics: ToolMetric[]): AggregatedMetrics {
+  private aggregateMetrics(
+    tool: string,
+    metrics: ToolMetric[],
+  ): AggregatedMetrics {
     const invocations = metrics.length;
-    const successes = metrics.filter(m => m.success).length;
-    const failures = metrics.filter(m => !m.success).length;
-    const cacheHits = metrics.filter(m => m.cached).length;
-    const cacheMisses = metrics.filter(m => !m.cached).length;
+    const successes = metrics.filter((m) => m.success).length;
+    const failures = metrics.filter((m) => !m.success).length;
+    const cacheHits = metrics.filter((m) => m.cached).length;
+    const cacheMisses = metrics.filter((m) => !m.cached).length;
 
     const successRate = invocations > 0 ? successes / invocations : 0;
     const cacheHitRate = invocations > 0 ? cacheHits / invocations : 0;
 
     // Duration stats
-    const durations = metrics.map(m => m.duration).sort((a, b) => a - b);
+    const durations = metrics.map((m) => m.duration).sort((a, b) => a - b);
     const durationStats = {
       min: durations[0] ?? 0,
       max: durations[durations.length - 1] ?? 0,
-      avg: durations.length > 0
-        ? durations.reduce((sum, d) => sum + d, 0) / durations.length
-        : 0,
+      avg:
+        durations.length > 0
+          ? durations.reduce((sum, d) => sum + d, 0) / durations.length
+          : 0,
       p50: this.percentile(durations, 50),
       p95: this.percentile(durations, 95),
       p99: this.percentile(durations, 99),
@@ -278,10 +287,14 @@ export class ToolMetrics {
    * Export metrics as JSON (for debugging or persistence)
    */
   exportJSON(): string {
-    return JSON.stringify({
-      metrics: this.metrics,
-      perToolMetrics: Array.from(this.perToolMetrics.entries()),
-    }, null, 2);
+    return JSON.stringify(
+      {
+        metrics: this.metrics,
+        perToolMetrics: Array.from(this.perToolMetrics.entries()),
+      },
+      null,
+      2,
+    );
   }
 
   /**

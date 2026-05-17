@@ -153,12 +153,14 @@ export class ToolCallAssembler {
   getState() {
     return {
       activeCount: this.activeToolCalls.size,
-      pending: Array.from(this.activeToolCalls.entries()).map(([index, tc]) => ({
-        index,
-        id: tc.id,
-        name: tc.name,
-        argumentsLength: tc.arguments.length,
-      })),
+      pending: Array.from(this.activeToolCalls.entries()).map(
+        ([index, tc]) => ({
+          index,
+          id: tc.id,
+          name: tc.name,
+          argumentsLength: tc.arguments.length,
+        }),
+      ),
     };
   }
 }

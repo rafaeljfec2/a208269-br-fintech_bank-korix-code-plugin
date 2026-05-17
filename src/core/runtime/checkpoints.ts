@@ -2,11 +2,11 @@
  * Checkpoint manager - incremental file snapshots
  */
 
-import * as crypto from 'crypto';
-import fs from 'fs/promises';
-import type { Logger } from '../../telemetry/logger';
-import type { RuntimeState } from './runtimeState';
-import type { RuntimeCheckpoint, FileSnapshot } from './runtimeTypes';
+import * as crypto from "crypto";
+import fs from "fs/promises";
+import type { Logger } from "../../telemetry/logger";
+import type { RuntimeState } from "./runtimeState";
+import type { RuntimeCheckpoint, FileSnapshot } from "./runtimeTypes";
 
 export class CheckpointManager {
   private checkpoints = new Map<string, RuntimeCheckpoint>();
@@ -14,15 +14,21 @@ export class CheckpointManager {
 
   constructor(private readonly logger: Logger) {}
 
-  async create(state: RuntimeState, modifiedFiles: Set<string>): Promise<string> {
+  async create(
+    state: RuntimeState,
+    modifiedFiles: Set<string>,
+  ): Promise<string> {
     const checkpointId = `checkpoint-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
-    
+
     // Snapshot modified files
     const fileSnapshots: FileSnapshot[] = [];
     for (const filePath of modifiedFiles) {
       try {
-        const contentStr = await fs.readFile(filePath, 'utf-8');
-        const hash = crypto.createHash('sha256').update(contentStr).digest('hex');
+        const contentStr = await fs.readFile(filePath, "utf-8");
+        const hash = crypto
+          .createHash("sha256")
+          .update(contentStr)
+          .digest("hex");
 
         fileSnapshots.push({
           path: filePath,
@@ -46,7 +52,7 @@ export class CheckpointManager {
       timestamp: Date.now(),
       modifiedFiles: fileSnapshots,
       operationJournal: conversation.toolCallHistory.map((tc) => ({
-        type: 'tool_call' as const,
+        type: "tool_call" as const,
         toolName: tc.toolName,
         toolInput: tc.input,
         timestamp: tc.timestamp,
@@ -71,7 +77,7 @@ export class CheckpointManager {
     // Restore files
     for (const snapshot of checkpoint.modifiedFiles) {
       try {
-        await fs.writeFile(snapshot.path, snapshot.content, 'utf-8');
+        await fs.writeFile(snapshot.path, snapshot.content, "utf-8");
       } catch (error) {
         this.logger.error(`Failed to restore file ${snapshot.path}`, error);
         throw error; // Re-throw to fail restore
