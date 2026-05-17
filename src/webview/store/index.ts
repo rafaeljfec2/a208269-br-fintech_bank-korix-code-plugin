@@ -12,13 +12,13 @@ import { createToolsSlice, type ToolsSlice } from './slices/toolsSlice';
 
 export type RootStore = ChatSlice & RuntimeSlice & TimelineSlice & TerminalSlice & SettingsSlice & ToolsSlice;
 
-export const useStore = create<RootStore>((set, get) => ({
-  ...createChatSlice(set),
-  ...createRuntimeSlice(set),
-  ...createTimelineSlice(set),
-  ...createTerminalSlice(set),
-  ...createSettingsSlice(set),
-  ...createToolsSlice(set),
+export const useStore = create<RootStore>((set, get, api) => ({
+  ...createChatSlice(set, get, api),
+  ...createRuntimeSlice(set, get, api),
+  ...createTimelineSlice(set, get, api),
+  ...createTerminalSlice(set, get, api),
+  ...createSettingsSlice(set, get, api),
+  ...createToolsSlice(set, get, api),
 }));
 
 // Export types for external use

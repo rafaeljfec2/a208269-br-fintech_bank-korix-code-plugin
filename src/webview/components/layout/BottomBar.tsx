@@ -25,6 +25,9 @@ export default function BottomBar() {
   const setMode = useStore((state) => state.setMode);
   const setModel = useStore((state) => state.setModel);
   const addMessage = useStore((state) => state.addMessage);
+  const activeChatId = useStore((state) => state.activeChatId);
+  const createChat = useStore((state) => state.createChat);
+  const conversations = useStore((state) => state.conversations);
   const { sendMessage } = useVSCode();
 
   // Auto-resize textarea
@@ -45,19 +48,42 @@ export default function BottomBar() {
 
     const messageContent = input.trim();
 
-    // 1. Adicionar mensagem do usuário ao store IMEDIATAMENTE (UI feedback)
-    addMessage({
+    // 1. Garantir que há uma conversa ativa
+    let chatId = activeChatId;
+    if (!chatId) {
+      chatId = createChat('Nova conversa');
+    }
+
+    // 2. Pegar mensagens ANTES de adicionar (histórico sem a nova mensagem)
+    const chat = conversations[chatId];
+    const previousMessages = (chat?.messages ?? []).map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    // Debug
+    console.log('[BottomBar] Sending message:', {
+      newMessage: messageContent,
+      previousCount: previousMessages.length,
+      lastPreviousRole: previousMessages[previousMessages.length - 1]?.role,
+    });
+
+    // 3. Adicionar mensagem do usuário ao store IMEDIATAMENTE (UI feedback)
+    addMessage(chatId, {
       role: 'user',
       content: messageContent,
     });
 
-    // 2. Enviar para o backend (runtime processing)
+    // 4. Enviar para o backend com histórico (runtime processing)
     sendMessage({
       type: 'send_message',
-      payload: { content: messageContent },
+      payload: {
+        content: messageContent,
+        messages: previousMessages,
+      },
     });
 
-    // 3. Limpar input
+    // 5. Limpar input
     setInput('');
 
     // Reset textarea height after send

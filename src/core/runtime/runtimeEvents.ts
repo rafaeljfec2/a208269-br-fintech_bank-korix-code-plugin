@@ -6,6 +6,7 @@
  */
 
 import { EventEmitter } from 'events';
+import * as vscode from 'vscode';
 import type { RuntimeMetricsSnapshot } from './runtimeTypes';
 
 /**
@@ -259,18 +260,23 @@ export class RuntimeEventEmitter extends EventEmitter {
 
   /**
    * Listen to all runtime events
+   * Returns a Disposable that removes the listener when disposed
    */
-  onEvent(listener: (event: RuntimeEvent) => void): this {
-    return super.on('event', listener);
+  onEvent(listener: (event: RuntimeEvent) => void): vscode.Disposable {
+    this.on('event', listener);
+    return new vscode.Disposable(() => {
+      this.off('event', listener);
+    });
   }
 
   /**
    * Listen to specific event types
+   * Returns a Disposable that removes the listener when disposed
    */
   onType<T extends RuntimeEvent['type']>(
     type: T,
     listener: (event: Extract<RuntimeEvent, { type: T }>) => void,
-  ): this {
+  ): vscode.Disposable {
     return this.onEvent((event) => {
       if (event.type === type) {
         listener(event as Extract<RuntimeEvent, { type: T }>);

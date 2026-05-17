@@ -70,6 +70,7 @@ export type ExtensionToWebviewMessage =
 
 export interface SendMessagePayload {
   readonly content: string;
+  readonly messages?: readonly { role: 'user' | 'assistant' | 'system'; content: string }[];
 }
 
 export interface ChangeModePayload {

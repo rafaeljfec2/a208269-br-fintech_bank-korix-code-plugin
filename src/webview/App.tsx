@@ -1,11 +1,11 @@
 /**
  * App - Main React application
- * Claude.ai-inspired layout: TopBar + MainPanel + BottomBar + SidebarDrawer
+ * Claude.ai-inspired layout: TabBar + MainPanel + BottomBar + SidebarDrawer
  */
 
 import React, { useState } from 'react';
 import { useRuntimeEvents } from './hooks/useRuntimeEvents';
-import TopBar from './components/layout/TopBar';
+import TabBar from './components/layout/TopBar';
 import BottomBar from './components/layout/BottomBar';
 import SidebarDrawer from './components/layout/SidebarDrawer';
 import MainPanel from './components/layout/MainPanel';
@@ -19,13 +19,11 @@ export default function App() {
 
   return (
     <div className="h-screen w-full flex flex-col bg-[var(--vscode-editor-background)] text-[var(--vscode-foreground)] overflow-hidden">
-      {/* Top Bar - Session tabs */}
-      <TopBar onMenuClick={() => setIsMenuOpen(true)} />
+      {/* Tab Bar - Multiple session tabs */}
+      <TabBar onMenuClick={() => setIsMenuOpen(true)} />
 
       {/* Main Content Area */}
-      <div className="flex-1 min-h-0">
-        <MainPanel />
-      </div>
+      <MainPanel />
 
       {/* Bottom Bar - Input + Controls */}
       <BottomBar />

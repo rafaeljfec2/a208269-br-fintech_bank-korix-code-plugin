@@ -43,9 +43,21 @@ export class AgentLoop {
   async *run(
     initialMessage: string,
     context: ExecutionContext,
+    previousMessages?: readonly { role: 'user' | 'assistant' | 'system'; content: string }[],
   ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
     const state = new RuntimeState(context, 25);
-    
+
+    // Add previous messages for conversation history
+    if (previousMessages && previousMessages.length > 0) {
+      for (const msg of previousMessages) {
+        state.addMessage({
+          role: msg.role,
+          content: msg.content,
+          timestamp: Date.now(),
+        });
+      }
+    }
+
     // Add initial user message
     state.addMessage({
       role: 'user',
@@ -144,7 +156,9 @@ export class AgentLoop {
         };
 
         // Check completion
-        if (stepResult.stopReason === 'end_turn' && !stepResult.hadToolCalls) {
+        // Accept both 'end_turn' (standard) and 'stop' (LiteLLM format)
+        const isEndTurn = stepResult.stopReason === 'end_turn' || stepResult.stopReason === 'stop';
+        if (isEndTurn && !stepResult.hadToolCalls) {
           completed = true;
         }
       }

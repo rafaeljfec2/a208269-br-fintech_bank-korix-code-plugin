@@ -13,6 +13,7 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
 
   private _view?: vscode.WebviewView;
   private _messageHandler?: MessageHandler;
+  private _messageListener?: vscode.Disposable;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
@@ -33,18 +34,29 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+    // Dispose old MessageHandler BEFORE creating new one
+    this._messageHandler?.dispose();
+
     // Create message handler
     this._messageHandler = new MessageHandler(webviewView.webview, this._container);
 
     // Send initial state
     this._messageHandler.sendInitialState();
 
+    // Dispose old message listener to prevent accumulation
+    this._messageListener?.dispose();
+
     // Handle messages from webview
-    webviewView.webview.onDidReceiveMessage((message: WebviewToExtensionMessage) => {
+    this._messageListener = webviewView.webview.onDidReceiveMessage((message: WebviewToExtensionMessage) => {
       this._messageHandler?.handleMessage(message).catch((error) => {
         console.error('Failed to handle webview message:', error);
       });
     });
+  }
+
+  public dispose(): void {
+    this._messageListener?.dispose();
+    this._messageHandler?.dispose();
   }
 
   private _getHtmlForWebview(webview: vscode.Webview): string {

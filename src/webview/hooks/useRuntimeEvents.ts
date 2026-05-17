@@ -7,27 +7,17 @@ import { useStore } from '../store';
 import type { ExtensionToWebviewMessage } from '../../shared/protocol';
 
 export function useRuntimeEvents() {
-  const addMessage = useStore((state) => state.addMessage);
-  const appendStreamingToken = useStore((state) => state.appendStreamingToken);
-  const finalizeStreaming = useStore((state) => state.finalizeStreaming);
-  const addTimelineEvent = useStore((state) => state.addTimelineEvent);
-  const setExecuting = useStore((state) => state.setExecuting);
-  const setIteration = useStore((state) => state.setIteration);
-  const updateMetrics = useStore((state) => state.updateMetrics);
-  const setMode = useStore((state) => state.setMode);
-  const setModel = useStore((state) => state.setModel);
-  const createSession = useStore((state) => state.createSession);
-  const appendOutput = useStore((state) => state.appendOutput);
-
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
+      // Usar getState() para evitar dependências no useEffect e múltiplos listeners
+      const store = useStore.getState();
       const message = event.data;
 
       if (message.type === 'init') {
         const { mode, model, isExecuting } = message.payload;
-        setMode(mode);
-        setModel(model);
-        setExecuting(isExecuting);
+        store.setMode(mode);
+        store.setModel(model);
+        store.setExecuting(isExecuting);
         return;
       }
 
@@ -37,9 +27,9 @@ export function useRuntimeEvents() {
         switch (runtimeEvent.type) {
           case 'iteration_start': {
             const event = runtimeEvent;
-            setIteration(event.iteration);
-            setExecuting(true);
-            addTimelineEvent({
+            store.setIteration(event.iteration);
+            store.setExecuting(true);
+            store.addTimelineEvent({
               type: 'iteration',
               description: `Iteration ${event.iteration} started`,
               status: 'pending',
@@ -49,7 +39,7 @@ export function useRuntimeEvents() {
 
           case 'iteration_complete': {
             const event = runtimeEvent;
-            addTimelineEvent({
+            store.addTimelineEvent({
               type: 'iteration',
               description: `Iteration ${event.iteration} completed`,
               status: 'success',
@@ -60,12 +50,17 @@ export function useRuntimeEvents() {
 
           case 'token': {
             const event = runtimeEvent;
-            appendStreamingToken(event.content);
+            // Garantir que há conversa ativa antes de processar streaming
+            let chatId = useStore.getState().activeChatId;
+            if (!chatId) {
+              chatId = useStore.getState().createChat('Nova conversa');
+            }
+            store.appendStreamingToken(chatId, event.content);
             break;
           }
 
           case 'thinking':
-            addTimelineEvent({
+            store.addTimelineEvent({
               type: 'thinking',
               description: 'Reasoning...',
               status: 'pending',
@@ -74,19 +69,19 @@ export function useRuntimeEvents() {
 
           case 'tool_call': {
             const event = runtimeEvent;
-            addTimelineEvent({
+            store.addTimelineEvent({
               type: 'tool',
               description: `Tool: ${event.name}`,
               status: 'pending',
               metadata: { toolName: event.name, input: event.input },
             });
-            updateMetrics({ toolCallCount: (useStore.getState().metrics.toolCallCount ?? 0) + 1 });
+            store.updateMetrics({ toolCallCount: (useStore.getState().metrics.toolCallCount ?? 0) + 1 });
             break;
           }
 
           case 'tool_result': {
             const event = runtimeEvent;
-            addTimelineEvent({
+            store.addTimelineEvent({
               type: 'tool',
               description: `Tool ${event.name} completed`,
               status: 'success',
@@ -95,16 +90,23 @@ export function useRuntimeEvents() {
             break;
           }
 
-          case 'done':
-            finalizeStreaming();
-            setExecuting(false);
+          case 'done': {
+            const chatId = useStore.getState().activeChatId;
+            if (chatId) {
+              store.finalizeStreaming(chatId);
+            }
+            store.setExecuting(false);
             break;
+          }
 
           case 'error': {
             const event = runtimeEvent;
-            finalizeStreaming();
-            setExecuting(false);
-            addTimelineEvent({
+            const chatId = useStore.getState().activeChatId;
+            if (chatId) {
+              store.finalizeStreaming(chatId);
+            }
+            store.setExecuting(false);
+            store.addTimelineEvent({
               type: 'error',
               description: event.error,
               status: 'error',
@@ -115,7 +117,7 @@ export function useRuntimeEvents() {
 
           case 'checkpoint_created': {
             const event = runtimeEvent;
-            addTimelineEvent({
+            store.addTimelineEvent({
               type: 'checkpoint',
               description: 'Checkpoint created',
               status: 'success',
@@ -126,7 +128,7 @@ export function useRuntimeEvents() {
 
           case 'checkpoint_restored': {
             const event = runtimeEvent;
-            addTimelineEvent({
+            store.addTimelineEvent({
               type: 'checkpoint',
               description: 'Checkpoint restored',
               status: 'success',
@@ -139,28 +141,16 @@ export function useRuntimeEvents() {
 
       if (message.type === 'terminal_session_created') {
         const { sessionId, shellPath } = message.payload;
-        createSession(sessionId, shellPath);
+        store.createSession(sessionId, shellPath);
       }
 
       if (message.type === 'terminal_output') {
         const { sessionId, data } = message.payload;
-        appendOutput(sessionId, data);
+        store.appendOutput(sessionId, data);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [
-    addMessage,
-    appendStreamingToken,
-    finalizeStreaming,
-    addTimelineEvent,
-    setExecuting,
-    setIteration,
-    updateMetrics,
-    setMode,
-    setModel,
-    createSession,
-    appendOutput,
-  ]);
+  }, []); // Array vazio - listener registrado apenas uma vez
 }

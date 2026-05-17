@@ -37,6 +37,7 @@ export class MessageHandler {
   private readonly agentLoopFactory: AgentLoopFactory;
   private readonly toolApprovalHandler: ToolApprovalHandler;
   private readonly checkpointHandler: CheckpointHandler;
+  private _disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly webview: vscode.Webview,
@@ -74,7 +75,7 @@ export class MessageHandler {
    * Setup forwarding of RuntimeEventEmitter events to webview
    */
   private setupEventForwarding(): void {
-    this.eventEmitter.onEvent((event) => {
+    const subscription = this.eventEmitter.onEvent((event) => {
       const message: ExtensionToWebviewMessage = {
         type: 'runtime_event',
         payload: { event },
@@ -90,6 +91,7 @@ export class MessageHandler {
       );
     });
 
+    this._disposables.push(subscription);
     this.logger.info('Event forwarding setup complete');
   }
 
@@ -151,7 +153,10 @@ export class MessageHandler {
 
     switch (message.type) {
       case 'send_message':
-        await this.handleSendMessage(message.payload.content);
+        await this.handleSendMessage(
+          message.payload.content,
+          message.payload.messages ?? [],
+        );
         break;
 
       case 'change_mode':
@@ -200,8 +205,15 @@ export class MessageHandler {
   /**
    * User sends a message (execute agent loop)
    */
-  private async handleSendMessage(content: string): Promise<void> {
-    this.logger.info('User message received', { length: content.length });
+  private async handleSendMessage(
+    content: string,
+    previousMessages: readonly { role: 'user' | 'assistant' | 'system'; content: string }[],
+  ): Promise<void> {
+    this.logger.info('User message received', {
+      length: content.length,
+      historyLength: previousMessages.length,
+      lastHistoryRole: previousMessages[previousMessages.length - 1]?.role,
+    });
 
     try {
       // Get provider config
@@ -246,8 +258,8 @@ export class MessageHandler {
       // Mark as executing
       this.stateManager.startExecution();
 
-      // Run agent loop and process events
-      const generator = agentLoop.run(content, context);
+      // Run agent loop with history and process events
+      const generator = agentLoop.run(content, context, previousMessages);
 
       try {
         for await (const event of generator) {
@@ -512,6 +524,8 @@ export class MessageHandler {
    * Cleanup resources
    */
   public dispose(): void {
+    this._disposables.forEach(d => d.dispose());
+    this._disposables = [];
     this.logger.info('MessageHandler disposed');
   }
 }

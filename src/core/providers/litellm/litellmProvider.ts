@@ -131,10 +131,16 @@ export class LiteLLMProvider implements AIProvider {
    * Build Anthropic Messages API request
    */
   private buildRequest(input: ProviderInput): AnthropicMessagesRequest {
+    // Convert messages (já aplica stripTrailingAssistant internamente)
+    const messages = this.convertMessages(input);
+
+    // Validar após conversão e strip (safety check)
+    this.validateMessages(messages);
+
     const request: AnthropicMessagesRequest = {
       model: this.config.model,
       max_tokens: input.maxTokens ?? this.config.maxTokens ?? 8192, // Default 8192 (Anthropic max_tokens obrigatório)
-      messages: this.convertMessages(input),
+      messages,
       system: input.system, // Anthropic: system é campo separado, não mensagem
       tools: input.tools ? this.convertTools(input.tools) : undefined,
       stream: true,
@@ -146,6 +152,73 @@ export class LiteLLMProvider implements AIProvider {
     }
 
     return request;
+  }
+
+  /**
+   * Remove trailing assistant messages from the array
+   * Required for Claude 4.6+ (assistant message prefill no longer supported)
+   *
+   * References:
+   * - https://github.com/livekit/agents/issues/4907
+   * - https://github.com/microsoft/agent-framework/issues/5008
+   * - https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prefill-claudes-response
+   */
+  private stripTrailingAssistant(
+    messages: readonly AnthropicMessage[]
+  ): readonly AnthropicMessage[] {
+    if (messages.length === 0) {
+      return messages;
+    }
+
+    let lastIndex = messages.length - 1;
+
+    // Remove ALL trailing assistant messages
+    while (lastIndex >= 0 && messages[lastIndex].role === 'assistant') {
+      lastIndex--;
+    }
+
+    // If all messages were assistant (invalid state), return empty
+    if (lastIndex < 0) {
+      return [];
+    }
+
+    return messages.slice(0, lastIndex + 1);
+  }
+
+  /**
+   * Validate messages array before sending to Anthropic API
+   * Ensures compliance with Claude 4.6+ requirements
+   */
+  private validateMessages(messages: readonly AnthropicMessage[]): void {
+    // Validação 1: Array não pode estar vazio
+    if (messages.length === 0) {
+      throw new Error('[LiteLLM] Messages array cannot be empty');
+    }
+
+    // Validação 2: Primeira mensagem deve ser 'user'
+    if (messages[0].role !== 'user') {
+      throw new Error(
+        `[LiteLLM] First message must be from user, got: ${messages[0].role}`
+      );
+    }
+
+    // Validação 3: Última mensagem deve ser 'user' (Claude 4.6+ requirement)
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role !== 'user') {
+      throw new Error(
+        `[LiteLLM] Last message must be from user, got: ${lastMessage.role}. ` +
+        `This prevents "assistant message prefill" errors on Claude 4.6+.`
+      );
+    }
+
+    // Validação 4: Sem dupla sequência assistant → assistant
+    for (let i = 0; i < messages.length - 1; i++) {
+      if (messages[i].role === 'assistant' && messages[i + 1].role === 'assistant') {
+        throw new Error(
+          `[LiteLLM] Invalid sequence: assistant followed by assistant at index ${i}`
+        );
+      }
+    }
   }
 
   /**
@@ -178,7 +251,8 @@ export class LiteLLMProvider implements AIProvider {
       }
     }
 
-    return messages;
+    // CRITICAL FIX: Strip trailing assistant messages (Claude 4.6+ requirement)
+    return this.stripTrailingAssistant(messages);
   }
 
   /**
