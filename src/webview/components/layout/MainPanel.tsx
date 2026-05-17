@@ -5,6 +5,9 @@
 import React from 'react';
 import { useStore } from '../../store';
 import trIcon from '../../assets/tr-icon.svg';
+import ChatMessage from '../chat/ChatMessage';
+import MarkdownContent from '../chat/MarkdownContent';
+import StreamingIndicator from '../chat/StreamingIndicator';
 
 export default function MainPanel() {
   // Use selectors separados para evitar re-renders desnecessários
@@ -38,39 +41,23 @@ export default function MainPanel() {
     <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-[var(--vscode-editor-background)]">
       {/* Messages */}
       {activeChat.messages.map((msg) => (
-        <div key={msg.id} className="flex gap-3">
-          {msg.role === 'assistant' && (
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--vscode-button-background)] flex items-center justify-center text-xs">
-              K
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="text-xs opacity-50 mb-1">
-              {msg.role === 'user' ? 'You' : 'Korix'}
-            </div>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">
-              {msg.content}
-            </div>
-          </div>
-          {msg.role === 'user' && (
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--vscode-input-background)] flex items-center justify-center text-xs opacity-60">
-              U
-            </div>
-          )}
-        </div>
+        <ChatMessage key={msg.id} message={msg} />
       ))}
 
       {/* Streaming content */}
       {activeChat.isStreaming && activeChat.streamingContent && (
-        <div className="flex gap-3">
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--vscode-button-background)] flex items-center justify-center text-xs">
+        <div className="flex gap-3 px-4 py-3">
+          <div className="w-7 h-7 rounded-full bg-[var(--vscode-button-background)] text-[var(--vscode-button-foreground)] flex items-center justify-center text-xs font-semibold flex-shrink-0">
             K
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xs opacity-50 mb-1">Korix</div>
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">
-              {activeChat.streamingContent}
-              <span className="inline-block w-1.5 h-4 bg-[var(--vscode-button-background)] ml-0.5 animate-pulse"></span>
+            <div className="flex items-center justify-between mb-2 text-xs opacity-60">
+              <span>Korix</span>
+              <span>just now</span>
+            </div>
+            <div className="text-sm leading-relaxed">
+              <MarkdownContent content={activeChat.streamingContent} />
+              <StreamingIndicator />
             </div>
           </div>
         </div>

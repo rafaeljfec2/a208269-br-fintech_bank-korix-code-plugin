@@ -4,12 +4,39 @@
 
 import type { StateCreator } from 'zustand';
 
+export interface ToolExecution {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly status: 'success' | 'error' | 'pending';
+  readonly duration: number; // ms
+  readonly timestamp: number;
+}
+
+export interface MessageMetadata {
+  readonly execution?: {
+    readonly tools: ToolExecution[];
+    readonly isExpanded: boolean;
+    readonly totalDuration: number;
+  };
+  readonly statusCard?: {
+    readonly type: 'plan_created' | 'completed' | 'error';
+    readonly title: string;
+    readonly subtitle?: string;
+    readonly action?: {
+      readonly label: string;
+      readonly onClick: () => void;
+    };
+  };
+}
+
 export interface Message {
   readonly id: string;
   readonly role: 'user' | 'assistant' | 'system';
   readonly content: string;
   readonly timestamp: number;
   readonly isStreaming?: boolean;
+  readonly metadata?: MessageMetadata;
 }
 
 export interface ChatSession {
@@ -34,6 +61,10 @@ export interface ChatSlice {
   readonly appendStreamingToken: (chatId: string, token: string) => void;
   readonly finalizeStreaming: (chatId: string) => void;
   readonly clearChat: (chatId: string) => void;
+  readonly updateActiveMessageMetadata: (
+    chatId: string,
+    metadata: Partial<MessageMetadata>
+  ) => void;
 }
 
 export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set) => ({
@@ -189,6 +220,29 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (set)
             messages: [],
             streamingContent: '',
             isStreaming: false,
+          },
+        },
+      };
+    }),
+
+  updateActiveMessageMetadata: (chatId, metadata) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat || chat.messages.length === 0) return state;
+
+      const lastMessage = chat.messages[chat.messages.length - 1];
+      if (lastMessage.role !== 'assistant') return state;
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            messages: chat.messages.map((msg, i) =>
+              i === chat.messages.length - 1
+                ? { ...msg, metadata: { ...msg.metadata, ...metadata } }
+                : msg
+            ),
           },
         },
       };

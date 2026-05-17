@@ -5,8 +5,12 @@
 import { useEffect } from 'react';
 import { useStore } from '../store';
 import type { ExtensionToWebviewMessage } from '../../shared/protocol';
+import type { ToolExecution } from '../store/slices/chatSlice';
 
 export function useRuntimeEvents() {
+  // Track current message tools (scoped to current message)
+  let currentMessageTools: ToolExecution[] = [];
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
       // Usar getState() para evitar dependências no useEffect e múltiplos listeners
@@ -69,6 +73,8 @@ export function useRuntimeEvents() {
 
           case 'tool_call': {
             const event = runtimeEvent;
+
+            // Add to timeline (existing behavior)
             store.addTimelineEvent({
               type: 'tool',
               description: `Tool: ${event.name}`,
@@ -76,17 +82,64 @@ export function useRuntimeEvents() {
               metadata: { toolName: event.name, input: event.input },
             });
             store.updateMetrics({ toolCallCount: (useStore.getState().metrics.toolCallCount ?? 0) + 1 });
+
+            // NEW: Add pending tool to current message metadata
+            const chatId = useStore.getState().activeChatId;
+            if (chatId) {
+              const toolPending: ToolExecution = {
+                id: event.id,
+                name: event.name,
+                description: `${event.name}`,
+                status: 'pending',
+                duration: 0,
+                timestamp: event.timestamp,
+              };
+              currentMessageTools.push(toolPending);
+
+              store.updateActiveMessageMetadata(chatId, {
+                execution: {
+                  tools: [...currentMessageTools],
+                  isExpanded: false,
+                  totalDuration: 0,
+                },
+              });
+            }
             break;
           }
 
           case 'tool_result': {
             const event = runtimeEvent;
+
+            // Add to timeline (existing behavior)
             store.addTimelineEvent({
               type: 'tool',
               description: `Tool ${event.name} completed`,
-              status: 'success',
+              status: event.success ? 'success' : 'error',
               metadata: { toolName: event.name },
             });
+
+            // NEW: Update tool status and duration in message metadata
+            const chatId = useStore.getState().activeChatId;
+            if (chatId) {
+              const toolIndex = currentMessageTools.findIndex(t => t.id === event.id);
+              if (toolIndex !== -1) {
+                currentMessageTools[toolIndex] = {
+                  ...currentMessageTools[toolIndex],
+                  status: event.success ? 'success' : 'error',
+                  duration: event.duration,
+                };
+
+                const totalDuration = currentMessageTools.reduce((sum, t) => sum + t.duration, 0);
+
+                store.updateActiveMessageMetadata(chatId, {
+                  execution: {
+                    tools: [...currentMessageTools],
+                    isExpanded: true, // Auto-expand when tools complete
+                    totalDuration,
+                  },
+                });
+              }
+            }
             break;
           }
 
@@ -96,6 +149,30 @@ export function useRuntimeEvents() {
               store.finalizeStreaming(chatId);
             }
             store.setExecuting(false);
+
+            // Reset tools tracking for next message
+            currentMessageTools = [];
+            break;
+          }
+
+          case 'execution_complete': {
+            const event = runtimeEvent;
+            const chatId = useStore.getState().activeChatId;
+
+            // Add status card if successful
+            if (event.success && chatId) {
+              store.addMessage(chatId, {
+                role: 'assistant',
+                content: '',
+                metadata: {
+                  statusCard: {
+                    type: 'completed',
+                    title: 'Concluído com sucesso',
+                    subtitle: `${event.iterations} iterações, ${event.metrics.totalToolCalls} ferramentas`,
+                  },
+                },
+              });
+            }
             break;
           }
 
