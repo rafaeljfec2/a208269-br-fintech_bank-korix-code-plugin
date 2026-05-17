@@ -131,15 +131,21 @@ export class LiteLLMProvider implements AIProvider {
    * Build Anthropic Messages API request
    */
   private buildRequest(input: ProviderInput): AnthropicMessagesRequest {
-    return {
+    const request: AnthropicMessagesRequest = {
       model: this.config.model,
       max_tokens: input.maxTokens ?? this.config.maxTokens ?? 8192, // Default 8192 (Anthropic max_tokens obrigatório)
       messages: this.convertMessages(input),
       system: input.system, // Anthropic: system é campo separado, não mensagem
       tools: input.tools ? this.convertTools(input.tools) : undefined,
-      temperature: this.getTemperature(input.temperature),
       stream: true,
     };
+
+    // Claude 4.x deprecou temperature - não enviar para esses modelos
+    if (!this.isClaude4x(this.config.model)) {
+      request.temperature = this.getTemperature(input.temperature);
+    }
+
+    return request;
   }
 
   /**
@@ -209,5 +215,13 @@ export class LiteLLMProvider implements AIProvider {
     }
 
     return temperature;
+  }
+
+  /**
+   * Detecta se o modelo é Claude 4.x (que deprecou temperature)
+   * Claude 4.x: opus-4.6, opus-4.7, sonnet-4.5, sonnet-4.6, haiku-4.5, etc.
+   */
+  private isClaude4x(model: string): boolean {
+    return /claude-(opus|sonnet|haiku)-4.[0-9]+/i.test(model);
   }
 }

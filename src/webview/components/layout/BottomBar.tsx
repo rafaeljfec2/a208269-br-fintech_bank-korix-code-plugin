@@ -24,6 +24,7 @@ export default function BottomBar() {
   const isExecuting = useStore((state) => state.isExecuting);
   const setMode = useStore((state) => state.setMode);
   const setModel = useStore((state) => state.setModel);
+  const addMessage = useStore((state) => state.addMessage);
   const { sendMessage } = useVSCode();
 
   // Auto-resize textarea
@@ -42,11 +43,21 @@ export default function BottomBar() {
   const handleSend = () => {
     if (!input.trim() || isExecuting) return;
 
-    sendMessage({
-      type: 'send_message',
-      payload: { content: input },
+    const messageContent = input.trim();
+
+    // 1. Adicionar mensagem do usuário ao store IMEDIATAMENTE (UI feedback)
+    addMessage({
+      role: 'user',
+      content: messageContent,
     });
 
+    // 2. Enviar para o backend (runtime processing)
+    sendMessage({
+      type: 'send_message',
+      payload: { content: messageContent },
+    });
+
+    // 3. Limpar input
     setInput('');
 
     // Reset textarea height after send
