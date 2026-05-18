@@ -9,6 +9,7 @@ import MarkdownContent from './MarkdownContent';
 import ExecutionTimeline from './ExecutionTimeline';
 import StatusCard from './StatusCard';
 import StreamingIndicator from './StreamingIndicator';
+import QuestionCard from './QuestionCard';
 import type { ToolExecution } from './ToolExecutionItem';
 
 interface MessageMetadata {
@@ -25,6 +26,20 @@ interface MessageMetadata {
       readonly label: string;
       readonly onClick: () => void;
     };
+  };
+  readonly question?: {
+    readonly questionId: string;
+    readonly title: string;
+    readonly question: string;
+    readonly mode: 'single' | 'multiple';
+    readonly options: readonly {
+      readonly value: string;
+      readonly label: string;
+      readonly description: string;
+    }[];
+    readonly timeoutMs?: number;
+    readonly onSubmit: (answers: string[]) => void;
+    readonly onTimeout?: () => void;
   };
 }
 
@@ -75,6 +90,20 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           title={message.metadata.statusCard.title}
           subtitle={message.metadata.statusCard.subtitle}
           action={message.metadata.statusCard.action}
+        />
+      )}
+
+      {/* Question Card */}
+      {message.metadata?.question && (
+        <QuestionCard
+          questionId={message.metadata.question.questionId}
+          title={message.metadata.question.title}
+          question={message.metadata.question.question}
+          mode={message.metadata.question.mode}
+          options={message.metadata.question.options}
+          timeoutMs={message.metadata.question.timeoutMs}
+          onSubmit={message.metadata.question.onSubmit}
+          onTimeout={message.metadata.question.onTimeout}
         />
       )}
 

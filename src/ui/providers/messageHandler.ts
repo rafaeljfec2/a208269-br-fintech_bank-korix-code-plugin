@@ -249,6 +249,13 @@ export class MessageHandler {
         await this.handleTestConnection(message.payload);
         break;
 
+      case "answer_question":
+        this.handleAnswerQuestion(
+          message.payload.questionId,
+          message.payload.answers,
+        );
+        break;
+
       default:
         this.logger.warn("Unknown message type from webview", { message });
     }
@@ -340,6 +347,25 @@ export class MessageHandler {
     payload: TestConnectionPayload,
   ): Promise<void> {
     await this.connectionTester.testConnection(payload);
+  }
+
+  /**
+   * User answers a question
+   */
+  private handleAnswerQuestion(
+    questionId: string,
+    answers: string[],
+  ): void {
+    this.logger.info("User answered question", { questionId, answers });
+
+    // Emit user_answer event
+    this.eventEmitter.emitEvent({
+      type: "user_answer",
+      questionId,
+      answers,
+      isTimeout: false,
+      timestamp: Date.now(),
+    });
   }
 
   /**

@@ -21,6 +21,7 @@ import {
   GetOpenFilesTool,
   GetCurrentFileTool,
 } from "./workspace";
+import { AskUserQuestionTool } from "./askUserQuestion";
 import { getLogger } from "../telemetry/logger";
 
 export function registerAllTools(): void {
@@ -52,6 +53,8 @@ export function registerAllTools(): void {
     WorkspaceGraphTool,
     new GetOpenFilesTool(),
     new GetCurrentFileTool(),
+    // User interaction tools
+    AskUserQuestionTool,
   ];
 
   for (const tool of tools) {

@@ -62,6 +62,13 @@ export class ExecutionEngine {
       const conversation = state.getConversation();
       const tools = this.toolRegistry.toProviderDefinitions();
 
+      // DEBUG: Log tools being sent
+      this.logger.info("[ExecutionEngine] Sending tools to provider", {
+        toolCount: tools.length,
+        toolNames: tools.map((t) => t.name),
+        hasAskUserQuestion: tools.some((t) => t.name === "AskUserQuestion"),
+      });
+
       // Build request context
       const context: RequestContext = {
         correlationId: crypto.randomUUID(),
@@ -88,12 +95,26 @@ export class ExecutionEngine {
         this.processEvent(event, state, result);
       }
 
-      // Add assistant message if text was generated
-      if (this.currentTextBuffer) {
+      // Add assistant message if text or tool calls were generated
+      if (this.currentTextBuffer || this.pendingToolCalls.length > 0) {
+        // Build content: text + tool calls
+        let content = this.currentTextBuffer || "";
+
+        // Anthropic format: assistant message with tool_use blocks
+        // For now, just add text - tool calls are tracked separately
+        // TODO: Add tool_use blocks to content for proper Anthropic format
+
         state.addMessage({
           role: "assistant",
-          content: this.currentTextBuffer,
+          content,
           timestamp: Date.now(),
+          metadata: {
+            toolCalls: this.pendingToolCalls.map((tc) => ({
+              id: tc.id,
+              name: tc.name,
+              input: tc.input,
+            })),
+          },
         });
       }
 

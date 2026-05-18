@@ -28,6 +28,20 @@ export interface MessageMetadata {
       readonly onClick: () => void;
     };
   };
+  readonly question?: {
+    readonly questionId: string;
+    readonly title: string;
+    readonly question: string;
+    readonly mode: "single" | "multiple";
+    readonly options: readonly {
+      readonly value: string;
+      readonly label: string;
+      readonly description: string;
+    }[];
+    readonly timeoutMs?: number;
+    readonly onSubmit: (answers: string[]) => void;
+    readonly onTimeout?: () => void;
+  };
 }
 
 export interface Message {
@@ -37,6 +51,20 @@ export interface Message {
   readonly timestamp: number;
   readonly isStreaming?: boolean;
   readonly metadata?: MessageMetadata;
+}
+
+export interface ActiveQuestion {
+  readonly questionId: string;
+  readonly title: string;
+  readonly question: string;
+  readonly mode: "single" | "multiple";
+  readonly options: readonly {
+    readonly value: string;
+    readonly label: string;
+    readonly description: string;
+  }[];
+  readonly timeoutMs?: number;
+  readonly defaultAnswer?: string | string[];
 }
 
 export interface ChatSession {
@@ -54,6 +82,7 @@ export interface ChatSession {
 export interface ChatSlice {
   readonly conversations: Record<string, ChatSession>;
   readonly activeChatId: string | null;
+  readonly activeQuestion: ActiveQuestion | null;
   readonly sidebarVisible: boolean;
   readonly sidebarWidth: number;
 
@@ -65,7 +94,7 @@ export interface ChatSlice {
   readonly addMessage: (
     chatId: string,
     message: Omit<Message, "id" | "timestamp">,
-  ) => void;
+  ) => string;
   readonly appendStreamingToken: (chatId: string, token: string) => void;
   readonly finalizeStreaming: (chatId: string) => void;
   readonly clearChat: (chatId: string) => void;
@@ -82,6 +111,12 @@ export interface ChatSlice {
     updates: Partial<ToolExecution>,
   ) => void;
   readonly clearActiveMessageTools: (chatId: string) => void;
+  readonly removeQuestionFromMessage: (
+    chatId: string,
+    messageId: string,
+  ) => void;
+  readonly setActiveQuestion: (question: ActiveQuestion) => void;
+  readonly clearActiveQuestion: () => void;
   readonly toggleSidebar: () => void;
   readonly setSidebarWidth: (width: number) => void;
 }
@@ -91,6 +126,7 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
 ) => ({
   conversations: {},
   activeChatId: null,
+  activeQuestion: null,
   sidebarVisible: false,
   sidebarWidth: 450,
 
@@ -159,7 +195,9 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
       };
     }),
 
-  addMessage: (chatId, message) =>
+  addMessage: (chatId, message) => {
+    const messageId = crypto.randomUUID();
+
     set((state: ChatSlice) => {
       const chat = state.conversations[chatId];
       if (!chat) {
@@ -176,14 +214,17 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
               ...chat.messages,
               {
                 ...message,
-                id: crypto.randomUUID(),
+                id: messageId,
                 timestamp: Date.now(),
               },
             ],
           },
         },
       };
-    }),
+    });
+
+    return messageId;
+  },
 
   appendStreamingToken: (chatId, token) =>
     set((state: ChatSlice) => {
@@ -378,6 +419,42 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
         },
       };
     }),
+
+  removeQuestionFromMessage: (chatId, messageId) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) return state;
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            messages: chat.messages.map((msg) =>
+              msg.id === messageId
+                ? {
+                    ...msg,
+                    metadata: {
+                      ...msg.metadata,
+                      question: undefined,
+                    },
+                  }
+                : msg,
+            ),
+          },
+        },
+      };
+    }),
+
+  setActiveQuestion: (question) =>
+    set(() => ({
+      activeQuestion: question,
+    })),
+
+  clearActiveQuestion: () =>
+    set(() => ({
+      activeQuestion: null,
+    })),
 
   toggleSidebar: () =>
     set((state: ChatSlice) => ({

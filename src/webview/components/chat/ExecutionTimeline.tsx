@@ -13,7 +13,7 @@ interface ExecutionTimelineProps {
   readonly onToggle: () => void;
 }
 
-export default function ExecutionTimeline({
+function ExecutionTimeline({
   tools,
   isExpanded,
   onToggle,
@@ -70,3 +70,21 @@ export default function ExecutionTimeline({
     </div>
   );
 }
+
+// Memoize component to prevent re-renders when tools array hasn't changed
+export default React.memo(ExecutionTimeline, (prevProps, nextProps) => {
+  // Only re-render if isExpanded changed or tools array changed
+  return (
+    prevProps.isExpanded === nextProps.isExpanded &&
+    prevProps.tools.length === nextProps.tools.length &&
+    prevProps.tools.every((tool, idx) => {
+      const nextTool = nextProps.tools[idx];
+      return (
+        nextTool !== undefined &&
+        tool.id === nextTool.id &&
+        tool.status === nextTool.status &&
+        tool.duration === nextTool.duration
+      );
+    })
+  );
+});

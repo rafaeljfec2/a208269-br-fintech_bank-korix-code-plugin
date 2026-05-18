@@ -165,6 +165,7 @@ describe("useRuntimeEvents", () => {
 
   describe("runtime_event: token", () => {
     it("should handle token event", () => {
+      vi.useFakeTimers();
       renderHook(() => useRuntimeEvents());
 
       act(() => {
@@ -183,13 +184,20 @@ describe("useRuntimeEvents", () => {
         );
       });
 
-      // appendStreamingToken is called with (chatId, content)
+      // Token is buffered, need to advance timers to trigger flush (50ms)
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+
+      // appendStreamingToken is called with (chatId, content) after flush
       // Since activeChatId is null, createChat is called first
       expect(mockCreateChat).toHaveBeenCalledWith("Nova conversa");
       expect(mockAppendStreamingToken).toHaveBeenCalledWith(
         "test-chat-id",
         "Hello",
       );
+
+      vi.useRealTimers();
     });
   });
 

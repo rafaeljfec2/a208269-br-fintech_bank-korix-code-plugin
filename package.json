@@ -237,6 +237,7 @@
     "eventemitter3": "^5.0.1",
     "framer-motion": "^11.11.9",
     "highlight.js": "^11.11.1",
+    "immer": "^11.1.8",
     "marked": "^18.0.3",
     "node-fetch": "^2.7.0",
     "node-pty": "^1.0.0",

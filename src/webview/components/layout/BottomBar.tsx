@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../store';
 import { useVSCode } from '../../hooks/useVSCode';
 import Dropdown from '../shared/Dropdown';
+import QuestionCard from '../chat/QuestionCard';
 
 type OpenDropdown = 'model' | 'mode' | 'workspace' | 'approval' | null;
 type ApprovalMode = 'strict' | 'writes' | 'auto';
@@ -22,12 +23,14 @@ export default function BottomBar() {
   const mode = useStore((state) => state.mode);
   const model = useStore((state) => state.model);
   const isExecuting = useStore((state) => state.isExecuting);
+  const activeQuestion = useStore((state) => state.activeQuestion);
   const setMode = useStore((state) => state.setMode);
   const setModel = useStore((state) => state.setModel);
   const addMessage = useStore((state) => state.addMessage);
   const activeChatId = useStore((state) => state.activeChatId);
   const createChat = useStore((state) => state.createChat);
   const conversations = useStore((state) => state.conversations);
+  const clearActiveQuestion = useStore((state) => state.clearActiveQuestion);
   const { sendMessage } = useVSCode();
 
   // Auto-resize textarea
@@ -119,6 +122,78 @@ export default function BottomBar() {
 
   const currentModel = models.find((m) => m.id === model);
 
+  // Render QuestionCard if there's an active question
+  if (activeQuestion) {
+    return (
+      <div className="flex-shrink-0 border-t border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] px-3 py-2">
+        <QuestionCard
+          questionId={activeQuestion.questionId}
+          title={activeQuestion.title}
+          question={activeQuestion.question}
+          mode={activeQuestion.mode}
+          options={activeQuestion.options}
+          timeoutMs={activeQuestion.timeoutMs}
+          onSubmit={(answers) => {
+            console.log("[BottomBar] QuestionCard onSubmit:", answers);
+
+            // Send answer to extension
+            sendMessage({
+              type: "answer_question",
+              payload: {
+                questionId: activeQuestion.questionId,
+                answers,
+              },
+            });
+
+            // Clear question from footer
+            clearActiveQuestion();
+
+            // Add user response message
+            const chatId = activeChatId ?? createChat("Nova conversa");
+            const answerText = answers.join(", ");
+            addMessage(chatId, {
+              role: "user",
+              content: `✓ Resposta: ${answerText}`,
+            });
+          }}
+          onTimeout={() => {
+            console.log("[BottomBar] QuestionCard onTimeout");
+
+            // Send default answer
+            const defaultAnswers = Array.isArray(activeQuestion.defaultAnswer)
+              ? activeQuestion.defaultAnswer
+              : activeQuestion.defaultAnswer
+              ? [activeQuestion.defaultAnswer]
+              : [activeQuestion.options[0]?.value ?? ""];
+
+            sendMessage({
+              type: "answer_question",
+              payload: {
+                questionId: activeQuestion.questionId,
+                answers: defaultAnswers,
+              },
+            });
+
+            // Clear question from footer
+            clearActiveQuestion();
+
+            // Add timeout message
+            const chatId = activeChatId ?? createChat("Nova conversa");
+            addMessage(chatId, {
+              role: "user",
+              content: `⏱ Timeout - Resposta padrão: ${defaultAnswers.join(", ")}`,
+            });
+          }}
+          onCancel={() => {
+            console.log("[BottomBar] QuestionCard onCancel");
+            clearActiveQuestion();
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Render normal input area
   return (
     <div className="flex-shrink-0 border-t border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] px-3 py-2">
       {/* Input Area - Primeiro */}

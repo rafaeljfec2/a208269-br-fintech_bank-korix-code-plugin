@@ -8,35 +8,87 @@ import trIcon from '../../assets/tr-icon.svg';
 import ChatMessage from '../chat/ChatMessage';
 import MarkdownContent from '../chat/MarkdownContent';
 import EmptyChatWelcome from '../chat/EmptyChatWelcome';
+import ExecutionFeedback from '../chat/ExecutionFeedback';
 import SettingsPanel from '../settings/SettingsPanel';
 import ActivityLog from '../activity/ActivityLog';
 import RuntimeInspector from '../runtime/RuntimeInspector';
 import TerminalPanel from '../terminal/TerminalPanel';
 
 export default function MainPanel() {
-  // Use selectors separados para evitar re-renders desnecessários
-  const conversations = useStore((state) => state.conversations);
+  // Fine-grained selectors para evitar re-renders em cascata
   const activeChatId = useStore((state) => state.activeChatId);
   const activeTab = useStore((state) => state.activeTab);
+
+  // Selector específico para active chat (não pega conversations inteiro)
+  const activeChat = useStore((state) =>
+    state.activeChatId ? state.conversations[state.activeChatId] : null
+  );
+
+  // Selectors granulares para propriedades do chat ativo
+  const isStreaming = useStore((state) =>
+    state.activeChatId ? state.conversations[state.activeChatId]?.isStreaming : false
+  );
+  const streamingContent = useStore((state) =>
+    state.activeChatId ? state.conversations[state.activeChatId]?.streamingContent : ''
+  );
+  const messages = useStore((state) =>
+    state.activeChatId ? state.conversations[state.activeChatId]?.messages : []
+  );
+  const isThinking = useStore((state) =>
+    state.activeChatId ? state.conversations[state.activeChatId]?.isThinking : false
+  );
+  const thinkingContent = useStore((state) =>
+    state.activeChatId ? state.conversations[state.activeChatId]?.thinkingContent : ''
+  );
 
   // Refs para auto-scroll
   const containerRef = useRef<HTMLDivElement>(null);
   const streamingRef = useRef<HTMLDivElement>(null);
+  const scrollDebounceRef = useRef<number | null>(null);
+  const isNearBottomRef = useRef(true);
 
-  const activeChat = activeChatId ? conversations[activeChatId] : null;
-
-  // Auto-scroll durante streaming
+  // Track if user scrolled away from bottom
   useEffect(() => {
-    // Durante streaming, scroll para o elemento de streaming
-    if (activeChat?.isStreaming && streamingRef.current) {
-      streamingRef.current.scrollIntoView({
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      isNearBottomRef.current = distanceFromBottom < 100; // 100px threshold
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Debounced auto-scroll during streaming
+  useEffect(() => {
+    if (!isStreaming || !isNearBottomRef.current) return;
+
+    // Clear existing debounce
+    if (scrollDebounceRef.current) {
+      clearTimeout(scrollDebounceRef.current);
+    }
+
+    // Debounce to 200ms - only scroll if tokens stop arriving
+    scrollDebounceRef.current = window.setTimeout(() => {
+      streamingRef.current?.scrollIntoView({
         behavior: 'smooth',
         block: 'end'
       });
-    }
+    }, 200) as unknown as number;
 
-    // Após streaming terminar, scroll para o final do container
-    if (!activeChat?.isStreaming && activeChat?.messages.length > 0) {
+    return () => {
+      if (scrollDebounceRef.current) {
+        clearTimeout(scrollDebounceRef.current);
+      }
+    };
+  }, [isStreaming, streamingContent]);
+
+  // Scroll to bottom after streaming completes
+  useEffect(() => {
+    if (!isStreaming && messages.length > 0) {
       setTimeout(() => {
         containerRef.current?.scrollTo({
           top: containerRef.current.scrollHeight,
@@ -44,7 +96,7 @@ export default function MainPanel() {
         });
       }, 100);
     }
-  }, [activeChat?.isStreaming, activeChat?.streamingContent, activeChat?.messages.length]);
+  }, [isStreaming, messages.length]);
 
   // Renderizar RuntimeInspector quando activeTab === 'timeline'
   if (activeTab === 'timeline') {
@@ -142,10 +194,13 @@ export default function MainPanel() {
         </div>
       )}
 
+      {/* Execution Feedback - SEMPRE mostrar quando executando (tools, bash, etc) */}
+      <ExecutionFeedback />
+
       {/* Streaming content - sem avatar, sem header, COM REF para auto-scroll */}
       {activeChat.isStreaming && activeChat.streamingContent && (
         <div ref={streamingRef} className="px-3 py-3">
-          <MarkdownContent content={activeChat.streamingContent} />
+          <MarkdownContent content={activeChat.streamingContent} isStreaming={true} />
         </div>
       )}
     </div>

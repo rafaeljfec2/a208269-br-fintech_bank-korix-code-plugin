@@ -212,6 +212,33 @@ export interface ResumedEvent {
 }
 
 /**
+ * User interaction events
+ */
+export interface UserQuestionEvent {
+  readonly type: "user_question";
+  readonly questionId: string;
+  readonly title: string;
+  readonly question: string;
+  readonly mode: "single" | "multiple";
+  readonly options: readonly {
+    readonly value: string;
+    readonly label: string;
+    readonly description: string;
+  }[];
+  readonly timeoutMs?: number;
+  readonly defaultAnswer?: string | string[];
+  readonly timestamp: number;
+}
+
+export interface UserAnswerEvent {
+  readonly type: "user_answer";
+  readonly questionId: string;
+  readonly answers: string[];
+  readonly isTimeout: boolean;
+  readonly timestamp: number;
+}
+
+/**
  * Union of all runtime events
  */
 export type RuntimeEvent =
@@ -246,7 +273,10 @@ export type RuntimeEvent =
   // Control
   | CancelledEvent
   | PausedEvent
-  | ResumedEvent;
+  | ResumedEvent
+  // User interaction
+  | UserQuestionEvent
+  | UserAnswerEvent;
 
 /**
  * Typed event emitter for runtime events

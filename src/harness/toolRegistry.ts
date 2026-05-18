@@ -314,11 +314,18 @@ export class ToolRegistry {
             (schema as z.ZodArray<z.ZodTypeAny>).element,
           ),
         };
+      case "ZodObject":
+        // Recursively convert nested objects
+        return this.zodToJsonSchema(schema as z.ZodObject<z.ZodRawShape>);
       case "ZodOptional":
         return this.convertZodType(
           (schema as z.ZodOptional<z.ZodTypeAny>).unwrap(),
         );
       default:
+        // Fallback: try to convert as object if possible
+        if ("shape" in schema) {
+          return this.zodToJsonSchema(schema as z.ZodObject<z.ZodRawShape>);
+        }
         return { type: "string" };
     }
   }

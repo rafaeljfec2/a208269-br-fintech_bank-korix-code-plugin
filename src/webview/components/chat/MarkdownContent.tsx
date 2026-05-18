@@ -15,16 +15,29 @@ import { MarkdownErrorBoundary } from './MarkdownErrorBoundary';
 
 interface MarkdownContentProps {
   readonly content: string;
+  readonly isStreaming?: boolean;
 }
 
-function MarkdownContent({ content }: MarkdownContentProps) {
+function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps) {
   // Null/undefined guard
   if (!content || typeof content !== 'string') {
     console.warn('[MarkdownContent] Invalid content:', typeof content);
     return <div className="text-red-500">Invalid markdown content</div>;
   }
 
+  // CRITICAL OPTIMIZATION: Render plain text during streaming, markdown when done
+  // This prevents ReactMarkdown from re-processing the entire content on every token
+  if (isStreaming) {
+    return (
+      <div className="whitespace-pre-wrap text-[var(--vscode-foreground)] text-sm leading-relaxed font-mono">
+        {content}
+        <span className="inline-block w-2 h-4 bg-[var(--vscode-foreground)] animate-pulse ml-1" />
+      </div>
+    );
+  }
+
   // Post-process markdown for professional formatting with error handling
+  // Only run when NOT streaming (finalized content)
   const processedContent = React.useMemo(() => {
     try {
       return postProcessMarkdown(content, {

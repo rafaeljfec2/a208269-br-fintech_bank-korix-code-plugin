@@ -153,6 +153,16 @@ export class LiteLLMProvider implements AIProvider {
         : this.getTemperature(input.temperature),
     };
 
+    // DEBUG: Log tools payload being sent to LiteLLM
+    if (request.tools) {
+      console.log("[LiteLLMProvider] Sending request with tools:", {
+        toolCount: request.tools.length,
+        toolNames: request.tools.map((t) => t.name),
+        toolsPreview: JSON.stringify(request.tools.slice(0, 2), null, 2), // First 2 tools
+        hasAskUserQuestion: request.tools.some((t) => t.name === "AskUserQuestion"),
+      });
+    }
+
     return request;
   }
 
@@ -293,10 +303,47 @@ export class LiteLLMProvider implements AIProvider {
         });
       } else if (msg.role === "user" || msg.role === "assistant") {
         // User/assistant messages
-        messages.push({
-          role: msg.role,
-          content: msg.content,
-        });
+        const content: string | AnthropicContentBlock[] = msg.content;
+
+        // Assistant messages with tool calls: add tool_use blocks
+        if (msg.role === "assistant" && msg.metadata?.toolCalls) {
+          const toolCalls = msg.metadata.toolCalls as Array<{
+            id: string;
+            name: string;
+            input: unknown;
+          }>;
+
+          const contentBlocks: AnthropicContentBlock[] = [];
+
+          // Add text block if there's content
+          if (msg.content) {
+            contentBlocks.push({
+              type: "text",
+              text: msg.content,
+            });
+          }
+
+          // Add tool_use blocks
+          for (const tc of toolCalls) {
+            contentBlocks.push({
+              type: "tool_use",
+              id: tc.id,
+              name: tc.name,
+              input: tc.input,
+            });
+          }
+
+          messages.push({
+            role: "assistant",
+            content: contentBlocks,
+          });
+        } else {
+          // Regular text message
+          messages.push({
+            role: msg.role,
+            content,
+          });
+        }
       }
     }
 
@@ -311,11 +358,21 @@ export class LiteLLMProvider implements AIProvider {
   private convertTools(
     tools: readonly import("../../providers/types").ToolDefinition[],
   ): readonly AnthropicTool[] {
-    return tools.map((tool) => ({
+    const converted = tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.input_schema,
     }));
+
+    // DEBUG: Log AskUserQuestion if present
+    const askTool = converted.find((t) => t.name === "AskUserQuestion");
+    if (askTool) {
+      console.log("[LiteLLMProvider] ===== AskUserQuestion FULL PAYLOAD =====");
+      console.log(JSON.stringify(askTool, null, 2));
+      console.log("[LiteLLMProvider] ===== END PAYLOAD =====");
+    }
+
+    return converted;
   }
 
   /**

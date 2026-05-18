@@ -30,6 +30,13 @@ import { normalizeFinishReason } from "../normalization";
  * - error: erro
  */
 export class LiteLLMNormalizer {
+  // Tool call assembly state
+  private currentToolCall: {
+    id: string;
+    name: string;
+    jsonChunks: string[];
+    index: number; // Track index for tool_call_complete event
+  } | null = null;
   /**
    * Normalize Anthropic stream event para ProviderEvent(s)
    * Pode retornar múltiplos eventos (ex: usage + token)
@@ -40,6 +47,9 @@ export class LiteLLMNormalizer {
   ): ProviderEvent[] {
     const events: ProviderEvent[] = [];
     const timestamp = Date.now();
+
+    // DEBUG: Log EVERY event from LiteLLM
+    console.log("[LiteLLMNormalizer] Received event:", event.type, JSON.stringify(event).substring(0, 200));
 
     switch (event.type) {
       case "message_start":
@@ -65,7 +75,20 @@ export class LiteLLMNormalizer {
         break;
 
       case "content_block_stop":
-        // Fim do bloco - não gera evento
+        // Fim do bloco - emitir tool_call_complete se for tool call
+        if (this.currentToolCall) {
+          const fullJson = this.currentToolCall.jsonChunks.join("");
+          events.push({
+            type: "tool_call_complete",
+            index: this.currentToolCall.index, // FIX: Add required index field
+            id: this.currentToolCall.id,
+            name: this.currentToolCall.name,
+            arguments: fullJson,
+            timestamp,
+            correlation,
+          });
+          this.currentToolCall = null; // Reset
+        }
         break;
 
       case "message_delta":
@@ -131,17 +154,14 @@ export class LiteLLMNormalizer {
       return events;
     }
 
-    // Tool use block: emite tool_call_delta com id e name
+    // Tool use block: inicializa acumulador de JSON
     if (block.type === "tool_use") {
-      events.push({
-        type: "tool_call_delta",
-        index: event.index,
+      this.currentToolCall = {
         id: block.id,
         name: block.name,
-        argumentsChunk: "", // JSON vem nos deltas
-        timestamp,
-        correlation,
-      });
+        jsonChunks: [],
+        index: event.index ?? 0, // Capture index from event, default to 0 for single tool calls
+      };
     }
 
     return events;
@@ -168,15 +188,9 @@ export class LiteLLMNormalizer {
       });
     }
 
-    // Tool input JSON delta
-    if (delta.type === "input_json_delta" && delta.partial_json) {
-      events.push({
-        type: "tool_call_delta",
-        index: event.index,
-        argumentsChunk: delta.partial_json,
-        timestamp,
-        correlation,
-      });
+    // Tool input JSON delta - acumular chunks
+    if (delta.type === "input_json_delta" && delta.partial_json && this.currentToolCall) {
+      this.currentToolCall.jsonChunks.push(delta.partial_json);
     }
 
     return events;

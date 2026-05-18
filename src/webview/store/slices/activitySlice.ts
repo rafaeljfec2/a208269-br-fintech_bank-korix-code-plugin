@@ -4,6 +4,7 @@
  */
 
 import type { StateCreator } from "zustand";
+import { produce } from "immer";
 
 export interface ActivityItem {
   readonly id: string;
@@ -74,40 +75,40 @@ export const createActivitySlice: StateCreator<
   },
 
   endContext: (contextId) =>
-    set((state: ActivitySlice) => ({
-      contexts: state.contexts.map((ctx) =>
-        ctx.id === contextId
-          ? { ...ctx, endTime: Date.now(), isExpanded: false } // Auto-colapsar ao finalizar
-          : ctx,
-      ),
-      currentContextId: null,
-    })),
+    set((state: ActivitySlice) =>
+      produce(state, (draft) => {
+        const ctx = draft.contexts.find((c) => c.id === contextId);
+        if (ctx) {
+          ctx.endTime = Date.now();
+          ctx.isExpanded = false; // Auto-colapsar ao finalizar
+        }
+        draft.currentContextId = null;
+      })
+    ),
 
   addActivityItem: (contextId, item) =>
-    set((state: ActivitySlice) => ({
-      contexts: state.contexts.map((ctx) =>
-        ctx.id === contextId
-          ? {
-              ...ctx,
-              items: [
-                ...ctx.items,
-                {
-                  ...item,
-                  id: crypto.randomUUID(),
-                  timestamp: Date.now(),
-                },
-              ],
-            }
-          : ctx,
-      ),
-    })),
+    set((state: ActivitySlice) =>
+      produce(state, (draft) => {
+        const ctx = draft.contexts.find((c) => c.id === contextId);
+        if (ctx) {
+          ctx.items.push({
+            ...item,
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+          });
+        }
+      })
+    ),
 
   toggleContext: (contextId) =>
-    set((state: ActivitySlice) => ({
-      contexts: state.contexts.map((ctx) =>
-        ctx.id === contextId ? { ...ctx, isExpanded: !ctx.isExpanded } : ctx,
-      ),
-    })),
+    set((state: ActivitySlice) =>
+      produce(state, (draft) => {
+        const ctx = draft.contexts.find((c) => c.id === contextId);
+        if (ctx) {
+          ctx.isExpanded = !ctx.isExpanded;
+        }
+      })
+    ),
 
   clearActivity: () => set({ contexts: [], currentContextId: null }),
 });

@@ -130,6 +130,11 @@ export interface TestConnectionPayload {
   readonly baseUrl?: string;
 }
 
+export interface AnswerQuestionPayload {
+  readonly questionId: string;
+  readonly answers: string[];
+}
+
 export type WebviewToExtensionMessage =
   | { readonly type: "send_message"; readonly payload: SendMessagePayload }
   | { readonly type: "change_mode"; readonly payload: ChangeModePayload }
@@ -148,7 +153,11 @@ export type WebviewToExtensionMessage =
       readonly type: "test_connection";
       readonly payload: TestConnectionPayload;
     }
-  | { readonly type: "load_settings"; readonly payload: Record<string, never> };
+  | { readonly type: "load_settings"; readonly payload: Record<string, never> }
+  | {
+      readonly type: "answer_question";
+      readonly payload: AnswerQuestionPayload;
+    };
 
 // ============================================================
 // Helper Type Guards
