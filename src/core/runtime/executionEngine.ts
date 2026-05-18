@@ -44,6 +44,7 @@ export class ExecutionEngine {
     private readonly iterationGuard: IterationGuard,
     private readonly cancellationManager: CancellationManager,
     private readonly logger: Logger,
+    private readonly systemPrompt: string,
   ) {}
 
   async step(state: RuntimeState): Promise<StepResult> {
@@ -75,6 +76,7 @@ export class ExecutionEngine {
           messages: [...conversation.messages], // Copy readonly array
           tools,
           maxTokens: 4096,
+          system: this.systemPrompt,
         },
         context,
       );

@@ -41,7 +41,7 @@ export class AgentLoopFactory {
   /**
    * Create AgentLoop with all dependencies
    */
-  createAgentLoop(provider: AIProvider): AgentLoop {
+  createAgentLoop(provider: AIProvider, systemPrompt: string): AgentLoop {
     const toolRegistry = this.container.get<ToolRegistry>(TOKENS.ToolRegistry);
 
     // Create transient instances per execution
@@ -57,7 +57,7 @@ export class AgentLoopFactory {
       this.eventEmitter,
     );
 
-    // Create ExecutionEngine
+    // Create ExecutionEngine with system prompt
     const executionEngine = new ExecutionEngine(
       provider,
       toolRegistry,
@@ -68,6 +68,7 @@ export class AgentLoopFactory {
       iterationGuard,
       cancellationManager,
       this.logger,
+      systemPrompt,
     );
 
     // Create AgentLoop

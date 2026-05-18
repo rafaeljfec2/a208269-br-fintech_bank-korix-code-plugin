@@ -25,6 +25,8 @@ import type { PermissionManager } from "../../harness/permissions";
 import { AgentLoopFactory } from "./agentLoopFactory";
 import { ToolApprovalHandler } from "./toolApprovalHandler";
 import { CheckpointHandler } from "./checkpointHandler";
+import { PluginContextBuilder } from "../../prompts/pluginContext";
+import type { ToolRegistry } from "../../harness/toolRegistry";
 
 export class MessageHandler {
   private readonly logger: Logger;
@@ -34,6 +36,7 @@ export class MessageHandler {
   private readonly configManager: ProviderConfigManager;
   private readonly checkpointManager: CheckpointManager;
   private readonly permissionManager: PermissionManager;
+  private readonly toolRegistry: ToolRegistry;
   private readonly agentLoopFactory: AgentLoopFactory;
   private readonly toolApprovalHandler: ToolApprovalHandler;
   private readonly checkpointHandler: CheckpointHandler;
@@ -59,6 +62,7 @@ export class MessageHandler {
     this.permissionManager = container.get<PermissionManager>(
       TOKENS.PermissionManager,
     );
+    this.toolRegistry = container.get<ToolRegistry>(TOKENS.ToolRegistry);
 
     const terminalManager = container.get<TerminalSessionManager>(
       TOKENS.SessionManager,
@@ -260,13 +264,26 @@ export class MessageHandler {
       // Create provider instance
       const provider = this.agentLoopFactory.createProvider(providerConfig);
 
-      // Create AgentLoop
-      const agentLoop = this.agentLoopFactory.createAgentLoop(provider);
-
       // Get mode (use default if not initialized yet)
       const mode = this.stateManager.isInitialized()
         ? this.stateManager.getMode()
         : "ask";
+
+      // Build unified system prompt
+      const contextBuilder = new PluginContextBuilder(this.toolRegistry, this.logger);
+
+      const systemPrompt = contextBuilder.build({
+        mode,
+        providerType: providerType,
+        model: providerConfig.model,
+        maxIterations: 25,
+      });
+
+      // Create AgentLoop with system prompt
+      const agentLoop = this.agentLoopFactory.createAgentLoop(
+        provider,
+        systemPrompt,
+      );
 
       // Prepare execution context
       const context = {
