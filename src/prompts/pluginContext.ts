@@ -81,9 +81,9 @@ export class PluginContextBuilder {
 
     // Debug: verificar se Output Style está no prompt final
     const outputStyleSection = sections[1]; // Output Style é a 2ª seção
-    const hasOutputStyle = outputStyleSection && outputStyleSection.includes('Response Style');
+    const hasOutputStyle = outputStyleSection?.includes('Response Style');
 
-    console.log('[KORIX] System prompt final:', {
+    this.logger.debug('[KORIX] System prompt final', {
       totalLength: prompt.length,
       sections: sections.length,
       outputStyleIncluded: hasOutputStyle,
@@ -197,7 +197,7 @@ When asked about your capabilities or identity, reference these exact values.`;
         return '';
       }
 
-      console.log('[KORIX] Loading Output style from:', stylePath);
+      this.logger.debug('[KORIX] Loading Output style from', { stylePath });
 
       const content = readFileSync(stylePath, 'utf-8');
 
@@ -218,16 +218,10 @@ When asked about your capabilities or identity, reference these exact values.`;
 
       const keepCodingInstructions = frontmatter.includes('keep-coding-instructions: true');
 
-      // Log visible for debugging
-      console.log('[KORIX] Output style loaded:', {
-        keepCodingInstructions,
-        bodyLength: body.length,
-        preview: body.substring(0, 100) + '...',
-      });
-
       this.logger.debug('Output style loaded', {
         keepCodingInstructions,
         bodyLength: body.length,
+        preview: body.substring(0, 100) + '...',
       });
 
       return body.trim();
