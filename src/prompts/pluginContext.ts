@@ -12,7 +12,7 @@
  * - Interpolar variáveis nos templates
  */
 
-import * as fs from "fs";
+import { existsSync, readFileSync } from "fs";
 import * as path from "path";
 import type { Logger } from "../telemetry/logger";
 import type { ToolRegistry } from "../harness/toolRegistry";
@@ -32,7 +32,7 @@ export class PluginContextBuilder {
     private readonly logger: Logger,
   ) {
     // Resolve prompts directory relative to this file
-    this.promptsDir = path.join(__dirname);
+    this.promptsDir = path.join(__dirname, 'prompts');
   }
 
   /**
@@ -49,14 +49,47 @@ export class PluginContextBuilder {
     });
 
     const sections = [
+      // === CRÍTICO: OUTPUT STYLE (FORMATAÇÃO E TONE - PRIORIDADE MÁXIMA) ===
+      this.loadOutputStyle(),
+
+      // === IDENTIDADE E PRINCÍPIOS ===
       this.loadMarkdown("base.md"),
-      this.loadMarkdown("guidelines.md"),
+
+      // === CRÍTICO: MODOS DE OPERAÇÃO (NÃO-NEGOCIÁVEL) ===
       this.getModeContext(options.mode, options.maxIterations),
+
+      // === CRÍTICO: FERRAMENTAS E LIMITES (NÃO-NEGOCIÁVEL) ===
+      this.loadMarkdown("commands.md"),
+      this.loadMarkdown("limits.md"),
+
+      // === FERRAMENTAS DINÂMICAS (Confirmação) ===
       this.getToolsContext(options.mode),
-      this.getModelInfo(options.providerType, options.model),
+
+      // === CRÍTICO: PROVIDERS E MODELOS DISPONÍVEIS (NÃO-NEGOCIÁVEL) ===
+      this.loadMarkdown("providers.md", {
+        providerType: options.providerType,
+        model: options.model,
+      }),
+
+      // === RUNTIME E EXEMPLOS ===
+      this.loadMarkdown("runtime.md"),
+      this.loadMarkdown("engineering.md"),
+      this.loadMarkdown("examples/tool-usage.md"),
     ];
 
     const prompt = sections.join("\n\n");
+
+    // Debug: verificar se Output Style está no prompt final
+    const outputStyleSection = sections[1]; // Output Style é a 2ª seção
+    const hasOutputStyle = outputStyleSection && outputStyleSection.includes('Response Style');
+
+    console.log('[KORIX] System prompt final:', {
+      totalLength: prompt.length,
+      sections: sections.length,
+      outputStyleIncluded: hasOutputStyle,
+      outputStylePreview: outputStyleSection ? outputStyleSection.substring(0, 150) : 'EMPTY',
+      promptPreview: prompt.substring(0, 500) + '...',
+    });
 
     this.logger.debug("System prompt built", {
       length: prompt.length,
@@ -72,7 +105,7 @@ export class PluginContextBuilder {
   private loadMarkdown(filename: string, variables?: Record<string, string>): string {
     try {
       const filePath = path.join(this.promptsDir, filename);
-      let content = fs.readFileSync(filePath, "utf-8");
+      let content = readFileSync(filePath, "utf-8");
 
       // Interpolar variáveis se fornecidas
       if (variables) {
@@ -148,5 +181,59 @@ ${toolList}
 **Model**: ${model}
 
 When asked about your capabilities or identity, reference these exact values.`;
+  }
+
+  /**
+   * Carrega Output Style se configurado
+   * Baseado no mecanismo oficial do Claude Code
+   */
+  private loadOutputStyle(): string {
+    try {
+      const stylePath = path.join(this.promptsDir, 'output-styles', 'professional.md');
+
+      if (!existsSync(stylePath)) {
+        console.warn('[KORIX] Output style NOT FOUND at:', stylePath);
+        this.logger.warn('Output style not found, using default');
+        return '';
+      }
+
+      console.log('[KORIX] Loading Output style from:', stylePath);
+
+      const content = readFileSync(stylePath, 'utf-8');
+
+      // Parse frontmatter
+      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+      if (!frontmatterMatch) {
+        this.logger.error('Invalid output style format (missing frontmatter)');
+        return '';
+      }
+
+      const frontmatter = frontmatterMatch[1];
+      const body = frontmatterMatch[2];
+
+      if (!frontmatter || !body) {
+        this.logger.error('Invalid output style format (empty frontmatter or body)');
+        return '';
+      }
+
+      const keepCodingInstructions = frontmatter.includes('keep-coding-instructions: true');
+
+      // Log visible for debugging
+      console.log('[KORIX] Output style loaded:', {
+        keepCodingInstructions,
+        bodyLength: body.length,
+        preview: body.substring(0, 100) + '...',
+      });
+
+      this.logger.debug('Output style loaded', {
+        keepCodingInstructions,
+        bodyLength: body.length,
+      });
+
+      return body.trim();
+    } catch (error) {
+      this.logger.error('Failed to load output style', error);
+      return '';
+    }
   }
 }

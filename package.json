@@ -231,10 +231,13 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
+    "@types/dompurify": "^3.2.0",
     "clsx": "^2.1.1",
+    "dompurify": "^3.4.5",
     "eventemitter3": "^5.0.1",
     "framer-motion": "^11.11.9",
     "highlight.js": "^11.11.1",
+    "marked": "^18.0.3",
     "node-fetch": "^2.7.0",
     "node-pty": "^1.0.0",
     "pino": "^10.3.1",

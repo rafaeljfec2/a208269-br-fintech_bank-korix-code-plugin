@@ -227,3 +227,38 @@ body, .vscode-body {
 
 /* ===== Text Alignment ===== */
 /* Remover justificação - usar alinhamento padrão à esquerda para melhor legibilidade */
+
+/* ===== Markdown Tables Styling ===== */
+/* Custom styles for tables in markdown content */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.75rem; /* 12px */
+}
+
+.prose thead {
+  border-bottom: 2px solid var(--vscode-panel-border);
+}
+
+.prose th {
+  color: var(--vscode-foreground);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--vscode-input-background);
+}
+
+.prose td {
+  color: var(--vscode-foreground);
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.prose tr {
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.prose tbody tr:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}

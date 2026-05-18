@@ -70,6 +70,14 @@ export class ExecutionEngine {
         iterationId: state.getExecution().currentIteration,
       };
 
+      // Debug: log system prompt being sent to provider
+      console.log('[KORIX] System prompt enviado ao provider:', {
+        length: this.systemPrompt.length,
+        first1000chars: this.systemPrompt.substring(0, 1000),
+        hasResponseStyle: this.systemPrompt.includes('Response Style'),
+        hasOutputStyle: this.systemPrompt.includes('CRITICAL'),
+      });
+
       // Stream from provider
       const stream = this.provider.send(
         {
