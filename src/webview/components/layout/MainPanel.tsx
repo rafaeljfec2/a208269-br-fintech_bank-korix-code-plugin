@@ -7,6 +7,7 @@ import { useStore } from '../../store';
 import trIcon from '../../assets/tr-icon.svg';
 import ChatMessage from '../chat/ChatMessage';
 import MarkdownContent from '../chat/MarkdownContent';
+import EmptyChatWelcome from '../chat/EmptyChatWelcome';
 import SettingsPanel from '../settings/SettingsPanel';
 import ActivityLog from '../activity/ActivityLog';
 import RuntimeInspector from '../runtime/RuntimeInspector';
@@ -93,12 +94,21 @@ export default function MainPanel() {
     );
   }
 
+  // Check if chat is truly empty (no messages, not thinking, not streaming)
+  const isChatEmpty =
+    (!activeChat.messages || activeChat.messages.length === 0) &&
+    !activeChat.isThinking &&
+    !activeChat.isStreaming;
+
   // Render active conversation
   return (
     <div
       ref={containerRef}
       className="flex-1 overflow-y-auto px-3 py-4 space-y-4 bg-[#0d0d0d]"
     >
+      {/* Welcome message when chat is empty */}
+      {isChatEmpty && <EmptyChatWelcome />}
+
       {/* Messages */}
       {activeChat.messages?.map((msg) => (
         <ChatMessage key={msg.id} message={msg} />
