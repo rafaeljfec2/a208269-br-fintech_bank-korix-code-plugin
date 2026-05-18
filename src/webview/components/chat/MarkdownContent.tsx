@@ -5,9 +5,11 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkDirective from 'remark-directive';
 import rehypeHighlight from 'rehype-highlight';
 import { clsx } from 'clsx';
 import CodeBlock from './CodeBlock';
+import { InfoBlock } from '../shared/InfoBlock';
 import { postProcessMarkdown } from '../../utils/markdownPostProcessor';
 import { MarkdownErrorBoundary } from './MarkdownErrorBoundary';
 
@@ -15,7 +17,7 @@ interface MarkdownContentProps {
   readonly content: string;
 }
 
-export default function MarkdownContent({ content }: MarkdownContentProps) {
+function MarkdownContent({ content }: MarkdownContentProps) {
   // Null/undefined guard
   if (!content || typeof content !== 'string') {
     console.warn('[MarkdownContent] Invalid content:', typeof content);
@@ -69,11 +71,16 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
     <div className={markdownContent}>
       <MarkdownErrorBoundary content={processedContent} className={markdownContent}>
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]} // GitHub Flavored Markdown (tables, strikethrough, task lists)
-          rehypePlugins={[rehypeHighlight]} // Syntax highlighting
+          remarkPlugins={[remarkGfm, remarkDirective]}
+          rehypePlugins={[rehypeHighlight]}
           components={{
             // Custom renderer para code blocks
-            code({ inline, className, children, ...props }) {
+            code(props) {
+              const { inline, className, children, ...rest } = props as {
+                inline?: boolean;
+                className?: string;
+                children?: React.ReactNode;
+              };
               const match = /language-(\w+)/.exec(className || '');
               const language = match ? match[1] : '';
               const code = String(children).replace(/\n$/, '');
@@ -81,7 +88,7 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
               return !inline && language ? (
                 <CodeBlock code={code} language={language} />
               ) : (
-                <code className={className} {...props}>
+                <code className={className} {...rest}>
                   {children}
                 </code>
               );
@@ -94,6 +101,26 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
                 </a>
               );
             },
+            // Directive containers (:::note, :::warning, etc.)
+            containerDirective(props) {
+              const { name, children } = props as {
+                name?: string;
+                children?: React.ReactNode;
+              };
+
+              const typeMap: Record<string, 'note' | 'warning' | 'error' | 'success' | 'tip' | 'important'> = {
+                note: 'note',
+                warning: 'warning',
+                error: 'error',
+                success: 'success',
+                tip: 'tip',
+                important: 'important',
+              };
+
+              const type = name ? typeMap[name.toLowerCase()] ?? 'note' : 'note';
+
+              return <InfoBlock type={type}>{children}</InfoBlock>;
+            },
           }}
         >
           {processedContent}
@@ -102,3 +129,6 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
     </div>
   );
 }
+
+// Otimização: Re-render apenas quando content mudar
+export default React.memo(MarkdownContent);

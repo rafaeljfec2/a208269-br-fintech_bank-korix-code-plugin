@@ -11,18 +11,18 @@ import BottomBar from './components/layout/BottomBar';
 import Sidebar from './components/layout/Sidebar';
 import ResizeHandle from './components/layout/ResizeHandle';
 import MainPanel from './components/layout/MainPanel';
+import StatusLine from './components/shared/StatusLine';
 import ToolApprovalModal from './components/tools/ToolApprovalModal';
 
 export default function App() {
   const sidebarVisible = useStore((state) => state.sidebarVisible);
-  const conversations = useStore((state) => state.conversations);
-  const createChat = useStore((state) => state.createChat);
 
   // Setup event streaming from extension
   useRuntimeEvents();
 
   // Create initial conversation if none exists
   useEffect(() => {
+    const { conversations, createChat } = useStore.getState();
     if (Object.keys(conversations).length === 0) {
       createChat('Nova conversa');
     }
@@ -43,6 +43,9 @@ export default function App() {
         )}
         <MainPanel />
       </div>
+
+      {/* Status Line - Compact activity indicator */}
+      <StatusLine />
 
       {/* Bottom Bar - Input + Controls */}
       <BottomBar />

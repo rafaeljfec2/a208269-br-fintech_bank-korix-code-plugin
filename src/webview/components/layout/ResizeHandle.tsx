@@ -14,11 +14,11 @@ export default function ResizeHandle() {
 
     const startX = e.clientX;
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    const startWidth = sidebar?.offsetWidth ?? 250;
+    const startWidth = sidebar?.offsetWidth ?? 450;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const delta = moveEvent.clientX - startX;
-      const newWidth = Math.max(200, Math.min(500, startWidth + delta));
+      const newWidth = Math.max(300, Math.min(800, startWidth + delta));
       if (sidebar) {
         sidebar.style.width = `${newWidth}px`;
         // Persist to localStorage

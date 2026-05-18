@@ -2,16 +2,56 @@
  * Hook to process runtime events from extension
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "../store";
 import type { ExtensionToWebviewMessage } from "../../shared/protocol";
 import type { ToolExecution } from "../store/slices/chatSlice";
 
 export function useRuntimeEvents() {
-  // Track current activity context
-  let currentActivityContextId: string | null = null;
+  // Track current activity context - usar ref para persistir entre renders
+  const currentActivityContextIdRef = useRef<string | null>(null);
+
+  // Token batching - acumula tokens e faz flush periódico para reduzir re-renders
+  const tokenBufferRef = useRef<{ chatId: string; tokens: string[] } | null>(
+    null,
+  );
+  const flushTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
+    const flushTokens = () => {
+      if (
+        tokenBufferRef.current &&
+        tokenBufferRef.current.tokens.length > 0
+      ) {
+        const { chatId, tokens } = tokenBufferRef.current;
+        const combinedTokens = tokens.join("");
+        useStore.getState().appendStreamingToken(chatId, combinedTokens);
+        tokenBufferRef.current = null;
+      }
+      flushTimerRef.current = null;
+    };
+
+    const bufferToken = (chatId: string, token: string) => {
+      // Inicializar buffer se necessário
+      if (
+        !tokenBufferRef.current ||
+        tokenBufferRef.current.chatId !== chatId
+      ) {
+        // Flush buffer anterior se houver
+        if (tokenBufferRef.current) {
+          flushTokens();
+        }
+        tokenBufferRef.current = { chatId, tokens: [] };
+      }
+
+      // Adicionar token ao buffer
+      tokenBufferRef.current.tokens.push(token);
+
+      // Agendar flush se não houver timer ativo (throttle de 50ms)
+      if (!flushTimerRef.current) {
+        flushTimerRef.current = window.setTimeout(flushTokens, 50) as unknown as number;
+      }
+    };
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
       // Usar getState() para evitar dependências no useEffect e múltiplos listeners
       const store = useStore.getState();
@@ -40,10 +80,10 @@ export function useRuntimeEvents() {
             });
 
             // NOVO: Criar contexto de atividade para iteração
-            currentActivityContextId = store.startContext(
+            currentActivityContextIdRef.current = store.startContext(
               `Iteration ${event.iteration}`,
             );
-            store.addActivityItem(currentActivityContextId, {
+            store.addActivityItem(currentActivityContextIdRef.current, {
               category: "execution",
               context: `Iteration ${event.iteration}`,
               description: "Iteration started",
@@ -62,16 +102,16 @@ export function useRuntimeEvents() {
             });
 
             // NOVO: Finalizar contexto de atividade
-            if (currentActivityContextId) {
-              store.addActivityItem(currentActivityContextId, {
+            if (currentActivityContextIdRef.current) {
+              store.addActivityItem(currentActivityContextIdRef.current, {
                 category: "execution",
                 context: `Iteration ${event.iteration}`,
                 description: "Iteration completed",
                 status: "success",
                 duration: event.duration,
               });
-              store.endContext(currentActivityContextId);
-              currentActivityContextId = null;
+              store.endContext(currentActivityContextIdRef.current);
+              currentActivityContextIdRef.current = null;
             }
             break;
           }
@@ -90,7 +130,8 @@ export function useRuntimeEvents() {
               store.finalizeThinking(chatId);
             }
 
-            store.appendStreamingToken(chatId, event.content);
+            // Usar batching para reduzir re-renders (flush a cada 50ms)
+            bufferToken(chatId, event.content);
             break;
           }
 
@@ -110,8 +151,8 @@ export function useRuntimeEvents() {
             });
 
             // NOVO: Adicionar thinking ao activity log
-            if (currentActivityContextId) {
-              store.addActivityItem(currentActivityContextId, {
+            if (currentActivityContextIdRef.current) {
+              store.addActivityItem(currentActivityContextIdRef.current, {
                 category: "thinking",
                 context: "Thinking",
                 description: "Model is reasoning",
@@ -153,8 +194,8 @@ export function useRuntimeEvents() {
             }
 
             // NOVO: Adicionar tool call ao activity log
-            if (currentActivityContextId) {
-              store.addActivityItem(currentActivityContextId, {
+            if (currentActivityContextIdRef.current) {
+              store.addActivityItem(currentActivityContextIdRef.current, {
                 category: "tool",
                 context: `Tool: ${event.name}`,
                 description: `Executing ${event.name}`,
@@ -187,8 +228,8 @@ export function useRuntimeEvents() {
             }
 
             // NOVO: Adicionar tool result ao activity log
-            if (currentActivityContextId) {
-              store.addActivityItem(currentActivityContextId, {
+            if (currentActivityContextIdRef.current) {
+              store.addActivityItem(currentActivityContextIdRef.current, {
                 category: "tool",
                 context: `Tool: ${event.name}`,
                 description: event.success
@@ -324,6 +365,16 @@ export function useRuntimeEvents() {
     };
 
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+
+    return () => {
+      // Cleanup: remover listener
+      window.removeEventListener("message", handleMessage);
+
+      // Cleanup: flush pending tokens e limpar timer
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTokens(); // Flush final antes de desmontar
+      }
+    };
   }, []); // Array vazio - listener registrado apenas uma vez
 }

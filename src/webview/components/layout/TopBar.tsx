@@ -41,7 +41,7 @@ export default function TabBar() {
 
   return (
     <div className="flex-shrink-0 border-b border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)]">
-      <div className="flex items-stretch h-9">
+      <div className="flex items-stretch h-7">
         {/* Tabs Container - Scrollable (scrollbar oculta) */}
         <div className="flex items-stretch flex-1 overflow-x-auto min-w-0 no-scrollbar">
           {/* Dynamic Tabs */}

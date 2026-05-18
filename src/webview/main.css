@@ -31,11 +31,13 @@
 }
 
 body {
-  font-family: var(--vscode-font-family);
+  font-family: var(--vscode-font-family), 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
   background-color: var(--vscode-editor-background);
   overflow: hidden;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 #root {
@@ -45,9 +47,9 @@ body {
 
 /* ===== Sidebar ===== */
 .sidebar {
-  width: 250px;
-  min-width: 200px;
-  max-width: 500px;
+  width: 450px; /* Largura inicial maior para chat confortável */
+  min-width: 300px;
+  max-width: 800px;
   background-color: var(--vscode-sideBar-background);
   border-right: 1px solid var(--vscode-sideBar-border);
   display: flex;
@@ -188,25 +190,25 @@ body, .vscode-body {
   text-rendering: optimizeLegibility;
 }
 
-/* Reduzir fonte do chat de text-sm (14px) para 12px */
+/* Reduzir fonte do chat de text-sm (14px) para 11px */
 .session-item {
-  font-size: 12px; /* Já usa 12px - manter */
+  font-size: 11px;
 }
 
-/* Mensagens do chat - reduzir de 14px para 12px */
+/* Mensagens do chat - reduzir para 11px */
 .prose.prose-sm {
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.6875rem; /* 11px */
   line-height: 1.5;
 }
 
 .prose.prose-sm p,
 .prose.prose-sm li {
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.6875rem; /* 11px */
 }
 
 /* Code blocks inline - reduzir */
 .prose.prose-sm code:not([class*="language-"]) {
-  font-size: 0.7rem; /* 11.2px - 10% menor que texto normal */
+  font-size: 0.625rem; /* 10px - 10% menor que texto normal */
 }
 
 /* ===== Ocultar Scrollbar mas Manter Scroll ===== */
@@ -234,7 +236,7 @@ body, .vscode-body {
   width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.6875rem; /* 11px */
 }
 
 .prose thead {
@@ -261,4 +263,131 @@ body, .vscode-body {
 
 .prose tbody tr:hover {
   background-color: var(--vscode-list-hoverBackground);
+}
+
+/* ===== Professional Typography (Word-like) ===== */
+/* Heading Hierarchy - clear visual distinction with generous spacing */
+.prose.prose-sm h1 {
+  font-size: 1rem !important; /* 16px - diminuído mais 2px */
+  margin-top: 2rem !important;
+  margin-bottom: 1rem !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  color: var(--vscode-foreground);
+}
+
+.prose.prose-sm h2 {
+  font-size: 0.875rem !important; /* 14px - diminuído mais 2px */
+  margin-top: 1.5rem !important;
+  margin-bottom: 0.875rem !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  color: var(--vscode-foreground);
+}
+
+.prose.prose-sm h3 {
+  font-size: 0.75rem !important; /* 12px - diminuído mais 2px */
+  margin-top: 1.25rem !important;
+  margin-bottom: 0.75rem !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+  color: var(--vscode-foreground);
+}
+
+.prose.prose-sm h4 {
+  font-size: 0.6875rem !important; /* 11px - diminuído mais 2px */
+  margin-top: 1rem !important;
+  margin-bottom: 0.5rem !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Paragraph Spacing - simple spacing (espaçamento simples) */
+.prose.prose-sm p {
+  margin-top: 0.5rem !important; /* 8px - espaçamento simples */
+  margin-bottom: 0.5rem !important;
+  line-height: 1.6 !important; /* Generous line height within paragraph */
+}
+
+.prose.prose-sm p:first-child {
+  margin-top: 0 !important;
+}
+
+.prose.prose-sm p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* List Improvements - simple spacing */
+.prose.prose-sm ul,
+.prose.prose-sm ol {
+  margin-top: 0.5rem !important; /* 8px - espaçamento simples */
+  margin-bottom: 0.5rem !important;
+  padding-left: 1.5rem !important;
+  list-style-position: outside !important;
+}
+
+.prose.prose-sm ul {
+  list-style-type: disc !important;
+}
+
+.prose.prose-sm ol {
+  list-style-type: decimal !important;
+}
+
+.prose.prose-sm li {
+  margin-top: 0.25rem !important; /* 4px - mais compacto */
+  margin-bottom: 0.25rem !important;
+  line-height: 1.5 !important;
+  display: list-item !important;
+}
+
+.prose.prose-sm li::marker {
+  color: var(--vscode-textLink-foreground);
+}
+
+/* Nested lists - additional indentation */
+.prose.prose-sm ul ul,
+.prose.prose-sm ol ul,
+.prose.prose-sm ul ol,
+.prose.prose-sm ol ol {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.25rem !important;
+}
+
+/* Semantic Text Colors - subtle emphasis */
+.prose.prose-sm strong {
+  font-weight: 600 !important;
+  color: var(--vscode-textLink-activeForeground) !important;
+}
+
+.prose.prose-sm em {
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Blockquotes - prepare for InfoBlock styling */
+.prose.prose-sm blockquote {
+  margin: 1rem 0 !important;
+  padding-left: 1rem !important;
+  border-left: 4px solid var(--vscode-textBlockQuote-border) !important;
+  color: var(--vscode-textBlockQuote-foreground);
+  background-color: var(--vscode-textBlockQuote-background);
+}
+
+/* Horizontal Rules - subtle dividers */
+.prose.prose-sm hr {
+  margin: 1.5rem 0 !important;
+  border: none !important;
+  border-top: 1px solid var(--vscode-panel-border) !important;
+}
+
+/* ===== Message Alignment Fix ===== */
+/* Remove primeiro/último elemento margin para alinhamento visual perfeito */
+.prose.prose-sm > *:first-child {
+  margin-top: 0 !important;
+}
+
+.prose.prose-sm > *:last-child {
+  margin-bottom: 0 !important;
 }

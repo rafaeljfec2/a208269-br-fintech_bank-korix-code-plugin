@@ -7,7 +7,6 @@ import { useStore } from '../../store';
 import trIcon from '../../assets/tr-icon.svg';
 import ChatMessage from '../chat/ChatMessage';
 import MarkdownContent from '../chat/MarkdownContent';
-import StreamingIndicator from '../chat/StreamingIndicator';
 import SettingsPanel from '../settings/SettingsPanel';
 import ActivityLog from '../activity/ActivityLog';
 import RuntimeInspector from '../runtime/RuntimeInspector';
@@ -49,7 +48,7 @@ export default function MainPanel() {
   // Renderizar RuntimeInspector quando activeTab === 'timeline'
   if (activeTab === 'timeline') {
     return (
-      <div className="flex-1 overflow-y-auto p-4 bg-[var(--vscode-editor-background)]">
+      <div className="flex-1 overflow-y-auto p-4 bg-black">
         <RuntimeInspector />
       </div>
     );
@@ -68,7 +67,7 @@ export default function MainPanel() {
   // Renderizar ActivityLog quando activeTab === 'activity'
   if (activeTab === 'activity') {
     return (
-      <div className="flex-1 overflow-hidden bg-[var(--vscode-editor-background)]">
+      <div className="flex-1 overflow-hidden bg-black">
         <ActivityLog />
       </div>
     );
@@ -77,7 +76,7 @@ export default function MainPanel() {
   // Empty state - no active conversation
   if (!activeChat) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[var(--vscode-editor-background)]">
+      <div className="flex-1 flex items-center justify-center bg-black">
         <div className="text-center max-w-md px-6">
           <div className="flex items-center justify-center gap-3 mb-6">
             <img src={trIcon} alt="TR Logo" width="32" height="32" className="flex-shrink-0" />
@@ -98,7 +97,7 @@ export default function MainPanel() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto px-6 py-4 space-y-4 bg-[var(--vscode-editor-background)]"
+      className="flex-1 overflow-y-auto px-2 py-4 space-y-4 bg-black"
     >
       {/* Messages */}
       {activeChat.messages.map((msg) => (
@@ -107,7 +106,7 @@ export default function MainPanel() {
 
       {/* Thinking content - antes do streaming */}
       {activeChat.isThinking && activeChat.thinkingContent && (
-        <div className="px-4 py-3 bg-[var(--vscode-input-background)]/30 rounded-lg mb-4">
+        <div className="px-2 py-3 bg-[var(--vscode-input-background)]/30 rounded-lg mb-4">
           <div className="flex items-center gap-2 mb-2 text-xs text-[var(--vscode-descriptionForeground)]">
             <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24">
               <circle
@@ -135,9 +134,8 @@ export default function MainPanel() {
 
       {/* Streaming content - sem avatar, sem header, COM REF para auto-scroll */}
       {activeChat.isStreaming && activeChat.streamingContent && (
-        <div ref={streamingRef} className="px-4 py-3">
+        <div ref={streamingRef} className="px-2 py-3">
           <MarkdownContent content={activeChat.streamingContent} />
-          <StreamingIndicator />
         </div>
       )}
     </div>

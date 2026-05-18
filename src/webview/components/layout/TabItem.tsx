@@ -16,7 +16,7 @@ export default function TabItem({ conversation, isActive, onSelect, onClose }: T
   return (
     <div
       onClick={onSelect}
-      className={`flex items-center gap-2 px-4 h-9 border-r border-[var(--vscode-panel-border)] cursor-pointer flex-shrink-0 min-w-[120px] max-w-[200px]
+      className={`flex items-center gap-2 px-3 h-7 border-r border-[var(--vscode-panel-border)] cursor-pointer flex-shrink-0 min-w-[120px] max-w-[200px]
                 ${
                   isActive
                     ? 'border-b-2 border-[var(--vscode-button-background)] bg-[var(--vscode-editor-background)]'

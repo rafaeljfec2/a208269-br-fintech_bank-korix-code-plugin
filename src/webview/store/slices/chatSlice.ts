@@ -92,7 +92,7 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
   conversations: {},
   activeChatId: null,
   sidebarVisible: false,
-  sidebarWidth: 250,
+  sidebarWidth: 450,
 
   createChat: (title = "Nova conversa") => {
     const chatId = crypto.randomUUID();
