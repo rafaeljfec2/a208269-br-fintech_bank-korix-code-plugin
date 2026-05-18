@@ -114,7 +114,9 @@ describe("IterationGuard", () => {
   });
 
   describe("duplicate tool detection", () => {
-    it("should allow up to 3 calls of same tool", () => {
+    it("should allow up to 5 calls of same tool", () => {
+      guard.recordToolCall("ReadFile");
+      guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
@@ -123,11 +125,13 @@ describe("IterationGuard", () => {
       expect(result.shouldStop).toBe(false);
     });
 
-    it("should stop after more than 3 calls of same tool", () => {
+    it("should stop after more than 5 calls of same tool", () => {
       guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
-      guard.recordToolCall("ReadFile"); // 4th call
+      guard.recordToolCall("ReadFile");
+      guard.recordToolCall("ReadFile");
+      guard.recordToolCall("ReadFile"); // 6th call
 
       const result = guard.checkIteration(state);
       expect(result.shouldStop).toBe(true);
@@ -143,6 +147,8 @@ describe("IterationGuard", () => {
       guard.recordToolCall("WriteFile");
       guard.recordToolCall("WriteFile");
       guard.recordToolCall("WriteFile");
+      guard.recordToolCall("WriteFile");
+      guard.recordToolCall("WriteFile");
 
       guard.checkIteration(state);
 
@@ -151,7 +157,7 @@ describe("IterationGuard", () => {
       );
       expect(duplicateEvent).toBeDefined();
       expect(duplicateEvent?.toolName).toBe("WriteFile");
-      expect(duplicateEvent?.count).toBe(4);
+      expect(duplicateEvent?.count).toBe(6);
     });
 
     it("should track different tools independently", () => {
@@ -169,7 +175,9 @@ describe("IterationGuard", () => {
       guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
       guard.recordToolCall("ReadFile");
-      guard.recordToolCall("ReadFile"); // 4 calls
+      guard.recordToolCall("ReadFile");
+      guard.recordToolCall("ReadFile");
+      guard.recordToolCall("ReadFile"); // 6 calls
 
       expect(guard.checkIteration(state).shouldStop).toBe(true);
 
@@ -210,7 +218,7 @@ describe("IterationGuard", () => {
     });
 
     it("should detect no-progress after 3 identical iterations", () => {
-      // 3 iterations with same modified files count = no progress
+      // 3 iterations with same modified files and tool call count = no progress
       guard.recordProgress({
         iteration: 1,
         modifiedFiles: 5,
@@ -221,14 +229,14 @@ describe("IterationGuard", () => {
       guard.recordProgress({
         iteration: 2,
         modifiedFiles: 5,
-        toolCallCount: 11,
+        toolCallCount: 10,
         timestamp: Date.now(),
       });
 
       guard.recordProgress({
         iteration: 3,
         modifiedFiles: 5,
-        toolCallCount: 12,
+        toolCallCount: 10,
         timestamp: Date.now(),
       });
 
@@ -250,13 +258,13 @@ describe("IterationGuard", () => {
       guard.recordProgress({
         iteration: 2,
         modifiedFiles: 2,
-        toolCallCount: 6,
+        toolCallCount: 5,
         timestamp: Date.now(),
       });
       guard.recordProgress({
         iteration: 3,
         modifiedFiles: 2,
-        toolCallCount: 7,
+        toolCallCount: 5,
         timestamp: Date.now(),
       });
 
@@ -297,6 +305,8 @@ describe("IterationGuard", () => {
       guard.recordToolCall("Test");
       guard.recordToolCall("Test");
       guard.recordToolCall("Test");
+      guard.recordToolCall("Test");
+      guard.recordToolCall("Test");
 
       const result = guard.checkIteration(state);
       expect(result.shouldStop).toBe(true);
@@ -307,6 +317,8 @@ describe("IterationGuard", () => {
   describe("reset", () => {
     it("should reset all counters and progress markers", () => {
       // Set up state that would trigger guards
+      guard.recordToolCall("Test");
+      guard.recordToolCall("Test");
       guard.recordToolCall("Test");
       guard.recordToolCall("Test");
       guard.recordToolCall("Test");

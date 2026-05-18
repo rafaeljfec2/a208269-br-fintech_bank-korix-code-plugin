@@ -10,7 +10,7 @@ import type { GuardResult, ProgressMarker } from "./runtimeTypes";
 export class IterationGuard {
   private toolCallCounts = new Map<string, number>();
   private lastProgressMarkers: ProgressMarker[] = [];
-  private readonly maxSameToolCalls = 3;
+  private readonly maxSameToolCalls = 5;
   private readonly stallThresholdMs = 30000;
 
   constructor(
@@ -58,7 +58,9 @@ export class IterationGuard {
       const firstMarker = last3[0];
       if (firstMarker) {
         const allSame = last3.every(
-          (m) => m.modifiedFiles === firstMarker.modifiedFiles,
+          (m) =>
+            m.modifiedFiles === firstMarker.modifiedFiles &&
+            m.toolCallCount === firstMarker.toolCallCount,
         );
         if (allSame) {
           this.eventEmitter.emitEvent({
