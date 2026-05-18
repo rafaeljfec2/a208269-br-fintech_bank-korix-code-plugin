@@ -1,18 +1,21 @@
 /**
  * PluginContextBuilder - Constrói system prompt unificado para o LLM
  *
+ * Abordagem Híbrida:
+ * - Contexto estático: arquivos .md em src/prompts/
+ * - Contexto dinâmico: ferramentas do ToolRegistry, modelo/provider da config
+ *
  * Responsabilidades:
- * - Agregar informações sobre o plugin (nome, versão, propósito)
- * - Incluir contexto do modo atual (Ask/Plan/Agent)
- * - Listar ferramentas disponíveis com descrições
+ * - Carregar contexto base e de modo de arquivos .md
+ * - Listar ferramentas disponíveis dinamicamente
  * - Informar modelo e provider em uso
+ * - Interpolar variáveis nos templates
  */
 
+import * as fs from "fs";
+import * as path from "path";
 import type { Logger } from "../telemetry/logger";
 import type { ToolRegistry } from "../harness/toolRegistry";
-import { AgentModeHandler } from "../modes/agent/executor";
-import { AskModeHandler } from "../modes/ask/handler";
-import { PlanModeHandler } from "../modes/plan/decomposer";
 
 export interface ContextBuildOptions {
   readonly mode: "ask" | "plan" | "agent";
@@ -22,10 +25,15 @@ export interface ContextBuildOptions {
 }
 
 export class PluginContextBuilder {
+  private readonly promptsDir: string;
+
   constructor(
     private readonly toolRegistry: ToolRegistry,
     private readonly logger: Logger,
-  ) {}
+  ) {
+    // Resolve prompts directory relative to this file
+    this.promptsDir = path.join(__dirname);
+  }
 
   /**
    * Constrói system prompt unificado
@@ -41,7 +49,8 @@ export class PluginContextBuilder {
     });
 
     const sections = [
-      this.getPluginInfo(),
+      this.loadMarkdown("base.md"),
+      this.loadMarkdown("guidelines.md"),
       this.getModeContext(options.mode, options.maxIterations),
       this.getToolsContext(options.mode),
       this.getModelInfo(options.providerType, options.model),
@@ -58,35 +67,50 @@ export class PluginContextBuilder {
   }
 
   /**
-   * Informações básicas do plugin
+   * Carrega e interpola um arquivo markdown
    */
-  private getPluginInfo(): string {
-    return `# Korix Code AI Assistant
+  private loadMarkdown(filename: string, variables?: Record<string, string>): string {
+    try {
+      const filePath = path.join(this.promptsDir, filename);
+      let content = fs.readFileSync(filePath, "utf-8");
 
-You are an AI coding assistant integrated into VS Code via the Korix Code plugin.
+      // Interpolar variáveis se fornecidas
+      if (variables) {
+        content = this.interpolate(content, variables);
+      }
 
-**Plugin**: Korix Code (v0.1.0)
-**Environment**: VS Code Extension
-**Architecture**: Event-driven agentic runtime with tool execution capabilities`;
+      return content.trim();
+    } catch (error) {
+      this.logger.error(`Failed to load markdown file: ${filename}`, error);
+      return `<!-- Error loading ${filename} -->`;
+    }
+  }
+
+  /**
+   * Interpola variáveis em um template
+   * Substitui {variableName} pelos valores fornecidos
+   */
+  private interpolate(template: string, variables: Record<string, string>): string {
+    return template.replace(/\{(\w+)\}/g, (match, key: string) => {
+      const value = variables[key];
+      return value ?? match;
+    });
   }
 
   /**
    * Contexto específico do modo atual
    *
-   * Delega para os handlers de modo existentes
+   * Carrega do arquivo .md correspondente e interpola variáveis
    */
   private getModeContext(
     mode: "ask" | "plan" | "agent",
     maxIterations?: number,
   ): string {
-    switch (mode) {
-      case "agent":
-        return new AgentModeHandler({ maxIterations }).getSystemPrompt();
-      case "plan":
-        return new PlanModeHandler().getSystemPrompt();
-      case "ask":
-        return new AskModeHandler().getSystemPrompt();
-    }
+    const variables: Record<string, string> = {
+      maxIterations: String(maxIterations ?? 25),
+    };
+
+    return this.loadMarkdown(`modes/${mode}.md`, variables);
   }
 
   /**

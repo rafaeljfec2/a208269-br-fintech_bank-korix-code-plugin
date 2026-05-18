@@ -1,4 +1,10 @@
 import esbuild from 'esbuild';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -59,6 +65,38 @@ const webviewConfig = {
   metafile: production,
 };
 
+/**
+ * Copy markdown prompt files to dist
+ */
+async function copyPrompts() {
+  const srcDir = path.join(__dirname, 'src', 'prompts');
+  const destDir = path.join(__dirname, 'dist', 'prompts');
+
+  async function copyRecursive(src, dest) {
+    await fs.mkdir(dest, { recursive: true });
+    const entries = await fs.readdir(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+
+      if (entry.isDirectory()) {
+        await copyRecursive(srcPath, destPath);
+      } else if (entry.name.endsWith('.md')) {
+        await fs.copyFile(srcPath, destPath);
+      }
+    }
+  }
+
+  try {
+    await copyRecursive(srcDir, destDir);
+    console.log('[prompts] Markdown files copied to dist/prompts/');
+  } catch (error) {
+    console.error('[prompts] Failed to copy markdown files:', error);
+    throw error;
+  }
+}
+
 async function build() {
   try {
     if (watch) {
@@ -71,6 +109,10 @@ async function build() {
         esbuild.build(extensionConfig),
         esbuild.build(webviewConfig),
       ]);
+
+      // Copy markdown prompt files
+      await copyPrompts();
+
       console.log('[build] Build complete (extension + webview)');
 
       if (production) {
