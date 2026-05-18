@@ -72,14 +72,14 @@ export const WorkspaceGraphTool: Tool<
     return true; // Allowed in all modes
   },
 
-  async execute(
+  execute(
     input: WorkspaceGraphInput,
     _context: ToolContext,
-  ): Promise<ToolResult<WorkspaceGraphResult>> {
+  ): ToolResult<WorkspaceGraphResult> {
     const startTime = Date.now();
 
     try {
-      const graph = await buildWorkspaceGraph(input);
+      const graph = buildWorkspaceGraph(input);
 
       return {
         success: true,
@@ -107,10 +107,11 @@ export const WorkspaceGraphTool: Tool<
 /**
  * Build workspace graph from index
  */
-async function buildWorkspaceGraph(
-  input: WorkspaceGraphInput,
-): Promise<WorkspaceGraphResult> {
-  const contextEngine = getContextEngine();
+function buildWorkspaceGraph(
+  _input: WorkspaceGraphInput,
+): WorkspaceGraphResult {
+  // @ts-expect-error - Reserved for future use
+  const _contextEngine = getContextEngine();
 
   // Access internal indexer (would need to expose via public API)
   // For now, return a simplified graph

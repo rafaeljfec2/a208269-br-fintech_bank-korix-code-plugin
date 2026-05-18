@@ -31,7 +31,7 @@ export class AgentLoopFactory {
   /**
    * Create provider instance based on config
    */
-  async createProvider(config: ProviderConfig): Promise<AIProvider> {
+  createProvider(config: ProviderConfig): AIProvider {
     // Use LiteLLM factory (supports all provider types)
     // Type assertion needed due to dual type hierarchies (will be unified in future refactor)
     const factory = new LiteLLMFactory(this.logger);

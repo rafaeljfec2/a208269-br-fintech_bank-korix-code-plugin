@@ -3,6 +3,7 @@
  */
 
 import * as vscode from "vscode";
+import * as path from "path";
 import { getLogger } from "../../telemetry/logger";
 import type { WorkspaceIndexer } from "../indexing/workspaceIndexer";
 import type { RankingScore, HeuristicWeights } from "../types";
@@ -20,11 +21,11 @@ export class HeuristicRanker {
 
   constructor(private indexer: WorkspaceIndexer) {}
 
-  async rankFiles(context: {
+  rankFiles(context: {
     currentFile?: string;
     userSelection?: { file: string; range: vscode.Range };
     mentionedSymbols?: string[];
-  }): Promise<RankingScore[]> {
+  }): RankingScore[] {
     const logger = getLogger();
     const scores = new Map<string, { score: number; reasons: string[] }>();
 
@@ -43,11 +44,11 @@ export class HeuristicRanker {
     }
 
     if (context.currentFile) {
-      await this.scoreDirectImports(scores, context.currentFile);
+      this.scoreDirectImports(scores, context.currentFile);
     }
 
-    await this.scoreGitDiff(scores);
-    await this.scoreOpenTabs(scores);
+    this.scoreGitDiff(scores);
+    this.scoreOpenTabs(scores);
 
     if (context.mentionedSymbols && context.mentionedSymbols.length > 0) {
       this.scoreRelatedSymbols(scores, context.mentionedSymbols);
@@ -90,10 +91,10 @@ export class HeuristicRanker {
     }
   }
 
-  private async scoreDirectImports(
+  private scoreDirectImports(
     scores: Map<string, { score: number; reasons: string[] }>,
     file: string,
-  ): Promise<void> {
+  ): void {
     const imports = this.indexer.getImports(file);
 
     if (imports.length === 0) {
@@ -107,7 +108,6 @@ export class HeuristicRanker {
 
       let resolvedPath = imp.target;
       if (resolvedPath.startsWith(".")) {
-        const path = require("path");
         const dir = path.dirname(file);
         resolvedPath = path.resolve(dir, imp.target);
       }
@@ -125,16 +125,28 @@ export class HeuristicRanker {
     }
   }
 
-  private async scoreGitDiff(
+  private scoreGitDiff(
     scores: Map<string, { score: number; reasons: string[] }>,
-  ): Promise<void> {
+  ): void {
     try {
       const gitExtension = vscode.extensions.getExtension("vscode.git");
       if (!gitExtension) {
         return;
       }
 
-      const git = gitExtension.exports.getAPI(1);
+      interface GitAPI {
+        repositories: Array<{
+          state: {
+            workingTreeChanges: Array<{ uri: vscode.Uri }>;
+          };
+        }>;
+      }
+
+      interface GitExtension {
+        getAPI(version: number): GitAPI;
+      }
+
+      const git = (gitExtension.exports as GitExtension).getAPI(1);
       const repo = git.repositories[0];
 
       if (!repo) {
@@ -150,14 +162,14 @@ export class HeuristicRanker {
           entry.reasons.push("git diff");
         }
       }
-    } catch (error) {
+    } catch (_error) {
       // Git not available, skip
     }
   }
 
-  private async scoreOpenTabs(
+  private scoreOpenTabs(
     scores: Map<string, { score: number; reasons: string[] }>,
-  ): Promise<void> {
+  ): void {
     const openEditors = vscode.window.tabGroups.all
       .flatMap((group) => group.tabs)
       .map((tab) => tab.input)

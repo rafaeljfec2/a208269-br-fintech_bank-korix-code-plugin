@@ -18,13 +18,18 @@ import {
   type SettingsSlice,
 } from "./slices/settingsSlice";
 import { createToolsSlice, type ToolsSlice } from "./slices/toolsSlice";
+import {
+  createActivitySlice,
+  type ActivitySlice,
+} from "./slices/activitySlice";
 
 export type RootStore = ChatSlice &
   RuntimeSlice &
   TimelineSlice &
   TerminalSlice &
   SettingsSlice &
-  ToolsSlice;
+  ToolsSlice &
+  ActivitySlice;
 
 export const useStore = create<RootStore>((set, get, api) => ({
   ...createChatSlice(set, get, api),
@@ -33,6 +38,7 @@ export const useStore = create<RootStore>((set, get, api) => ({
   ...createTerminalSlice(set, get, api),
   ...createSettingsSlice(set, get, api),
   ...createToolsSlice(set, get, api),
+  ...createActivitySlice(set, get, api),
 }));
 
 // Export types for external use

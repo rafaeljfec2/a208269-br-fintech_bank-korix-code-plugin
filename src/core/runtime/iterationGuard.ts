@@ -14,7 +14,8 @@ export class IterationGuard {
   private readonly stallThresholdMs = 30000;
 
   constructor(
-    private readonly _logger: Logger, // Reserved for future logging
+    // @ts-expect-error - Reserved for future use
+    private readonly __logger: Logger,
     private readonly eventEmitter: RuntimeEventEmitter,
   ) {}
 
@@ -54,17 +55,20 @@ export class IterationGuard {
     // Check no-progress cycles
     if (this.lastProgressMarkers.length >= 3) {
       const last3 = this.lastProgressMarkers.slice(-3);
-      const allSame = last3.every(
-        (m) => m.modifiedFiles === last3[0]!.modifiedFiles,
-      );
-      if (allSame) {
-        this.eventEmitter.emitEvent({
-          type: "loop_warning",
-          reason: "no_progress",
-          iteration: execution.currentIteration,
-          timestamp: Date.now(),
-        });
-        return { shouldStop: true, reason: "no_progress" };
+      const firstMarker = last3[0];
+      if (firstMarker) {
+        const allSame = last3.every(
+          (m) => m.modifiedFiles === firstMarker.modifiedFiles,
+        );
+        if (allSame) {
+          this.eventEmitter.emitEvent({
+            type: "loop_warning",
+            reason: "no_progress",
+            iteration: execution.currentIteration,
+            timestamp: Date.now(),
+          });
+          return { shouldStop: true, reason: "no_progress" };
+        }
       }
     }
 

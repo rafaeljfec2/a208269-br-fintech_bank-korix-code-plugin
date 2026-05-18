@@ -38,7 +38,8 @@ export class ExecutionEngine {
     private readonly toolRegistry: ToolRegistry,
     private readonly permissionManager: PermissionManager,
     private readonly eventEmitter: RuntimeEventEmitter,
-    private readonly _checkpointManager: CheckpointManager, // Used by AgentLoop
+    // @ts-expect-error - Reserved for future use
+    private readonly __checkpointManager: CheckpointManager,
     private readonly metrics: RuntimeMetrics,
     private readonly iterationGuard: IterationGuard,
     private readonly cancellationManager: CancellationManager,
@@ -82,7 +83,7 @@ export class ExecutionEngine {
       for await (const event of stream) {
         this.cancellationManager.checkCancellation();
 
-        await this.processEvent(event, state, result);
+        this.processEvent(event, state, result);
       }
 
       // Add assistant message if text was generated
@@ -109,11 +110,11 @@ export class ExecutionEngine {
     }
   }
 
-  private async processEvent(
+  private processEvent(
     event: ProviderEvent,
     _state: RuntimeState,
     result: StepResult,
-  ): Promise<void> {
+  ): void {
     switch (event.type) {
       case "token":
         this.currentTextBuffer += event.value;
@@ -159,6 +160,7 @@ export class ExecutionEngine {
       case "finish":
         result.stopReason = event.reason as
           | "end_turn"
+          | "stop"
           | "max_tokens"
           | "stop_sequence"
           | undefined;

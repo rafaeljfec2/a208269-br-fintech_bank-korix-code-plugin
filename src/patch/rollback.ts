@@ -9,10 +9,10 @@ import type { RollbackPoint, AppliedPatch } from "./types";
 export class RollbackManager {
   private rollbackPoints: Map<string, RollbackPoint> = new Map();
 
-  async createRollbackPoint(
+  createRollbackPoint(
     patches: AppliedPatch[],
     fileBackups: Map<string, string>,
-  ): Promise<string> {
+  ): string {
     const logger = getLogger();
     const id = this.generateId();
 
@@ -68,7 +68,7 @@ export class RollbackManager {
     }
   }
 
-  async cleanup(id: string): Promise<void> {
+  cleanup(id: string): void {
     this.rollbackPoints.delete(id);
   }
 

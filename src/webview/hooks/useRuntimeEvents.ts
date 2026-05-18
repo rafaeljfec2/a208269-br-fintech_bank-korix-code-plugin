@@ -8,8 +8,8 @@ import type { ExtensionToWebviewMessage } from "../../shared/protocol";
 import type { ToolExecution } from "../store/slices/chatSlice";
 
 export function useRuntimeEvents() {
-  // Track current message tools (scoped to current message)
-  let currentMessageTools: ToolExecution[] = [];
+  // Track current activity context
+  let currentActivityContextId: string | null = null;
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
@@ -38,6 +38,17 @@ export function useRuntimeEvents() {
               description: `Iteration ${event.iteration} started`,
               status: "pending",
             });
+
+            // NOVO: Criar contexto de atividade para iteração
+            currentActivityContextId = store.startContext(
+              `Iteration ${event.iteration}`,
+            );
+            store.addActivityItem(currentActivityContextId, {
+              category: "execution",
+              context: `Iteration ${event.iteration}`,
+              description: "Iteration started",
+              status: "pending",
+            });
             break;
           }
 
@@ -49,6 +60,19 @@ export function useRuntimeEvents() {
               status: "success",
               metadata: { hadToolCalls: event.hadToolCalls },
             });
+
+            // NOVO: Finalizar contexto de atividade
+            if (currentActivityContextId) {
+              store.addActivityItem(currentActivityContextId, {
+                category: "execution",
+                context: `Iteration ${event.iteration}`,
+                description: "Iteration completed",
+                status: "success",
+                duration: event.duration,
+              });
+              store.endContext(currentActivityContextId);
+              currentActivityContextId = null;
+            }
             break;
           }
 
@@ -59,17 +83,43 @@ export function useRuntimeEvents() {
             if (!chatId) {
               chatId = useStore.getState().createChat("Nova conversa");
             }
+
+            // Se estava thinking, finalizar antes de iniciar streaming
+            const activeChat = useStore.getState().conversations[chatId];
+            if (activeChat?.isThinking) {
+              store.finalizeThinking(chatId);
+            }
+
             store.appendStreamingToken(chatId, event.content);
             break;
           }
 
-          case "thinking":
+          case "thinking": {
+            const event = runtimeEvent;
+            const chatId = useStore.getState().activeChatId;
+
+            // Append thinking content
+            if (chatId && event.content) {
+              store.appendThinkingToken(chatId, event.content);
+            }
+
             store.addTimelineEvent({
               type: "thinking",
               description: "Reasoning...",
               status: "pending",
             });
+
+            // NOVO: Adicionar thinking ao activity log
+            if (currentActivityContextId) {
+              store.addActivityItem(currentActivityContextId, {
+                category: "thinking",
+                context: "Thinking",
+                description: "Model is reasoning",
+                status: "pending",
+              });
+            }
             break;
+          }
 
           case "tool_call": {
             const event = runtimeEvent;
@@ -86,7 +136,7 @@ export function useRuntimeEvents() {
                 (useStore.getState().metrics.toolCallCount ?? 0) + 1,
             });
 
-            // NEW: Add pending tool to current message metadata
+            // NEW: Add pending tool to active message tracking
             const chatId = useStore.getState().activeChatId;
             if (chatId) {
               const toolPending: ToolExecution = {
@@ -97,14 +147,19 @@ export function useRuntimeEvents() {
                 duration: 0,
                 timestamp: event.timestamp,
               };
-              currentMessageTools.push(toolPending);
 
-              store.updateActiveMessageMetadata(chatId, {
-                execution: {
-                  tools: [...currentMessageTools],
-                  isExpanded: false,
-                  totalDuration: 0,
-                },
+              // Use store-based tracking instead of local variable
+              store.addActiveMessageTool(chatId, toolPending);
+            }
+
+            // NOVO: Adicionar tool call ao activity log
+            if (currentActivityContextId) {
+              store.addActivityItem(currentActivityContextId, {
+                category: "tool",
+                context: `Tool: ${event.name}`,
+                description: `Executing ${event.name}`,
+                status: "pending",
+                metadata: { toolName: event.name, input: event.input },
               });
             }
             break;
@@ -121,32 +176,27 @@ export function useRuntimeEvents() {
               metadata: { toolName: event.name },
             });
 
-            // NEW: Update tool status and duration in message metadata
+            // NEW: Update tool status and duration in active message tracking
             const chatId = useStore.getState().activeChatId;
             if (chatId) {
-              const toolIndex = currentMessageTools.findIndex(
-                (t) => t.id === event.id,
-              );
-              if (toolIndex !== -1) {
-                currentMessageTools[toolIndex] = {
-                  ...currentMessageTools[toolIndex],
-                  status: event.success ? "success" : "error",
-                  duration: event.duration,
-                };
+              // Use store-based tracking instead of local variable
+              store.updateActiveMessageTool(chatId, event.id, {
+                status: event.success ? "success" : "error",
+                duration: event.duration,
+              });
+            }
 
-                const totalDuration = currentMessageTools.reduce(
-                  (sum, t) => sum + t.duration,
-                  0,
-                );
-
-                store.updateActiveMessageMetadata(chatId, {
-                  execution: {
-                    tools: [...currentMessageTools],
-                    isExpanded: true, // Auto-expand when tools complete
-                    totalDuration,
-                  },
-                });
-              }
+            // NOVO: Adicionar tool result ao activity log
+            if (currentActivityContextId) {
+              store.addActivityItem(currentActivityContextId, {
+                category: "tool",
+                context: `Tool: ${event.name}`,
+                description: event.success
+                  ? `${event.name} completed successfully`
+                  : `${event.name} failed`,
+                status: event.success ? "success" : "error",
+                duration: event.duration,
+              });
             }
             break;
           }
@@ -154,12 +204,28 @@ export function useRuntimeEvents() {
           case "done": {
             const chatId = useStore.getState().activeChatId;
             if (chatId) {
+              // Transfer activeMessageTools to message metadata
+              const activeChat = useStore.getState().conversations[chatId];
+              if (activeChat?.activeMessageTools) {
+                const totalDuration = activeChat.activeMessageTools.reduce(
+                  (sum, t) => sum + t.duration,
+                  0,
+                );
+
+                store.updateActiveMessageMetadata(chatId, {
+                  execution: {
+                    tools: activeChat.activeMessageTools,
+                    isExpanded: false,
+                    totalDuration,
+                  },
+                });
+              }
+
               store.finalizeStreaming(chatId);
+              // Clear active message tools for next message
+              store.clearActiveMessageTools(chatId);
             }
             store.setExecuting(false);
-
-            // Reset tools tracking for next message
-            currentMessageTools = [];
             break;
           }
 
@@ -167,8 +233,25 @@ export function useRuntimeEvents() {
             const event = runtimeEvent;
             const chatId = useStore.getState().activeChatId;
 
+            // NOVO: Atualizar métricas de tokens
+            store.updateMetrics({
+              inputTokens: event.metrics.inputTokens ?? 0,
+              outputTokens: event.metrics.outputTokens ?? 0,
+              cachedTokens: event.metrics.cachedTokens ?? 0,
+              tokenCount:
+                (event.metrics.inputTokens ?? 0) +
+                (event.metrics.outputTokens ?? 0),
+            });
+
             // Add status card if successful
             if (event.success && chatId) {
+              const totalTokens =
+                (event.metrics.inputTokens ?? 0) +
+                (event.metrics.outputTokens ?? 0);
+              const duration = event.metrics.totalDuration
+                ? (event.metrics.totalDuration / 1000).toFixed(1)
+                : "0";
+
               store.addMessage(chatId, {
                 role: "assistant",
                 content: "",
@@ -176,7 +259,12 @@ export function useRuntimeEvents() {
                   statusCard: {
                     type: "completed",
                     title: "Concluído com sucesso",
-                    subtitle: `${event.iterations} iterações, ${event.metrics.totalToolCalls} ferramentas`,
+                    subtitle: [
+                      `${event.iterations} iterações`,
+                      `${event.metrics.totalToolCalls} ferramentas`,
+                      `${totalTokens} tokens`,
+                      `${duration}s`,
+                    ].join(" • "),
                   },
                 },
               });

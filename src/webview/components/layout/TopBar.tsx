@@ -28,6 +28,15 @@ export default function TabBar() {
     }
   };
 
+  const handleActivityClick = () => {
+    // Toggle: se já está em activity, volta para chat
+    if (activeTab === 'activity') {
+      setActiveTab('chat');
+    } else {
+      setActiveTab('activity');
+    }
+  };
+
   const conversationsList = Object.values(conversations);
 
   return (
@@ -84,8 +93,24 @@ export default function TabBar() {
           </button>
 
           <button
+            onClick={handleActivityClick}
+            className={clsx(
+              'px-3 hover:bg-[var(--vscode-list-hoverBackground)]',
+              activeTab === 'activity' ? 'opacity-100' : 'opacity-50'
+            )}
+            title="Activity Log"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M2 3h12v1H2V3zm0 3h12v1H2V6zm0 3h12v1H2V9zm0 3h12v1H2v-1z" />
+            </svg>
+          </button>
+
+          <button
             onClick={handleSettingsClick}
-            className="px-3 opacity-50 hover:opacity-100 hover:bg-[var(--vscode-list-hoverBackground)]"
+            className={clsx(
+              'px-3 hover:bg-[var(--vscode-list-hoverBackground)]',
+              activeTab === 'settings' ? 'opacity-100' : 'opacity-50'
+            )}
             title="Settings"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">

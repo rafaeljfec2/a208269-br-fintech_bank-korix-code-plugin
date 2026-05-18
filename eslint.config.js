@@ -32,6 +32,23 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '*.config.js', '*.config.mjs'],
+    ignores: [
+      'dist/**',
+      'node_modules/**',
+      '*.config.js',
+      '*.config.mjs',
+      '*.config.ts',
+      '.claude/**',
+      '.cursor/**',
+      'axiom-plugin/**',
+      'coverage/**',
+      'scripts/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/__tests__/**',
+      '**/__mocks__/**',
+      'src/webview/**/*.tsx',
+      'src/webview/**/*.ts',
+    ],
   }
 );

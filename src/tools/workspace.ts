@@ -35,10 +35,10 @@ export class GetDiagnosticsTool implements Tool<
     return true;
   }
 
-  async execute(
+  execute(
     input: GetDiagnosticsInput,
     _context: ToolContext,
-  ): Promise<ToolResult<DiagnosticInfo[]>> {
+  ): ToolResult<DiagnosticInfo[]> {
     try {
       const diagnostics: DiagnosticInfo[] = [];
 
@@ -131,10 +131,10 @@ export class GetOpenFilesTool implements Tool<
     return true;
   }
 
-  async execute(
+  execute(
     _input: Record<string, never>,
     _context: ToolContext,
-  ): Promise<ToolResult<OpenFileInfo[]>> {
+  ): ToolResult<OpenFileInfo[]> {
     try {
       const openFiles: OpenFileInfo[] = vscode.workspace.textDocuments.map(
         (doc) => ({
@@ -193,10 +193,10 @@ export class GetCurrentFileTool implements Tool<
     return true;
   }
 
-  async execute(
+  execute(
     _input: Record<string, never>,
     _context: ToolContext,
-  ): Promise<ToolResult<CurrentFileInfo | null>> {
+  ): ToolResult<CurrentFileInfo | null> {
     try {
       const editor = vscode.window.activeTextEditor;
 

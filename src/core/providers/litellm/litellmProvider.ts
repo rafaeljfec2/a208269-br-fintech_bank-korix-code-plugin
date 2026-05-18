@@ -132,9 +132,12 @@ export class LiteLLMProvider implements AIProvider {
    */
   private buildRequest(input: ProviderInput): AnthropicMessagesRequest {
     // Convert messages (já aplica stripTrailingAssistant internamente)
-    const messages = this.convertMessages(input);
+    let messages = this.convertMessages(input);
 
-    // Validar após conversão e strip (safety check)
+    // Merge consecutive assistant messages (fix for thinking blocks + responses)
+    messages = this.mergeConsecutiveAssistant(messages);
+
+    // Validar após conversão, merge e strip (safety check)
     this.validateMessages(messages);
 
     const request: AnthropicMessagesRequest = {
@@ -144,12 +147,11 @@ export class LiteLLMProvider implements AIProvider {
       system: input.system, // Anthropic: system é campo separado, não mensagem
       tools: input.tools ? this.convertTools(input.tools) : undefined,
       stream: true,
+      // Claude 4.x deprecou temperature - só incluir para modelos anteriores
+      temperature: this.isClaude4x(this.config.model)
+        ? undefined
+        : this.getTemperature(input.temperature),
     };
-
-    // Claude 4.x deprecou temperature - não enviar para esses modelos
-    if (!this.isClaude4x(this.config.model)) {
-      request.temperature = this.getTemperature(input.temperature);
-    }
 
     return request;
   }
@@ -173,7 +175,7 @@ export class LiteLLMProvider implements AIProvider {
     let lastIndex = messages.length - 1;
 
     // Remove ALL trailing assistant messages
-    while (lastIndex >= 0 && messages[lastIndex].role === "assistant") {
+    while (lastIndex >= 0 && messages[lastIndex]?.role === "assistant") {
       lastIndex--;
     }
 
@@ -196,32 +198,76 @@ export class LiteLLMProvider implements AIProvider {
     }
 
     // Validação 2: Primeira mensagem deve ser 'user'
-    if (messages[0].role !== "user") {
+    const firstMessage = messages[0];
+    if (firstMessage?.role !== "user") {
       throw new Error(
-        `[LiteLLM] First message must be from user, got: ${messages[0].role}`,
+        `[LiteLLM] First message must be from user, got: ${firstMessage?.role ?? "undefined"}`,
       );
     }
 
     // Validação 3: Última mensagem deve ser 'user' (Claude 4.6+ requirement)
     const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role !== "user") {
+    if (lastMessage?.role !== "user") {
       throw new Error(
-        `[LiteLLM] Last message must be from user, got: ${lastMessage.role}. ` +
+        `[LiteLLM] Last message must be from user, got: ${lastMessage?.role ?? "undefined"}. ` +
           `This prevents "assistant message prefill" errors on Claude 4.6+.`,
       );
     }
 
     // Validação 4: Sem dupla sequência assistant → assistant
+    // NOTE: Esta validação agora é preventiva - mergeConsecutiveAssistant() já corrige isso
     for (let i = 0; i < messages.length - 1; i++) {
+      const current = messages[i];
+      const next = messages[i + 1];
       if (
-        messages[i].role === "assistant" &&
-        messages[i + 1].role === "assistant"
+        current &&
+        next &&
+        current.role === "assistant" &&
+        next.role === "assistant"
       ) {
         throw new Error(
-          `[LiteLLM] Invalid sequence: assistant followed by assistant at index ${i}`,
+          `[LiteLLM] Invalid sequence: assistant followed by assistant at index ${i}. ` +
+            `This should never happen after mergeConsecutiveAssistant().`,
         );
       }
     }
+  }
+
+  /**
+   * Merge consecutive assistant messages into single messages
+   * Fixes issue where thinking blocks + responses create assistant → assistant sequences
+   */
+  private mergeConsecutiveAssistant(
+    messages: readonly AnthropicMessage[],
+  ): readonly AnthropicMessage[] {
+    if (messages.length === 0) {
+      return messages;
+    }
+
+    const merged: AnthropicMessage[] = [];
+
+    for (const current of messages) {
+      const last = merged[merged.length - 1];
+
+      // Se último e atual são ambos assistant, mesclar conteúdos
+      if (last?.role === "assistant" && current.role === "assistant") {
+        // Mesclar conteúdo com quebra de linha dupla
+        const lastContent =
+          typeof last.content === "string" ? last.content : "";
+        const currentContent =
+          typeof current.content === "string" ? current.content : "";
+
+        merged[merged.length - 1] = {
+          ...last,
+          content: lastContent + "\n\n" + currentContent,
+        };
+      } else {
+        // Adicionar novo item (copiar para evitar mutação)
+        merged.push({ ...current });
+      }
+    }
+
+    return merged;
   }
 
   /**

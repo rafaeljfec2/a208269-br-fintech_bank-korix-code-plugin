@@ -18,8 +18,8 @@ export class RuntimeMetrics {
   private eventTimeline: RuntimeEventRecord[] = [];
   private readonly startTime: number;
 
-  constructor(private readonly _logger: Logger) {
-    // Reserved for future logging
+  // @ts-expect-error - Reserved for future use
+  constructor(private readonly __logger: Logger) {
     this.startTime = Date.now();
   }
 

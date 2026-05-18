@@ -113,7 +113,8 @@ async function getChangedFiles(
 
   // Filter by status if specified
   if (input.statusFilter && input.statusFilter.length > 0) {
-    return changedFiles.filter((f) => input.statusFilter!.includes(f.status));
+    const statusFilter = input.statusFilter;
+    return changedFiles.filter((f) => statusFilter.includes(f.status));
   }
 
   return changedFiles;

@@ -16,10 +16,10 @@ export class ToolApprovalHandler {
    * NOTE: Currently ExecutionEngine uses vscode.window.showWarningMessage for approvals.
    * This handler is prepared for future webview-based approval UI integration.
    */
-  async handleApproveTool(
+  handleApproveTool(
     toolCallId: string,
     approval: "once" | "always" | "reject",
-  ): Promise<void> {
+  ): void {
     this.logger.info("Tool approval decision", { toolCallId, approval });
 
     // Extract tool name from toolCallId

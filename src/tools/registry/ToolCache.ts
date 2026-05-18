@@ -11,6 +11,11 @@
 
 import * as crypto from "crypto";
 import type { ToolResult } from "../../harness/toolRegistry";
+import { ToolCacheMetrics, type CacheStats } from "./ToolCacheMetrics";
+import { ToolCacheEviction, type CachePolicy } from "./ToolCacheEviction";
+import { ToolCacheInvalidation } from "./ToolCacheInvalidation";
+
+export type { CacheStats, CachePolicy };
 
 export interface CacheEntry<T = unknown> {
   readonly key: string;
@@ -19,24 +24,6 @@ export interface CacheEntry<T = unknown> {
   readonly accessCount: number;
   readonly size: number; // bytes (estimated)
   readonly ttl?: number; // milliseconds
-}
-
-export interface CachePolicy {
-  readonly maxSize: number; // bytes
-  readonly maxAge: number; // milliseconds (default TTL)
-  readonly maxEntries: number;
-  readonly enableHotCold?: boolean; // hot/cold partitioning
-}
-
-export interface CacheStats {
-  readonly hits: number;
-  readonly misses: number;
-  readonly hitRate: number;
-  readonly evictions: number;
-  readonly currentSize: number; // bytes
-  readonly currentEntries: number;
-  readonly hotEntries: number;
-  readonly coldEntries: number;
 }
 
 interface CacheNode<T = unknown> {
@@ -56,18 +43,16 @@ interface CacheNode<T = unknown> {
  * 4. Eviction: remove from tail (least recently used)
  */
 export class ToolCache {
-  private readonly cache: Map<string, CacheNode> = new Map();
-  private head: CacheNode | null = null; // Most recently used
-  private tail: CacheNode | null = null; // Least recently used
-  private hotHead: CacheNode | null = null; // Hot partition head
+  private readonly cache: Map<string, CacheNode<unknown>> = new Map();
+  private head: CacheNode<unknown> | null = null; // Most recently used
+  private tail: CacheNode<unknown> | null = null; // Least recently used
+  private hotHead: CacheNode<unknown> | null = null; // Hot partition head
   private currentSize = 0; // bytes
   private readonly policy: Required<CachePolicy>;
 
-  private stats = {
-    hits: 0,
-    misses: 0,
-    evictions: 0,
-  };
+  private readonly metrics: ToolCacheMetrics;
+  private readonly eviction: ToolCacheEviction;
+  private readonly invalidation: ToolCacheInvalidation;
 
   constructor(policy: CachePolicy) {
     this.policy = {
@@ -76,32 +61,28 @@ export class ToolCache {
       maxEntries: policy.maxEntries,
       enableHotCold: policy.enableHotCold ?? true,
     };
+
+    this.metrics = new ToolCacheMetrics();
+    this.eviction = new ToolCacheEviction(this.policy);
+    this.invalidation = new ToolCacheInvalidation();
   }
 
   /**
    * Get cached tool result
-   *
-   * @param tool Tool name
-   * @param input Tool input
-   * @returns Cached result or null
    */
   get<T>(tool: string, input: unknown): ToolResult<T> | null {
     const key = this.generateKey(tool, input);
     const node = this.cache.get(key);
 
     if (!node) {
-      this.stats.misses++;
+      this.metrics.recordMiss();
       return null;
     }
 
     // Check TTL expiration
-    const age = Date.now() - node.entry.timestamp;
-    const ttl = node.entry.ttl ?? this.policy.maxAge;
-
-    if (age > ttl) {
-      // Expired - remove
+    if (this.eviction.isExpired(node)) {
       this.remove(key);
-      this.stats.misses++;
+      this.metrics.recordMiss();
       return null;
     }
 
@@ -123,17 +104,12 @@ export class ToolCache {
       this.promoteToHot(node);
     }
 
-    this.stats.hits++;
+    this.metrics.recordHit();
     return node.entry.value as ToolResult<T>;
   }
 
   /**
    * Set tool result in cache
-   *
-   * @param tool Tool name
-   * @param input Tool input
-   * @param result Tool result
-   * @param ttl Optional TTL override (milliseconds)
    */
   set<T>(
     tool: string,
@@ -175,7 +151,7 @@ export class ToolCache {
     const node: CacheNode<T> = {
       entry,
       prev: null,
-      next: this.head,
+      next: this.head as CacheNode<T> | null,
       isHot: false,
     };
 
@@ -188,32 +164,19 @@ export class ToolCache {
     }
     this.head = node;
 
-    if (!this.tail) {
-      this.tail = node;
-    }
+    this.tail ??= node;
 
     this.currentSize += size;
 
     // Evict if over capacity
-    this.evictIfNeeded();
+    this.performEviction();
   }
 
   /**
    * Invalidate cache entries matching pattern
-   *
-   * @param pattern String or regex pattern to match keys
    */
   invalidate(pattern: string | RegExp): void {
-    const toRemove: string[] = [];
-
-    for (const [key, _node] of this.cache.entries()) {
-      const matches =
-        typeof pattern === "string" ? key.includes(pattern) : pattern.test(key);
-
-      if (matches) {
-        toRemove.push(key);
-      }
-    }
+    const toRemove = this.invalidation.findMatching(pattern, this.cache);
 
     for (const key of toRemove) {
       this.remove(key);
@@ -235,41 +198,14 @@ export class ToolCache {
    * Get cache statistics
    */
   getStats(): CacheStats {
-    let hotEntries = 0;
-    let coldEntries = 0;
-
-    for (const node of this.cache.values()) {
-      if (node.isHot) {
-        hotEntries++;
-      } else {
-        coldEntries++;
-      }
-    }
-
-    const total = this.stats.hits + this.stats.misses;
-    const hitRate = total > 0 ? this.stats.hits / total : 0;
-
-    return {
-      hits: this.stats.hits,
-      misses: this.stats.misses,
-      hitRate,
-      evictions: this.stats.evictions,
-      currentSize: this.currentSize,
-      currentEntries: this.cache.size,
-      hotEntries,
-      coldEntries,
-    };
+    return this.metrics.getStats(this.currentSize, this.cache);
   }
 
   /**
    * Reset cache statistics
    */
   resetStats(): void {
-    this.stats = {
-      hits: 0,
-      misses: 0,
-      evictions: 0,
-    };
+    this.metrics.reset();
   }
 
   /**
@@ -324,9 +260,7 @@ export class ToolCache {
 
     this.head = node;
 
-    if (!this.tail) {
-      this.tail = node;
-    }
+    this.tail ??= node;
   }
 
   /**
@@ -340,9 +274,7 @@ export class ToolCache {
     node.isHot = true;
 
     // Hot partition uses same linked list, but we track hot head
-    if (!this.hotHead) {
-      this.hotHead = node;
-    }
+    this.hotHead ??= node;
   }
 
   /**
@@ -386,66 +318,18 @@ export class ToolCache {
   }
 
   /**
-   * Evict entries if cache exceeds capacity
-   *
-   * Eviction strategy:
-   * 1. Remove expired entries first
-   * 2. Remove from cold partition (LRU)
-   * 3. If still over capacity, remove from hot partition
+   * Perform eviction using eviction manager
    */
-  private evictIfNeeded(): void {
-    // Remove expired entries first
-    this.removeExpired();
+  private performEviction(): void {
+    const toEvict = this.eviction.evictIfNeeded(
+      this.currentSize,
+      this.cache,
+      this.tail,
+    );
 
-    // Check if over capacity
-    while (
-      this.cache.size > this.policy.maxEntries ||
-      this.currentSize > this.policy.maxSize
-    ) {
-      // Evict from tail (least recently used in cold partition)
-      let nodeToEvict = this.tail;
-
-      // If tail is hot, find last cold node
-      if (nodeToEvict?.isHot && this.policy.enableHotCold) {
-        let current = this.tail;
-        while (current && current.isHot) {
-          current = current.prev;
-        }
-        nodeToEvict = current;
-      }
-
-      // If no cold nodes, evict from hot partition
-      if (!nodeToEvict) {
-        nodeToEvict = this.tail;
-      }
-
-      if (!nodeToEvict) {
-        break; // Cache is empty
-      }
-
-      this.remove(nodeToEvict.entry.key);
-      this.stats.evictions++;
-    }
-  }
-
-  /**
-   * Remove all expired entries
-   */
-  private removeExpired(): void {
-    const now = Date.now();
-    const toRemove: string[] = [];
-
-    for (const [key, node] of this.cache.entries()) {
-      const age = now - node.entry.timestamp;
-      const ttl = node.entry.ttl ?? this.policy.maxAge;
-
-      if (age > ttl) {
-        toRemove.push(key);
-      }
-    }
-
-    for (const key of toRemove) {
+    for (const key of toEvict) {
       this.remove(key);
+      this.metrics.recordEviction();
     }
   }
 }

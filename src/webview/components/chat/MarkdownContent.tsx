@@ -30,36 +30,37 @@ export default function MarkdownContent({ content }: MarkdownContentProps) {
   );
 
   return (
-    <ReactMarkdown
-      className={markdownContent}
-      remarkPlugins={[remarkGfm]} // GitHub Flavored Markdown (tables, strikethrough, task lists)
-      rehypePlugins={[rehypeHighlight]} // Syntax highlighting
-      components={{
-        // Custom renderer para code blocks
-        code({ inline, className, children, ...props }) {
-          const match = /language-(\w+)/.exec(className || '');
-          const language = match ? match[1] : '';
-          const code = String(children).replace(/\n$/, '');
+    <div className={markdownContent}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]} // GitHub Flavored Markdown (tables, strikethrough, task lists)
+        rehypePlugins={[rehypeHighlight]} // Syntax highlighting
+        components={{
+          // Custom renderer para code blocks
+          code({ inline, className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || '');
+            const language = match ? match[1] : '';
+            const code = String(children).replace(/\n$/, '');
 
-          return !inline && language ? (
-            <CodeBlock code={code} language={language} />
-          ) : (
-            <code className={className} {...props}>
-              {children}
-            </code>
-          );
-        },
-        // Links abrem em nova aba
-        a({ children, href, ...props }) {
-          return (
-            <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
-              {children}
-            </a>
-          );
-        },
-      }}
-    >
-      {content}
-    </ReactMarkdown>
+            return !inline && language ? (
+              <CodeBlock code={code} language={language} />
+            ) : (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            );
+          },
+          // Links abrem em nova aba
+          a({ children, href, ...props }) {
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                {children}
+              </a>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 }

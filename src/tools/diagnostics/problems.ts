@@ -58,14 +58,11 @@ export const ProblemsTool: Tool<ProblemsInput, Problem[]> = {
     return true; // Allowed in all modes
   },
 
-  async execute(
-    input: ProblemsInput,
-    _context: ToolContext,
-  ): Promise<ToolResult<Problem[]>> {
+  execute(input: ProblemsInput, _context: ToolContext): ToolResult<Problem[]> {
     const startTime = Date.now();
 
     try {
-      const problems = await getProblems(input);
+      const problems = getProblems(input);
 
       return {
         success: true,
@@ -93,7 +90,7 @@ export const ProblemsTool: Tool<ProblemsInput, Problem[]> = {
 /**
  * Get problems from VSCode diagnostics
  */
-async function getProblems(input: ProblemsInput): Promise<Problem[]> {
+function getProblems(input: ProblemsInput): Problem[] {
   // Get all diagnostics
   const diagnostics = vscode.languages.getDiagnostics();
 

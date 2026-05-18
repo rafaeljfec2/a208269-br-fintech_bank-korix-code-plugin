@@ -95,9 +95,8 @@ export class CommandRunner {
       let stdout = "";
       const stderr = "";
       let completed = false;
-      let timeoutId: NodeJS.Timeout;
 
-      const cleanup = (): void => {
+      const cleanup = (timeoutId: NodeJS.Timeout): void => {
         clearTimeout(timeoutId);
         pty.onData(() => {});
         pty.onExit(() => {});
@@ -106,13 +105,16 @@ export class CommandRunner {
       const finish = (
         timedOut: boolean,
         exitCode: number | null = null,
+        timeoutId?: NodeJS.Timeout,
       ): void => {
         if (completed) {
           return;
         }
         completed = true;
 
-        cleanup();
+        if (timeoutId) {
+          cleanup(timeoutId);
+        }
 
         const duration = Date.now() - startTime;
 
@@ -141,15 +143,15 @@ export class CommandRunner {
         stdout += data;
       });
 
+      const timeoutId = setTimeout(() => {
+        this.logger.warn("Command timed out", { command, timeout });
+        finish(true, null, timeoutId);
+      }, timeout);
+
       pty.onExit((exitCode) => {
         this.logger.debug("Command process exited", { command, exitCode });
-        finish(false, exitCode);
+        finish(false, exitCode, timeoutId);
       });
-
-      timeoutId = setTimeout(() => {
-        this.logger.warn("Command timed out", { command, timeout });
-        finish(true, null);
-      }, timeout);
 
       pty.write(command);
     });

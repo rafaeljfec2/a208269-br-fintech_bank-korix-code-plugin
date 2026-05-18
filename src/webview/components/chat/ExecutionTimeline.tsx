@@ -18,6 +18,10 @@ export default function ExecutionTimeline({
   isExpanded,
   onToggle,
 }: ExecutionTimelineProps) {
+  // Calculate total duration
+  const totalDuration = tools.reduce((sum, tool) => sum + tool.duration, 0);
+  const formattedDuration = (totalDuration / 1000).toFixed(1);
+
   // Classes
   const expandableHeader = clsx(
     'flex items-center justify-between px-3 py-2 cursor-pointer rounded',
@@ -33,8 +37,15 @@ export default function ExecutionTimeline({
           <span>{isExpanded ? '▼' : '▶'}</span>
           <span className="font-medium">Execução</span>
         </div>
-        <div className="text-xs opacity-50">
-          {tools.length} ferramenta{tools.length !== 1 ? 's' : ''} usada{tools.length !== 1 ? 's' : ''}
+        <div className="flex items-center gap-3 text-xs opacity-50">
+          <span>
+            {tools.length} ferramenta{tools.length !== 1 ? 's' : ''}
+          </span>
+          {totalDuration > 0 && (
+            <span className="tabular-nums">
+              {formattedDuration}s total
+            </span>
+          )}
         </div>
       </div>
 

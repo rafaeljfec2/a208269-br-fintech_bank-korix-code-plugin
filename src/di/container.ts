@@ -51,9 +51,7 @@ export class Container {
     }
 
     if (binding.singleton) {
-      if (!binding.instance) {
-        binding.instance = binding.factory(this);
-      }
+      binding.instance ??= binding.factory(this);
       return binding.instance;
     }
 

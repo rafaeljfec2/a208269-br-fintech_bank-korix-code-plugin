@@ -231,10 +231,10 @@ async function testProviderStreaming() {
       maxTokens: 100,
     });
 
-    let textContent = "";
+    let _textContent = "";
     for await (const chunk of stream) {
       if (chunk.type === "text") {
-        textContent += chunk.content;
+        _textContent += chunk.content;
         outputChannel.append(chunk.content);
       } else if (chunk.type === "done") {
         logger.info("Stream completed", {

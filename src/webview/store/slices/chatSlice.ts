@@ -46,6 +46,9 @@ export interface ChatSession {
   readonly streamingContent: string;
   readonly isStreaming: boolean;
   readonly createdAt: number;
+  readonly thinkingContent?: string;
+  readonly isThinking?: boolean;
+  readonly activeMessageTools?: ToolExecution[];
 }
 
 export interface ChatSlice {
@@ -70,6 +73,15 @@ export interface ChatSlice {
     chatId: string,
     metadata: Partial<MessageMetadata>,
   ) => void;
+  readonly appendThinkingToken: (chatId: string, token: string) => void;
+  readonly finalizeThinking: (chatId: string) => void;
+  readonly addActiveMessageTool: (chatId: string, tool: ToolExecution) => void;
+  readonly updateActiveMessageTool: (
+    chatId: string,
+    toolId: string,
+    updates: Partial<ToolExecution>,
+  ) => void;
+  readonly clearActiveMessageTools: (chatId: string) => void;
   readonly toggleSidebar: () => void;
   readonly setSidebarWidth: (width: number) => void;
 }
@@ -121,7 +133,8 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
       let newActiveChatId = state.activeChatId;
       if (state.activeChatId === chatId) {
         const remainingIds = Object.keys(remaining);
-        newActiveChatId = remainingIds.length > 0 ? (remainingIds[0] ?? null) : null;
+        newActiveChatId =
+          remainingIds.length > 0 ? (remainingIds[0] ?? null) : null;
       }
 
       return {
@@ -218,6 +231,59 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
       };
     }),
 
+  appendThinkingToken: (chatId, token) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) {
+        console.warn(`Chat ${chatId} not found`);
+        return state;
+      }
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            thinkingContent: (chat.thinkingContent ?? "") + token,
+            isThinking: true,
+          },
+        },
+      };
+    }),
+
+  finalizeThinking: (chatId) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat || !chat.thinkingContent) return state;
+
+      // Adicionar thinking block como mensagem do sistema
+      const thinkingMessage: Message = {
+        id: crypto.randomUUID(),
+        role: "system" as const,
+        content: chat.thinkingContent,
+        timestamp: Date.now(),
+        metadata: {
+          statusCard: {
+            type: "plan_created" as const,
+            title: "Raciocínio",
+            subtitle: "Modelo processou o contexto",
+          },
+        },
+      };
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            messages: [...chat.messages, thinkingMessage],
+            thinkingContent: "",
+            isThinking: false,
+          },
+        },
+      };
+    }),
+
   clearChat: (chatId) =>
     set((state: ChatSlice) => {
       const chat = state.conversations[chatId];
@@ -254,6 +320,60 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
                 ? { ...msg, metadata: { ...msg.metadata, ...metadata } }
                 : msg,
             ),
+          },
+        },
+      };
+    }),
+
+  addActiveMessageTool: (chatId, tool) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) return state;
+
+      const tools = [...(chat.activeMessageTools ?? []), tool];
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            activeMessageTools: tools,
+          },
+        },
+      };
+    }),
+
+  updateActiveMessageTool: (chatId, toolId, updates) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat || !chat.activeMessageTools) return state;
+
+      const tools = chat.activeMessageTools.map((t) =>
+        t.id === toolId ? { ...t, ...updates } : t,
+      );
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            activeMessageTools: tools,
+          },
+        },
+      };
+    }),
+
+  clearActiveMessageTools: (chatId) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) return state;
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            activeMessageTools: undefined,
           },
         },
       };

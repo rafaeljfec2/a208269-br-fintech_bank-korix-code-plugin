@@ -55,26 +55,39 @@ export default function RuntimeInspector() {
               No events yet
             </div>
           ) : (
-            recentEvents.map((event) => (
-              <div
-                key={event.id}
-                className="flex items-center gap-2 text-xs px-2 py-1 hover:bg-[var(--vscode-list-hoverBackground)] rounded"
-              >
-                <span
-                  className={
-                    event.status === 'error' ? 'text-red-400' : 'text-green-400'
-                  }
+            recentEvents.map((event, index) => {
+              // Calculate duration from previous event
+              const prevEvent = index < recentEvents.length - 1 ? recentEvents[index + 1] : null;
+              const duration = prevEvent
+                ? ((event.timestamp - prevEvent.timestamp) / 1000).toFixed(1)
+                : null;
+
+              return (
+                <div
+                  key={event.id}
+                  className="flex items-center gap-2 text-xs px-2 py-1 hover:bg-[var(--vscode-list-hoverBackground)] rounded"
                 >
-                  {event.status === 'error' ? '✗' : '✓'}
-                </span>
-                <span className="flex-1 truncate text-[var(--vscode-foreground)]">
-                  {event.description}
-                </span>
-                <span className="text-[var(--vscode-descriptionForeground)] opacity-60">
-                  {getEventBadge(event.type)}
-                </span>
-              </div>
-            ))
+                  <span
+                    className={
+                      event.status === 'error' ? 'text-red-400' : 'text-green-400'
+                    }
+                  >
+                    {event.status === 'error' ? '✗' : '✓'}
+                  </span>
+                  <span className="flex-1 truncate text-[var(--vscode-foreground)]">
+                    {event.description}
+                  </span>
+                  <span className="text-[var(--vscode-descriptionForeground)] opacity-60">
+                    {getEventBadge(event.type)}
+                  </span>
+                  {duration && (
+                    <span className="text-[var(--vscode-descriptionForeground)] tabular-nums text-[10px]">
+                      +{duration}s
+                    </span>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </div>

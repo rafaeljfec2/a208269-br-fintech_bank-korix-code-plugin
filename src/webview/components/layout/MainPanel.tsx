@@ -9,6 +9,9 @@ import ChatMessage from '../chat/ChatMessage';
 import MarkdownContent from '../chat/MarkdownContent';
 import StreamingIndicator from '../chat/StreamingIndicator';
 import SettingsPanel from '../settings/SettingsPanel';
+import ActivityLog from '../activity/ActivityLog';
+import RuntimeInspector from '../runtime/RuntimeInspector';
+import TerminalPanel from '../terminal/TerminalPanel';
 
 export default function MainPanel() {
   // Use selectors separados para evitar re-renders desnecessários
@@ -43,9 +46,32 @@ export default function MainPanel() {
     }
   }, [activeChat?.isStreaming, activeChat?.streamingContent, activeChat?.messages.length]);
 
+  // Renderizar RuntimeInspector quando activeTab === 'timeline'
+  if (activeTab === 'timeline') {
+    return (
+      <div className="flex-1 overflow-y-auto p-4 bg-[var(--vscode-editor-background)]">
+        <RuntimeInspector />
+      </div>
+    );
+  }
+
+  // Renderizar TerminalPanel quando activeTab === 'terminal'
+  if (activeTab === 'terminal') {
+    return <TerminalPanel />;
+  }
+
   // Renderizar SettingsPanel quando activeTab === 'settings'
   if (activeTab === 'settings') {
     return <SettingsPanel />;
+  }
+
+  // Renderizar ActivityLog quando activeTab === 'activity'
+  if (activeTab === 'activity') {
+    return (
+      <div className="flex-1 overflow-hidden bg-[var(--vscode-editor-background)]">
+        <ActivityLog />
+      </div>
+    );
   }
 
   // Empty state - no active conversation
@@ -78,6 +104,34 @@ export default function MainPanel() {
       {activeChat.messages.map((msg) => (
         <ChatMessage key={msg.id} message={msg} />
       ))}
+
+      {/* Thinking content - antes do streaming */}
+      {activeChat.isThinking && activeChat.thinkingContent && (
+        <div className="px-4 py-3 bg-[var(--vscode-input-background)]/30 rounded-lg mb-4">
+          <div className="flex items-center gap-2 mb-2 text-xs text-[var(--vscode-descriptionForeground)]">
+            <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24">
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+                fill="none"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              />
+            </svg>
+            <span>Pensando...</span>
+          </div>
+          <div className="text-sm text-[var(--vscode-descriptionForeground)] italic">
+            {activeChat.thinkingContent}
+          </div>
+        </div>
+      )}
 
       {/* Streaming content - sem avatar, sem header, COM REF para auto-scroll */}
       {activeChat.isStreaming && activeChat.streamingContent && (

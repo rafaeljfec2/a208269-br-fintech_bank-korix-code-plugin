@@ -33,7 +33,7 @@ export class ContextBuilder {
       budget: budget.getBudget(),
     });
 
-    const rankedFiles = await this.ranker.rankFiles({
+    const rankedFiles = this.ranker.rankFiles({
       currentFile: options.currentFile,
       userSelection: options.userSelection,
       mentionedSymbols: options.mentionedSymbols,

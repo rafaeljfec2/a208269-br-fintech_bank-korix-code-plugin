@@ -6,6 +6,9 @@ export interface RuntimeMetrics {
   readonly tokenCount: number;
   readonly toolCallCount: number;
   readonly iterationCount: number;
+  readonly inputTokens?: number;
+  readonly outputTokens?: number;
+  readonly cachedTokens?: number;
 }
 
 export interface RuntimeSlice {
@@ -30,6 +33,9 @@ export const createRuntimeSlice = (set: any): RuntimeSlice => ({
     tokenCount: 0,
     toolCallCount: 0,
     iterationCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cachedTokens: 0,
   },
   mode: "agent",
   model: "claude-opus-4-7",

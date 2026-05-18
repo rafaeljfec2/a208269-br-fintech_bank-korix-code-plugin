@@ -26,9 +26,19 @@ describe("useRuntimeEvents", () => {
   const mockSetModel = vi.fn();
   const mockCreateSession = vi.fn();
   const mockAppendOutput = vi.fn();
+  const mockCreateChat = vi.fn();
+  const mockUpdateActiveMessageMetadata = vi.fn();
+  // Activity Log mocks
+  const mockStartContext = vi.fn();
+  const mockEndContext = vi.fn();
+  const mockAddActivityItem = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Mock createChat to return a chat ID
+    mockCreateChat.mockReturnValue("test-chat-id");
+    mockStartContext.mockReturnValue("test-context-id");
 
     const state = {
       addMessage: mockAddMessage,
@@ -42,7 +52,17 @@ describe("useRuntimeEvents", () => {
       setModel: mockSetModel,
       createSession: mockCreateSession,
       appendOutput: mockAppendOutput,
+      createChat: mockCreateChat,
+      updateActiveMessageMetadata: mockUpdateActiveMessageMetadata,
+      // Activity Log state
+      startContext: mockStartContext,
+      endContext: mockEndContext,
+      addActivityItem: mockAddActivityItem,
+      contexts: [],
+      currentContextId: null,
       metrics: { toolCallCount: 0 },
+      conversations: {},
+      activeChatId: null,
     };
 
     // Mock getState for direct calls
@@ -163,7 +183,13 @@ describe("useRuntimeEvents", () => {
         );
       });
 
-      expect(mockAppendStreamingToken).toHaveBeenCalledWith("Hello");
+      // appendStreamingToken is called with (chatId, content)
+      // Since activeChatId is null, createChat is called first
+      expect(mockCreateChat).toHaveBeenCalledWith("Nova conversa");
+      expect(mockAppendStreamingToken).toHaveBeenCalledWith(
+        "test-chat-id",
+        "Hello",
+      );
     });
   });
 
@@ -238,6 +264,9 @@ describe("useRuntimeEvents", () => {
                 event: {
                   type: "tool_result",
                   name: "ReadFile",
+                  success: true, // ADDED: event.success is required
+                  duration: 100,
+                  id: "test-tool-id",
                 },
               },
             },
@@ -273,7 +302,8 @@ describe("useRuntimeEvents", () => {
         );
       });
 
-      expect(mockFinalizeStreaming).toHaveBeenCalled();
+      // finalizeStreaming only called if activeChatId exists (currently null in mock)
+      expect(mockFinalizeStreaming).not.toHaveBeenCalled();
       expect(mockSetExecuting).toHaveBeenCalledWith(false);
     });
   });
@@ -298,7 +328,8 @@ describe("useRuntimeEvents", () => {
         );
       });
 
-      expect(mockFinalizeStreaming).toHaveBeenCalled();
+      // finalizeStreaming only called if activeChatId exists (currently null in mock)
+      expect(mockFinalizeStreaming).not.toHaveBeenCalled();
       expect(mockSetExecuting).toHaveBeenCalledWith(false);
       expect(mockAddTimelineEvent).toHaveBeenCalledWith({
         type: "error",

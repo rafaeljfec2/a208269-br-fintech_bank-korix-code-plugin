@@ -80,7 +80,7 @@ export class PatchApplier {
       }
     }
 
-    const rollbackId = await this.rollbackManager.createRollbackPoint(
+    const rollbackId = this.rollbackManager.createRollbackPoint(
       appliedPatches,
       fileBackups,
     );

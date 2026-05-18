@@ -22,16 +22,17 @@ export class RecoveryManager {
   private attemptCounts = new Map<string, number>();
 
   constructor(
-    private readonly _logger: Logger, // Reserved for future logging
+    // @ts-expect-error - Reserved for future use
+    private readonly __logger: Logger,
     private readonly checkpointManager: CheckpointManager,
     private readonly eventEmitter: RuntimeEventEmitter,
   ) {}
 
-  async handleError(
+  handleError(
     error: Error,
     state: RuntimeState,
     context: string,
-  ): Promise<RecoveryAction> {
+  ): RecoveryAction {
     const errorKey = `${context}-${error.message}`;
     const attempts = this.attemptCounts.get(errorKey) ?? 0;
 

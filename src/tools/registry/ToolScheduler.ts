@@ -13,7 +13,7 @@ import type { ToolResult } from "../../harness/toolRegistry";
 export interface ScheduledTask<T = unknown> {
   readonly id: string;
   readonly tool: string;
-  readonly input: unknown;
+  readonly input: T;
   readonly priority: number; // 0-10, higher = more urgent
   readonly dependencies?: readonly string[]; // task IDs that must complete first
   readonly timeout?: number; // milliseconds
@@ -54,7 +54,7 @@ interface QueuedTask<T = unknown> {
  * 5. Cancellation propagates to all dependent tasks
  */
 export class ToolScheduler {
-  private readonly queue: Map<string, QueuedTask> = new Map();
+  private readonly queue: Map<string, QueuedTask<unknown>> = new Map();
   private readonly executing: Set<string> = new Set();
   private readonly completed: Map<string, TaskResult> = new Map();
   private readonly stats = {
@@ -94,7 +94,7 @@ export class ToolScheduler {
         reject,
       };
 
-      this.queue.set(task.id, queued);
+      this.queue.set(task.id, queued as QueuedTask<unknown>);
       this.stats.queued++;
 
       // Start execution if no dependencies or all dependencies are met

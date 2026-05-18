@@ -104,8 +104,11 @@ export class CheckpointManager {
     );
 
     for (let i = this.maxCheckpoints; i < sorted.length; i++) {
-      const [id] = sorted[i]!;
-      this.checkpoints.delete(id);
+      const entry = sorted[i];
+      if (entry) {
+        const [id] = entry;
+        this.checkpoints.delete(id);
+      }
     }
   }
 }

@@ -5,7 +5,12 @@
 import type { StateCreator } from "zustand";
 import type { Mode } from "../../../core/types";
 
-export type ActiveTab = "chat" | "timeline" | "terminal" | "settings";
+export type ActiveTab =
+  | "chat"
+  | "timeline"
+  | "terminal"
+  | "settings"
+  | "activity";
 
 export interface SettingsSlice {
   readonly mode: Mode;

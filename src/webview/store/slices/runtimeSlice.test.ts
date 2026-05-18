@@ -23,6 +23,9 @@ describe("runtimeSlice", () => {
         tokenCount: 0,
         toolCallCount: 0,
         iterationCount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedTokens: 0,
       });
       expect(state.mode).toBe("agent");
       expect(state.model).toBe("claude-opus-4-7");

@@ -314,8 +314,10 @@ export class ToolMetrics {
       for (const [tool, metrics] of data.perToolMetrics) {
         this.perToolMetrics.set(tool, metrics);
       }
-    } catch (error) {
-      throw new Error(`Failed to import metrics: ${(error as Error).message}`);
+    } catch (error: unknown) {
+      throw new Error(`Failed to import metrics: ${(error as Error).message}`, {
+        cause: error,
+      });
     }
   }
 }

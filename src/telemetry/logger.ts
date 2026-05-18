@@ -58,7 +58,7 @@ export class Logger {
 
   error(
     message: string,
-    error?: Error | unknown,
+    error?: unknown,
     metadata?: Record<string, unknown>,
   ): void {
     const enrichedMetadata = {

@@ -224,3 +224,6 @@ body, .vscode-body {
 .no-scrollbar {
   -ms-overflow-style: none;
 }
+
+/* ===== Text Alignment ===== */
+/* Remover justificação - usar alinhamento padrão à esquerda para melhor legibilidade */

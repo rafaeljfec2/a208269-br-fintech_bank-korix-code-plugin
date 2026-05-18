@@ -83,7 +83,7 @@ export class WorkspaceIndexer {
       this.index.files.set(uri.fsPath, fileInfo);
 
       await this.extractSymbols(uri, document);
-      await this.extractImports(uri, document);
+      this.extractImports(uri, document);
     } catch (error) {
       const logger = getLogger();
       logger.warn("Failed to index file", { file: uri.fsPath, error });
@@ -132,15 +132,12 @@ export class WorkspaceIndexer {
       if (symbolInfos.length > 0) {
         this.index.symbols.set(uri.fsPath, symbolInfos);
       }
-    } catch (error) {
+    } catch (_error) {
       // Symbol provider not available for this file type
     }
   }
 
-  private async extractImports(
-    uri: vscode.Uri,
-    document: vscode.TextDocument,
-  ): Promise<void> {
+  private extractImports(uri: vscode.Uri, document: vscode.TextDocument): void {
     const text = document.getText();
     const importRegexes = [
       // TypeScript/JavaScript

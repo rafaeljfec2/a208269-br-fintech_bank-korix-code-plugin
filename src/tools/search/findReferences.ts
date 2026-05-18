@@ -100,8 +100,8 @@ async function findReferences(
 
   const uri = vscode.Uri.file(absolutePath);
 
-  // Open document
-  const document = await vscode.workspace.openTextDocument(uri);
+  // Open document (required for reference provider)
+  await vscode.workspace.openTextDocument(uri);
 
   // Create position
   const position = new vscode.Position(input.line, input.column);

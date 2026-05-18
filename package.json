@@ -225,7 +225,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "vsce package --no-dependencies",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint src --ext ts,tsx",
     "format": "prettier --write \"src/**/*.ts\"",
     "test:litellm": "./scripts/run-test.sh"
   },
@@ -254,6 +254,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^20.11.0",

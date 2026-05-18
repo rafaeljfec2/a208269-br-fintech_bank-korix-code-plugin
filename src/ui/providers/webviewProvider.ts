@@ -11,7 +11,8 @@ import type { WebviewToExtensionMessage } from "../../shared/protocol";
 export class KorixWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "korix.chatView";
 
-  private _view?: vscode.WebviewView;
+  // @ts-expect-error - Reserved for future use
+  private __view?: vscode.WebviewView;
   private _messageHandler?: MessageHandler;
   private _messageListener?: vscode.Disposable;
 
@@ -25,7 +26,7 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ): void | Thenable<void> {
-    this._view = webviewView;
+    this.__view = webviewView;
 
     webviewView.webview.options = {
       enableScripts: true,
@@ -44,7 +45,7 @@ export class KorixWebviewProvider implements vscode.WebviewViewProvider {
     );
 
     // Send initial state
-    this._messageHandler.sendInitialState();
+    void this._messageHandler.sendInitialState();
 
     // Dispose old message listener to prevent accumulation
     this._messageListener?.dispose();

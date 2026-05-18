@@ -261,7 +261,10 @@ export class ToolRegistry {
   } {
     // Simplified Zod to JSON Schema conversion
     // For production, use a library like zod-to-json-schema
-    const schemaDef = schema._def as { typeName?: string };
+    interface ZodDef {
+      typeName?: string;
+    }
+    const schemaDef = schema._def as ZodDef;
     const schemaType = schemaDef.typeName;
 
     if (schemaType === "ZodObject") {
@@ -292,7 +295,10 @@ export class ToolRegistry {
   }
 
   private convertZodType(schema: z.ZodTypeAny): unknown {
-    const typeName = schema._def.typeName;
+    interface ZodDef {
+      typeName?: string;
+    }
+    const typeName = (schema._def as ZodDef).typeName;
 
     switch (typeName) {
       case "ZodString":

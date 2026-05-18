@@ -86,9 +86,11 @@ export default function BottomBar() {
     // 5. Limpar input
     setInput('');
 
-    // Reset textarea height after send
+    // Reset textarea height after send e focar de volta
     if (textareaRef.current) {
       textareaRef.current.style.height = '60px';
+      // Focar de volta no input para facilitar continuação da conversa
+      textareaRef.current.focus();
     }
   };
 

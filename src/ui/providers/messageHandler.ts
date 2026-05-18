@@ -183,25 +183,25 @@ export class MessageHandler {
         break;
 
       case "change_mode":
-        await this.handleChangeMode(message.payload.mode);
+        this.handleChangeMode(message.payload.mode);
         break;
 
       case "approve_tool":
-        await this.handleApproveTool(
+        this.handleApproveTool(
           message.payload.toolCallId,
           message.payload.approval,
         );
         break;
 
       case "terminal_input":
-        await this.handleTerminalInput(
+        this.handleTerminalInput(
           message.payload.sessionId,
           message.payload.data,
         );
         break;
 
       case "create_terminal":
-        await this.handleCreateTerminal(message.payload.shellPath);
+        this.handleCreateTerminal(message.payload.shellPath);
         break;
 
       case "restore_checkpoint":
@@ -258,8 +258,7 @@ export class MessageHandler {
       }
 
       // Create provider instance
-      const provider =
-        await this.agentLoopFactory.createProvider(providerConfig);
+      const provider = this.agentLoopFactory.createProvider(providerConfig);
 
       // Create AgentLoop
       const agentLoop = this.agentLoopFactory.createAgentLoop(provider);
@@ -319,9 +318,7 @@ export class MessageHandler {
   /**
    * User switches mode (Ask/Plan/Agent)
    */
-  private async handleChangeMode(
-    mode: "ask" | "plan" | "agent",
-  ): Promise<void> {
+  private handleChangeMode(mode: "ask" | "plan" | "agent"): void {
     this.logger.info("Mode change requested", { mode });
 
     // Update mode in RuntimeStateManager
@@ -333,34 +330,31 @@ export class MessageHandler {
       payload: { mode },
     };
 
-    await this.webview.postMessage(message);
+    void this.webview.postMessage(message);
     this.logger.info("Mode changed successfully", { mode });
   }
 
   /**
    * User approves/rejects a tool call
    */
-  private async handleApproveTool(
+  private handleApproveTool(
     toolCallId: string,
     approval: "once" | "always" | "reject",
-  ): Promise<void> {
-    await this.toolApprovalHandler.handleApproveTool(toolCallId, approval);
+  ): void {
+    this.toolApprovalHandler.handleApproveTool(toolCallId, approval);
   }
 
   /**
    * User types in terminal
    */
-  private async handleTerminalInput(
-    sessionId: string,
-    data: string,
-  ): Promise<void> {
+  private handleTerminalInput(sessionId: string, data: string): void {
     this.terminalBridge.write(sessionId, data);
   }
 
   /**
    * User creates a new terminal
    */
-  private async handleCreateTerminal(shellPath?: string): Promise<void> {
+  private handleCreateTerminal(shellPath?: string): void {
     this.terminalBridge.createSession(shellPath);
   }
 
@@ -405,7 +399,7 @@ export class MessageHandler {
         },
       };
 
-      await this.webview.postMessage(message);
+      void this.webview.postMessage(message);
       this.logger.info("Settings loaded and sent to webview");
     } catch (error) {
       this.logger.error("Failed to load settings", error);
@@ -467,7 +461,7 @@ export class MessageHandler {
         payload: { success: true, message: "Settings saved successfully" },
       };
 
-      await this.webview.postMessage(message);
+      void this.webview.postMessage(message);
       this.logger.info("Settings saved successfully", {
         provider: payload.provider,
       });
@@ -481,7 +475,7 @@ export class MessageHandler {
             error instanceof Error ? error.message : "Failed to save settings",
         },
       };
-      await this.webview.postMessage(message);
+      void this.webview.postMessage(message);
     }
   }
 
@@ -508,7 +502,7 @@ export class MessageHandler {
       };
 
       // Create provider instance
-      const provider = await this.agentLoopFactory.createProvider(tempConfig);
+      const provider = this.agentLoopFactory.createProvider(tempConfig);
 
       // Simple test: send a minimal message
       const testPrompt = "Hi";
@@ -545,7 +539,7 @@ export class MessageHandler {
         },
       };
 
-      await this.webview.postMessage(message);
+      void this.webview.postMessage(message);
       this.logger.info("Connection test completed", {
         success: responseReceived,
       });
@@ -559,7 +553,7 @@ export class MessageHandler {
             error instanceof Error ? error.message : "Connection test failed",
         },
       };
-      await this.webview.postMessage(message);
+      void this.webview.postMessage(message);
     }
   }
 
@@ -567,7 +561,9 @@ export class MessageHandler {
    * Cleanup resources
    */
   public dispose(): void {
-    this._disposables.forEach((d) => d.dispose());
+    for (const d of this._disposables) {
+      d.dispose();
+    }
     this._disposables = [];
     this.logger.info("MessageHandler disposed");
   }

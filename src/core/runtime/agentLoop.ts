@@ -36,7 +36,8 @@ export class AgentLoop {
     private readonly iterationGuard: IterationGuard,
     private readonly cancellationManager: CancellationManager,
     private readonly metrics: RuntimeMetrics,
-    private readonly _eventEmitter: RuntimeEventEmitter, // Used by internal managers
+    // @ts-expect-error - Reserved for future use
+    private readonly __eventEmitter: RuntimeEventEmitter,
     private readonly logger: Logger,
   ) {}
 
@@ -53,6 +54,10 @@ export class AgentLoop {
     // Add previous messages for conversation history
     if (previousMessages && previousMessages.length > 0) {
       for (const msg of previousMessages) {
+        // Skip system messages - not supported in runtime state
+        if (msg.role === "system") {
+          continue;
+        }
         state.addMessage({
           role: msg.role,
           content: msg.content,
@@ -104,7 +109,7 @@ export class AgentLoop {
           );
         } catch (error) {
           // Handle error via recovery
-          const recoveryAction = await this.recoveryManager.handleError(
+          const recoveryAction = this.recoveryManager.handleError(
             error as Error,
             state,
             `iteration_${execution.currentIteration}`,
