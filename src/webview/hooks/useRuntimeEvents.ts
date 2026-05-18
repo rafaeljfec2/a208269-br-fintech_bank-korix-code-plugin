@@ -243,7 +243,9 @@ export function useRuntimeEvents() {
           }
 
           case "done": {
+            console.log("[RuntimeEvents] Done event received - finalizing streaming");
             const chatId = useStore.getState().activeChatId;
+
             if (chatId) {
               // Transfer activeMessageTools to message metadata
               const activeChat = useStore.getState().conversations[chatId];
@@ -262,10 +264,14 @@ export function useRuntimeEvents() {
                 });
               }
 
+              console.log("[RuntimeEvents] Calling finalizeStreaming for chat:", chatId);
               store.finalizeStreaming(chatId);
               // Clear active message tools for next message
               store.clearActiveMessageTools(chatId);
+            } else {
+              console.warn("[RuntimeEvents] No activeChatId found when done event received");
             }
+
             store.setExecuting(false);
             break;
           }
