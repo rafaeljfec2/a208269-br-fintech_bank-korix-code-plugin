@@ -49,7 +49,7 @@ export default function ChatMessage({ message }: ChatMessageProps) {
   // Chat fluido - SEM avatares, SEM labels ("You", "Korix")
   // Diferenciação visual APENAS por background
   const messageContainer = clsx(
-    'px-2 py-3 my-2',
+    'px-3 py-3 my-2',
     message.role === 'user' && 'bg-[var(--vscode-input-background)] rounded-lg' // Container cinza para usuário
   );
 

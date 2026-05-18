@@ -247,13 +247,14 @@ body, .vscode-body {
   color: var(--vscode-foreground);
   font-weight: 600;
   text-align: left;
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem;
   background-color: var(--vscode-input-background);
+  font-size: 0.625rem; /* 10px */
 }
 
 .prose td {
   color: var(--vscode-foreground);
-  padding: 0.5rem 0.75rem;
+  padding: 0.25rem 0.5rem;
   border-top: 1px solid var(--vscode-panel-border);
 }
 
@@ -355,24 +356,40 @@ body, .vscode-body {
   margin-bottom: 0.25rem !important;
 }
 
-/* Semantic Text Colors - subtle emphasis */
-.prose.prose-sm strong {
+/* Links - azul + bold */
+.prose.prose-sm a {
+  color: var(--vscode-textLink-foreground) !important;
   font-weight: 600 !important;
-  color: var(--vscode-textLink-activeForeground) !important;
+  text-decoration: none;
 }
 
+.prose.prose-sm a:hover {
+  color: var(--vscode-textLink-activeForeground) !important;
+  text-decoration: underline;
+}
+
+/* Semantic Text Colors - bold branco */
+.prose.prose-sm strong {
+  font-weight: 600 !important;
+  color: var(--vscode-foreground) !important;
+}
+
+/* Citações - itálico com fonte legível */
 .prose.prose-sm em {
   font-style: italic;
+  font-family: 'Georgia', 'Times New Roman', serif;
   color: var(--vscode-descriptionForeground);
 }
 
-/* Blockquotes - prepare for InfoBlock styling */
+/* Blockquotes - itálico com fonte legível */
 .prose.prose-sm blockquote {
   margin: 1rem 0 !important;
   padding-left: 1rem !important;
   border-left: 4px solid var(--vscode-textBlockQuote-border) !important;
   color: var(--vscode-textBlockQuote-foreground);
   background-color: var(--vscode-textBlockQuote-background);
+  font-style: italic;
+  font-family: 'Georgia', 'Times New Roman', serif;
 }
 
 /* Horizontal Rules - subtle dividers */
