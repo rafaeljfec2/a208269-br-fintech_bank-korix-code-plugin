@@ -73,11 +73,8 @@ export default function MainPanel() {
     );
   }
 
-  // Empty state - no active conversation OR no messages yet
-  const hasMessages = activeChat?.messages && activeChat.messages.length > 0;
-  const showEmptyState = !activeChat || (!hasMessages && !activeChat?.isStreaming && !activeChat?.isThinking);
-
-  if (showEmptyState) {
+  // Empty state - only show when truly empty (no active chat)
+  if (!activeChat) {
     return (
       <div className="flex-1 flex items-center justify-center bg-[#0d0d0d]">
         <div className="text-center max-w-md px-6">
@@ -89,7 +86,7 @@ export default function MainPanel() {
             AI-native coding assistant powered by Axiom Agents
           </p>
           <p className="text-xs opacity-40 mt-3 text-white">
-            {activeChat ? 'Start typing to begin...' : 'Create a new session to start chatting'}
+            Create a new session to start chatting
           </p>
         </div>
       </div>
