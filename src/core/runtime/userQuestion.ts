@@ -79,6 +79,14 @@ export async function askUserQuestion(
   const mode = config.mode ?? "single";
 
   // Emit user_question event
+  console.log("[askUserQuestion] About to emit user_question event", {
+    questionId,
+    title: config.title,
+    question: config.question,
+    mode,
+    optionsCount: config.options.length,
+  });
+
   emitter.emitEvent({
     type: "user_question",
     questionId,
@@ -91,42 +99,53 @@ export async function askUserQuestion(
     timestamp: Date.now(),
   });
 
-  // Wait for user_answer via promise (with optional timeout)
+  console.log("[askUserQuestion] user_question event emitted successfully");
+
+  // Wait for user_answer via promise (with guaranteed cleanup)
   return new Promise((resolve) => {
+    // eslint-disable-next-line prefer-const -- timeoutHandle is assigned later after cleanup function is defined
     let timeoutHandle: NodeJS.Timeout | undefined;
+    let isResolved = false;
+
+    // Cleanup function ensures listener is always disposed
+    const cleanup = () => {
+      if (isResolved) return;
+      isResolved = true;
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      listener.dispose();
+    };
 
     const listener = emitter.onType("user_answer", (event) => {
       if (event.questionId === questionId) {
-        if (timeoutHandle) clearTimeout(timeoutHandle);
+        cleanup();
         resolve(event.answers);
-        listener.dispose();
       }
     });
 
-    // Setup timeout if specified
-    if (config.timeoutMs) {
-      timeoutHandle = setTimeout(() => {
-        listener.dispose();
+    // Safety timeout: use provided timeout or default to 5 minutes
+    const effectiveTimeout = config.timeoutMs ?? 300000;
 
-        // Resolve with default answer
-        const defaultAnswers = Array.isArray(config.defaultAnswer)
-          ? config.defaultAnswer
-          : config.defaultAnswer
-            ? [config.defaultAnswer]
-            : [config.options[0]?.value ?? ""];
+    timeoutHandle = setTimeout(() => {
+      cleanup();
 
-        // Emit timeout event
-        emitter.emitEvent({
-          type: "user_answer",
-          questionId,
-          answers: defaultAnswers,
-          isTimeout: true,
-          timestamp: Date.now(),
-        });
+      // Resolve with default answer
+      const defaultAnswers = Array.isArray(config.defaultAnswer)
+        ? config.defaultAnswer
+        : config.defaultAnswer
+          ? [config.defaultAnswer]
+          : [config.options[0]?.value ?? ""];
 
-        resolve(defaultAnswers);
-      }, config.timeoutMs);
-    }
+      // Emit timeout event
+      emitter.emitEvent({
+        type: "user_answer",
+        questionId,
+        answers: defaultAnswers,
+        isTimeout: true,
+        timestamp: Date.now(),
+      });
+
+      resolve(defaultAnswers);
+    }, effectiveTimeout);
   });
 }
 

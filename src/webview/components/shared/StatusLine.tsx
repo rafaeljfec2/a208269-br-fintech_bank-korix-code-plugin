@@ -21,6 +21,16 @@ export default function StatusLine() {
     return activeChat?.isThinking ?? false;
   });
 
+  // DEBUG: Log state when any flag is true
+  if (isStreaming || isThinking || isExecuting) {
+    console.log("[StatusLine] Showing indicator:", {
+      isStreaming,
+      isThinking,
+      isExecuting,
+      timestamp: Date.now(),
+    });
+  }
+
   // Se não há atividade, não mostra nada
   if (!isStreaming && !isThinking && !isExecuting) {
     return null;

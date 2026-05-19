@@ -129,6 +129,15 @@ export class MessageHandler {
         type: event.type,
       });
 
+      // Extra logging for user_question events
+      if (event.type === "user_question") {
+        console.log("[MessageHandler] user_question event received!", {
+          questionId: event.questionId,
+          title: event.title,
+          optionsCount: event.options.length,
+        });
+      }
+
       const message: ExtensionToWebviewMessage = {
         type: "runtime_event",
         payload: { event },
@@ -140,12 +149,20 @@ export class MessageHandler {
           this.logger.debug("[MessageHandler] Event forwarded successfully", {
             type: event.type,
           });
+
+          if (event.type === "user_question") {
+            console.log("[MessageHandler] user_question forwarded to webview successfully");
+          }
         },
         (error) => {
           this.logger.error(
             "Failed to forward runtime event to webview",
             error,
           );
+
+          if (event.type === "user_question") {
+            console.error("[MessageHandler] FAILED to forward user_question to webview", error);
+          }
         },
       );
     });

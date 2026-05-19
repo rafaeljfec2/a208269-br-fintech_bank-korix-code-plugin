@@ -78,9 +78,34 @@ export class LiteLLMNormalizer {
         // Fim do bloco - emitir tool_call_complete se for tool call
         if (this.currentToolCall) {
           const fullJson = this.currentToolCall.jsonChunks.join("");
+          console.log(
+            `[LiteLLMNormalizer] content_block_stop for tool ${this.currentToolCall.name} - assembled ${this.currentToolCall.jsonChunks.length} chunks (${fullJson.length} chars)`,
+          );
+          console.log(
+            `[LiteLLMNormalizer] Full JSON:`,
+            fullJson.substring(0, 1000),
+          );
+
+          // Validate JSON is parseable before emitting
+          try {
+            JSON.parse(fullJson);
+            console.log(
+              `[LiteLLMNormalizer] JSON validation OK, emitting tool_call_complete`,
+            );
+          } catch (error) {
+            console.error(
+              `[LiteLLMNormalizer] WARNING: Assembled JSON is INVALID for tool ${this.currentToolCall.name}`,
+            );
+            console.error(`[LiteLLMNormalizer] Invalid JSON:`, fullJson);
+            console.error(
+              `[LiteLLMNormalizer] Parse error:`,
+              (error as Error).message,
+            );
+          }
+
           events.push({
             type: "tool_call_complete",
-            index: this.currentToolCall.index, // FIX: Add required index field
+            index: this.currentToolCall.index,
             id: this.currentToolCall.id,
             name: this.currentToolCall.name,
             arguments: fullJson,

@@ -34,6 +34,12 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   schema: z.ZodSchema<TInput>;
 
   /**
+   * Marks tool as interactive (blocks execution waiting for user input).
+   * Interactive tools don't trigger loop continuation.
+   */
+  readonly isInteractive?: boolean;
+
+  /**
    * Execute the tool with validated input
    */
   execute(input: TInput, context: ToolContext): Promise<ToolResult<TOutput>>;

@@ -25,6 +25,7 @@ export interface Task {
  */
 export interface StepResult {
   hadToolCalls: boolean;
+  hadInteractiveToolCalls?: boolean;
   hadThinking: boolean;
   tokenCount: number;
   stopReason?: "end_turn" | "stop" | "max_tokens" | "stop_sequence";

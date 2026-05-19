@@ -182,6 +182,11 @@ export class AgentLoop {
       const metricsSnapshot = this.metrics.finalize();
 
       // FIX: Emit "done" when the entire loop completes, not after each iteration
+      this.logger.info("[AgentLoop] Emitting done event", {
+        completed: true,
+        iterations: state.getExecution().currentIteration,
+      });
+
       yield {
         type: "done",
         stopReason: "end_turn",

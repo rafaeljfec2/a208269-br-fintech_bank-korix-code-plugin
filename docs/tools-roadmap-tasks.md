@@ -1,0 +1,1430 @@
+# Tools Roadmap — Task Breakdown
+
+**Data**: 2026-05-19  
+**Versão**: 1.0  
+
+Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáveis.
+
+---
+
+## 📊 Overview de Fases
+
+| Fase | Items | Subtasks | Horas Total | Status |
+|------|-------|----------|-------------|--------|
+| **Fase 1 (P0)** | 3 | 28 | 12h | 🟡 Planejado |
+| **Fase 2 (P1)** | 3 | 35 | 28h | 🟡 Planejado |
+| **Fase 3 (P0)** | 1 | 47 | 80h | 🟡 Planejado |
+| **Total** | 7 | **110** | **120h** | - |
+
+---
+
+# FASE 1: Critical Gap Fixes (P0)
+
+**Duração**: 2 semanas  
+**Esforço Total**: 12 horas  
+**Objetivo**: Eliminar blockers críticos
+
+---
+
+## 1.1 DeleteFile Tool
+
+**Esforço Total**: 4 horas  
+**Prioridade**: 🔴 P0  
+**Dependências**: Nenhuma
+
+### Subtasks
+
+#### Task 1.1.1: Setup & Schema (30min)
+- [ ] Criar arquivo `src/tools/filesystem/deleteFile.ts`
+- [ ] Importar dependências (vscode, path, zod, types)
+- [ ] Definir `DeleteFileSchema` com Zod
+  - `path: string`
+  - `recursive?: boolean`
+  - `force?: boolean`
+- [ ] Criar type `DeleteFileInput` com `z.infer`
+- [ ] Criar skeleton da tool com name, description, schema
+
+**Critério de aceitação**: Arquivo compila sem erros
+
+---
+
+#### Task 1.1.2: Security Validation (45min)
+- [ ] Implementar função `isCriticalPath(absolutePath, workspaceRoot)`
+  - [ ] Lista de paths críticos: `.git`, `package.json`, `tsconfig.json`, `node_modules`, `.env`, `pnpm-lock.yaml`
+  - [ ] Retornar `true` se path começa com qualquer critical path
+- [ ] Implementar função `isSafePath(filePath)`
+  - [ ] Regex patterns: `/\.cache/`, `/tmp/`, `/temp/`, `/\.tmp$/`, `/\.log$/`
+  - [ ] Retornar `true` se match qualquer pattern
+- [ ] Adicionar validação de workspace bounds
+  - [ ] Verificar se `absolutePath.startsWith(workspaceRoot)`
+  - [ ] Retornar erro se fora do workspace
+
+**Critério de aceitação**: Funções utilitárias testáveis isoladamente
+
+---
+
+#### Task 1.1.3: Core Execute Logic (1h)
+- [ ] Implementar método `execute()`
+  - [ ] Normalizar path (absoluto vs relativo)
+  - [ ] Validar workspace bounds (usar validação de 1.1.2)
+  - [ ] Validar critical paths (usar validação de 1.1.2)
+  - [ ] Criar `vscode.Uri.file(absolutePath)`
+  - [ ] Verificar se path existe (`vscode.workspace.fs.stat`)
+  - [ ] Chamar `vscode.workspace.fs.delete(uri, { recursive, useTrash: true })`
+  - [ ] Retornar `ToolResult` com success/error
+- [ ] Implementar `allowedInMode()` — apenas `agent`
+- [ ] Implementar `requiresApproval()` — usar `isSafePath()` + `force` flag
+
+**Critério de aceitação**: Tool executa delete com validações
+
+---
+
+#### Task 1.1.4: Unit Tests (1h)
+- [ ] Criar arquivo `src/tools/filesystem/deleteFile.test.ts`
+- [ ] Setup mocks (vscode.workspace.fs, context)
+- [ ] Teste: "should delete file within workspace"
+  - Input: `{ path: "test.txt" }`
+  - Assert: `result.success === true`
+- [ ] Teste: "should block deletion outside workspace"
+  - Input: `{ path: "/etc/passwd" }`
+  - Assert: `result.success === false`, error contains "outside workspace"
+- [ ] Teste: "should block deletion of .git directory"
+  - Input: `{ path: ".git" }`
+  - Assert: error contains "critical files"
+- [ ] Teste: "should require approval for normal files"
+  - Input: `{ path: "src/index.ts" }`
+  - Assert: `requiresApproval === true`
+- [ ] Teste: "should not require approval for temp files with force"
+  - Input: `{ path: "tmp/cache.tmp", force: true }`
+  - Assert: `requiresApproval === false`
+- [ ] Teste: "should use trash for safety"
+  - Assert: `delete()` called with `{ useTrash: true }`
+- [ ] Rodar testes: `pnpm test deleteFile.test.ts`
+
+**Critério de aceitação**: 6+ testes passando
+
+---
+
+#### Task 1.1.5: Integration & Registration (30min)
+- [ ] Exportar `DeleteFileTool` em `src/tools/filesystem/deleteFile.ts`
+- [ ] Importar em `src/tools/index.ts`
+- [ ] Adicionar à lista de tools registradas (linha ~31)
+- [ ] Adicionar `DeleteFile` ao array `writeTools` em `toolRegistry.ts` (linha ~343)
+- [ ] Rodar `pnpm run lint`
+- [ ] Rodar `pnpm test` (all tests)
+- [ ] Testar manualmente via provider call (opcional)
+
+**Critério de aceitação**: Tool registrada, todos testes passando
+
+---
+
+#### Task 1.1.6: Documentation (15min)
+- [ ] Adicionar JSDoc ao `DeleteFileTool`
+- [ ] Documentar security policies no description
+- [ ] Adicionar exemplo de uso no description
+- [ ] Atualizar `docs/tools-api.md` com DeleteFile entry (se existir)
+- [ ] Commit: `feat: add DeleteFile tool with security validation`
+
+**Critério de aceitação**: Documentação completa e commit criado
+
+---
+
+## 1.2 TodoWrite Tool Registration
+
+**Esforço Total**: 2 horas  
+**Prioridade**: 🔴 P0  
+**Dependências**: RuntimeState precisa expor método público
+
+### Subtasks
+
+#### Task 1.2.1: Create Tool Wrapper (30min)
+- [ ] Criar arquivo `src/tools/todoWrite.ts`
+- [ ] Importar dependências (zod, types)
+- [ ] Definir `TodoSchema`
+  - `content: string (min 1)`
+  - `status: enum(["pending", "in_progress", "completed"])`
+  - `activeForm: string (min 1)`
+- [ ] Definir `TodoWriteSchema`
+  - `todos: array(TodoSchema).min(1)`
+- [ ] Criar types com `z.infer`
+- [ ] Criar interface `TodoWriteOutput`
+  - `updatedCount: number`
+  - `todos: Array<...>`
+- [ ] Criar skeleton da tool
+
+**Critério de aceitação**: Schema definido, compila sem erros
+
+---
+
+#### Task 1.2.2: Validation Logic (30min)
+- [ ] Implementar validação "only one in_progress"
+  - [ ] Filter `input.todos` por `status === "in_progress"`
+  - [ ] Se `inProgress.length > 1`, retornar erro
+- [ ] Criar mensagem de erro descritiva
+- [ ] Adicionar description detalhado na tool
+  - [ ] Explicar regras (one in_progress, complete immediately)
+  - [ ] Adicionar exemplo JSON
+
+**Critério de aceitação**: Validação implementada
+
+---
+
+#### Task 1.2.3: RuntimeState Integration (45min)
+- [ ] Modificar `src/core/runtime/runtimeState.ts`
+- [ ] Adicionar método público `updateTodos(todos: Array<...>): void`
+  - [ ] Validar "only one in_progress" (duplicar lógica da tool)
+  - [ ] Atualizar `this.conversationState.todos`
+  - [ ] Emitir evento `todos_updated`
+- [ ] Adicionar método público `getTodos(): Array<...>`
+  - [ ] Retornar `this.conversationState.todos ?? []`
+- [ ] Adicionar tipo do evento em `src/core/runtime/runtimeEvents.ts`
+  - [ ] `type: "todos_updated"`
+  - [ ] `data: { todos: Array<...> }`
+
+**Critério de aceitação**: RuntimeState expõe métodos públicos
+
+---
+
+#### Task 1.2.4: Execute Implementation (15min)
+- [ ] Implementar `TodoWriteTool.execute()`
+- [ ] Validar input (chamar lógica de 1.2.2)
+- [ ] Obter RuntimeState do context
+- [ ] Chamar `runtimeState.updateTodos(input.todos)`
+- [ ] Criar output: `{ updatedCount, todos }`
+- [ ] Retornar `ToolResult` com success
+- [ ] Implementar `allowedInMode()` — `true` (todos os modos)
+
+**Critério de aceitação**: Execute funcional
+
+---
+
+#### Task 1.2.5: Unit Tests (30min)
+- [ ] Criar arquivo `src/tools/todoWrite.test.ts`
+- [ ] Teste: "should update todos successfully"
+  - Input: 3 todos (1 completed, 1 in_progress, 1 pending)
+  - Assert: `result.success === true`, `updatedCount === 3`
+- [ ] Teste: "should reject multiple in_progress todos"
+  - Input: 2 todos com `status: "in_progress"`
+  - Assert: `result.success === false`, error contains "only ONE"
+- [ ] Teste: "should emit todos_updated event"
+  - Mock RuntimeState
+  - Assert: event emitted com dados corretos
+- [ ] Rodar testes: `pnpm test todoWrite.test.ts`
+
+**Critério de aceitação**: 3+ testes passando
+
+---
+
+#### Task 1.2.6: Integration & Registration (15min)
+- [ ] Exportar `TodoWriteTool` em `src/tools/todoWrite.ts`
+- [ ] Importar em `src/tools/index.ts`
+- [ ] Adicionar à lista de tools registradas
+- [ ] Rodar `pnpm test` (all tests)
+- [ ] Verificar webview render (se possível)
+
+**Critério de aceitação**: Tool registrada, funcional
+
+---
+
+#### Task 1.2.7: Documentation & Commit (15min)
+- [ ] Adicionar JSDoc
+- [ ] Documentar regras no description
+- [ ] Adicionar exemplo de uso
+- [ ] Commit: `feat: register TodoWrite as tool with state integration`
+
+**Critério de aceitação**: Commit criado
+
+---
+
+## 1.3 ReadFile Image Support
+
+**Esforço Total**: 6 horas  
+**Prioridade**: 🔴 P0  
+**Dependências**: Nenhuma (parser manual de headers)
+
+### Subtasks
+
+#### Task 1.3.1: Extend Schema (20min)
+- [ ] Modificar `src/tools/filesystem.ts`
+- [ ] Estender `ReadFileSchema`
+  - [ ] Adicionar `encoding: z.enum(["utf-8", "utf8", "base64", "image"])`
+  - [ ] Adicionar `imageMetadata: z.boolean().optional()`
+- [ ] Criar interface `ReadFileOutput` (union type)
+  - [ ] `content?: string` (para texto)
+  - [ ] `image?: { base64, format, width, height, size }` (para imagens)
+- [ ] Atualizar type signature da tool: `Tool<ReadFileInput, ReadFileOutput>`
+
+**Critério de aceitação**: Schema estendido, compila
+
+---
+
+#### Task 1.3.2: Image Detection Logic (30min)
+- [ ] Implementar detecção de imagem no `execute()`
+  - [ ] Extrair extensão: `path.extname(absolutePath).toLowerCase()`
+  - [ ] Lista de extensões: `[".jpg", ".jpeg", ".png", ".gif", ".webp"]`
+  - [ ] Criar flag: `const isImage = imageExtensions.includes(ext)`
+- [ ] Adicionar branch: `if (isImage && input.encoding === "image")`
+  - [ ] Retornar output com campo `image`
+- [ ] Manter branch original para texto
+
+**Critério de aceitação**: Lógica de branch implementada
+
+---
+
+#### Task 1.3.3: PNG Parser (1h)
+- [ ] Criar função `parsePngDimensions(buffer: Uint8Array): { width, height }`
+- [ ] PNG format:
+  - [ ] Bytes 16-23 contêm width/height (big-endian, 4 bytes cada)
+  - [ ] Width: `(buffer[16] << 24) | (buffer[17] << 16) | (buffer[18] << 8) | buffer[19]`
+  - [ ] Height: `(buffer[20] << 24) | (buffer[21] << 16) | (buffer[22] << 8) | buffer[23]`
+- [ ] Testes unitários:
+  - [ ] Mock PNG header bytes
+  - [ ] Verificar width/height corretos
+  - [ ] Testar com PNG real (leitura de fixture)
+
+**Critério de aceitação**: Parser PNG funcional com testes
+
+---
+
+#### Task 1.3.4: JPEG Parser (1h)
+- [ ] Criar função `parseJpegDimensions(buffer: Uint8Array): { width, height }`
+- [ ] JPEG format:
+  - [ ] Scan buffer para SOF marker (0xFF 0xC0)
+  - [ ] Loop: `for (let i = 0; i < buffer.length - 9; i++)`
+  - [ ] Check: `if (buffer[i] === 0xff && buffer[i + 1] === 0xc0)`
+  - [ ] Height: `(buffer[i + 5] << 8) | buffer[i + 6]`
+  - [ ] Width: `(buffer[i + 7] << 8) | buffer[i + 8]`
+- [ ] Testes unitários:
+  - [ ] Mock JPEG header com SOF marker
+  - [ ] Verificar width/height
+  - [ ] Testar com JPEG real
+
+**Critério de aceitação**: Parser JPEG funcional com testes
+
+---
+
+#### Task 1.3.5: GIF Parser (45min)
+- [ ] Criar função `parseGifDimensions(buffer: Uint8Array): { width, height }`
+- [ ] GIF format:
+  - [ ] Bytes 6-9 contêm width/height (little-endian, 2 bytes cada)
+  - [ ] Width: `buffer[6] | (buffer[7] << 8)`
+  - [ ] Height: `buffer[8] | (buffer[9] << 8)`
+- [ ] Testes unitários:
+  - [ ] Mock GIF header
+  - [ ] Verificar dimensions
+  - [ ] Testar com GIF real
+
+**Critério de aceitação**: Parser GIF funcional com testes
+
+---
+
+#### Task 1.3.6: Image Metadata Function (30min)
+- [ ] Criar função `parseImageDimensions(buffer, format): { width, height }`
+- [ ] Switch por format:
+  - [ ] `case "png"`: chamar `parsePngDimensions()`
+  - [ ] `case "jpeg"` ou `"jpg"`: chamar `parseJpegDimensions()`
+  - [ ] `case "gif"`: chamar `parseGifDimensions()`
+  - [ ] `case "webp"`: retornar `{ width: 0, height: 0 }` (fallback)
+- [ ] Criar função `readImageMetadata(buffer, ext)`
+  - [ ] Normalizar format (jpg → jpeg)
+  - [ ] Chamar `parseImageDimensions()`
+  - [ ] Retornar `{ format, width, height }`
+
+**Critério de aceitação**: Função wrapper implementada
+
+---
+
+#### Task 1.3.7: Integrate Image Reading (45min)
+- [ ] Modificar branch `if (isImage && encoding === "image")`
+- [ ] Chamar `readImageMetadata(content, ext)`
+- [ ] Converter buffer para base64: `Buffer.from(content).toString("base64")`
+- [ ] Criar output:
+  ```typescript
+  {
+    image: {
+      base64: base64String,
+      format: imageInfo.format,
+      width: imageInfo.width,
+      height: imageInfo.height,
+      size: content.byteLength,
+    }
+  }
+  ```
+- [ ] Retornar `ToolResult` com `data`
+
+**Critério de aceitação**: Leitura de imagem funcional end-to-end
+
+---
+
+#### Task 1.3.8: Integration Tests (1h)
+- [ ] Criar fixtures de imagens (PNG, JPEG, GIF) em `src/tools/filesystem/__fixtures__/`
+- [ ] Teste: "should read PNG image with metadata"
+  - Input: `{ path: "test.png", encoding: "image" }`
+  - Assert: `result.data.image.format === "png"`, width/height corretos
+- [ ] Teste: "should read JPEG image with metadata"
+  - Input: `{ path: "test.jpg", encoding: "image" }`
+  - Assert: format, dimensions corretos
+- [ ] Teste: "should read GIF image with metadata"
+  - Input: `{ path: "test.gif", encoding: "image" }`
+  - Assert: format, dimensions corretos
+- [ ] Teste: "should return base64 encoded data"
+  - Assert: `result.data.image.base64` é string válida
+- [ ] Teste: "should fallback to text for non-image files"
+  - Input: `{ path: "test.txt", encoding: "image" }`
+  - Assert: `result.data.content` existe
+
+**Critério de aceitação**: 5+ integration tests passando
+
+---
+
+#### Task 1.3.9: Documentation & Commit (30min)
+- [ ] Atualizar description da `ReadFileTool`
+  - [ ] Documentar suporte a imagens
+  - [ ] Listar formatos suportados (PNG, JPEG, GIF, WebP*)
+  - [ ] Adicionar exemplo de uso com `encoding: "image"`
+- [ ] Adicionar JSDoc aos parsers
+- [ ] Rodar `pnpm run lint`
+- [ ] Rodar `pnpm test` (all tests)
+- [ ] Commit: `feat: add image reading support to ReadFile (PNG, JPEG, GIF)`
+
+**Critério de aceitação**: Documentação completa, commit criado
+
+---
+
+# FASE 2: Advanced Features (P1)
+
+**Duração**: 2 semanas  
+**Esforço Total**: 28 horas  
+**Objetivo**: Melhorar capabilities avançadas
+
+---
+
+## 2.1 Await Tool (Background Polling)
+
+**Esforço Total**: 12 horas  
+**Prioridade**: 🟡 P1  
+**Dependências**: Modificação em CommandRunner
+
+### Subtasks
+
+#### Task 2.1.1: Background Session Infrastructure (2h)
+- [ ] Modificar `src/terminal/commandRunner.ts`
+- [ ] Criar interface `BackgroundSession`
+  - `id: string`
+  - `output: string`
+  - `exitCode?: number`
+  - `exited: boolean`
+  - `process?: ChildProcess`
+- [ ] Adicionar `private sessions = new Map<string, BackgroundSession>()`
+- [ ] Criar função `generateSessionId(): string`
+  - [ ] Format: `session-${Date.now()}-${counter++}`
+
+**Critério de aceitação**: Infraestrutura de sessions criada
+
+---
+
+#### Task 2.1.2: Extend RunCommand Schema (30min)
+- [ ] Modificar `RunCommandInputSchema`
+  - [ ] Adicionar `background: z.boolean().optional()`
+- [ ] Modificar interface `RunCommandOutput`
+  - [ ] Adicionar `sessionId?: string`
+  - [ ] Adicionar `background?: boolean`
+- [ ] Atualizar description com documentação de background mode
+
+**Critério de aceitação**: Schema estendido
+
+---
+
+#### Task 2.1.3: Start Background Session (2h)
+- [ ] Implementar `startBackgroundSession(command, sessionId, options)`
+  - [ ] Criar objeto `BackgroundSession`
+  - [ ] Spawn process: `spawn("bash", ["-c", command], { cwd, shell: true })`
+  - [ ] Capturar stdout: `proc.stdout.on("data", (data) => session.output += data)`
+  - [ ] Capturar stderr: `proc.stderr.on("data", (data) => session.output += data)`
+  - [ ] Capturar exit: `proc.on("exit", (code) => { session.exitCode = code; session.exited = true })`
+  - [ ] Timeout cleanup: `setTimeout(() => { proc.kill(); sessions.delete(sessionId) }, timeout)`
+  - [ ] Retornar session
+- [ ] Adicionar à sessions Map
+
+**Critério de aceitação**: Background session funcional
+
+---
+
+#### Task 2.1.4: Modify RunCommand Execute (1h)
+- [ ] Modificar `CommandRunner.run()`
+- [ ] Adicionar branch: `if (options?.background)`
+  - [ ] Gerar sessionId
+  - [ ] Chamar `startBackgroundSession()`
+  - [ ] Adicionar à sessions Map
+  - [ ] Retornar `{ stdout: "", sessionId, duration: 0, timedOut: false }`
+- [ ] Manter branch original para sync execution
+
+**Critério de aceitação**: Background mode implementado
+
+---
+
+#### Task 2.1.5: Get Session Status (45min)
+- [ ] Implementar método `getSessionStatus(sessionId): Promise<SessionStatus | null>`
+  - [ ] Buscar session: `this.sessions.get(sessionId)`
+  - [ ] Se não existe, retornar `null`
+  - [ ] Retornar `{ output: session.output, exitCode: session.exitCode, exited: session.exited }`
+- [ ] Adicionar à interface `CommandRunner`
+
+**Critério de aceitação**: Status retrieval funcional
+
+---
+
+#### Task 2.1.6: Create Await Tool (2h)
+- [ ] Criar arquivo `src/tools/terminal/await.ts`
+- [ ] Definir `AwaitSchema`
+  - `sessionId: string`
+  - `pattern?: string` (regex)
+  - `timeout?: number` (default 60000)
+  - `pollInterval?: number` (default 1000)
+- [ ] Criar interface `AwaitOutput`
+  - `matched: boolean`
+  - `output: string`
+  - `exitCode?: number`
+  - `duration: number`
+- [ ] Criar skeleton da tool
+
+**Critério de aceitação**: Tool structure criada
+
+---
+
+#### Task 2.1.7: Await Polling Logic (2h)
+- [ ] Implementar `AwaitTool.execute()`
+- [ ] Criar polling loop:
+  ```typescript
+  let elapsed = 0;
+  while (elapsed < timeout) {
+    const status = await commandRunner.getSessionStatus(sessionId);
+    
+    // Check pattern match
+    if (pattern && pattern.test(status.output)) {
+      matched = true;
+      break;
+    }
+    
+    // Check exit
+    if (status.exited) break;
+    
+    // Sleep
+    await sleep(pollInterval);
+    elapsed = Date.now() - startTime;
+  }
+  ```
+- [ ] Criar helper: `function sleep(ms): Promise<void>`
+- [ ] Retornar output com matched, output, exitCode, duration
+
+**Critério de aceitação**: Polling loop funcional
+
+---
+
+#### Task 2.1.8: Unit Tests (2h)
+- [ ] Criar `src/tools/terminal/await.test.ts`
+- [ ] Mock CommandRunner
+- [ ] Teste: "should wait for pattern match"
+  - Mock session que emite pattern após 500ms
+  - Assert: `result.data.matched === true`, `duration >= 500`
+- [ ] Teste: "should timeout if pattern not matched"
+  - Mock session sem pattern
+  - Timeout: 1000ms
+  - Assert: `result.success === false`, error contains "Timeout"
+- [ ] Teste: "should return immediately if command exited"
+  - Mock session com `exited: true`
+  - Assert: resultado imediato
+- [ ] Teste: "should return error if session not found"
+  - SessionId inválido
+  - Assert: error contains "Session not found"
+- [ ] Rodar testes: `pnpm test await.test.ts`
+
+**Critério de aceitação**: 4+ testes passando
+
+---
+
+#### Task 2.1.9: Integration & Documentation (30min)
+- [ ] Exportar `AwaitTool` em `await.ts`
+- [ ] Importar em `src/tools/index.ts`
+- [ ] Adicionar à lista de tools registradas
+- [ ] Atualizar description com exemplo de uso
+- [ ] Rodar `pnpm test` (all)
+- [ ] Commit: `feat: add Await tool for background command polling`
+
+**Critério de aceitação**: Tool registrada, documentada
+
+---
+
+## 2.2 Glob Pattern Matching
+
+**Esforço Total**: 6 horas  
+**Prioridade**: 🟡 P1  
+**Dependências**: npm install glob
+
+### Subtasks
+
+#### Task 2.2.1: Install Dependency (10min)
+- [ ] Executar: `pnpm add glob`
+- [ ] Executar: `pnpm add -D @types/glob`
+- [ ] Verificar `package.json` atualizado
+
+**Critério de aceitação**: Dependency instalada
+
+---
+
+#### Task 2.2.2: Create Glob Tool (1h)
+- [ ] Criar arquivo `src/tools/filesystem/glob.ts`
+- [ ] Importar `import { glob } from "glob"`
+- [ ] Definir `GlobSchema`
+  - `pattern: string` (e.g., `**/*.ts`)
+  - `ignore?: string[]` (paths to exclude)
+  - `maxResults?: number` (default 1000)
+  - `followSymlinks?: boolean`
+- [ ] Criar interface de output: `string[]` (lista de paths)
+- [ ] Criar skeleton da tool
+
+**Critério de aceitação**: Tool structure criada
+
+---
+
+#### Task 2.2.3: Implement Execute Logic (1h)
+- [ ] Implementar `GlobTool.execute()`
+- [ ] Chamar glob:
+  ```typescript
+  const results = await glob(input.pattern, {
+    cwd: context.workspaceRoot,
+    ignore: input.ignore ?? ["node_modules/**", ".git/**"],
+    absolute: false,
+    followSymbolicLinks: input.followSymlinks ?? false,
+  });
+  ```
+- [ ] Limitar resultados: `results.slice(0, maxResults)`
+- [ ] Retornar `ToolResult` com array de paths
+
+**Critério de aceitação**: Execute funcional
+
+---
+
+#### Task 2.2.4: Unit Tests (2h)
+- [ ] Criar `src/tools/filesystem/glob.test.ts`
+- [ ] Setup: criar temp directory com arquivos de teste
+- [ ] Teste: "should find all TypeScript files"
+  - Pattern: `**/*.ts`
+  - Assert: encontra arquivos .ts, não encontra .js
+- [ ] Teste: "should support multi-extension patterns"
+  - Pattern: `src/**/*.{ts,tsx}`
+  - Assert: encontra .ts e .tsx em src/
+- [ ] Teste: "should respect ignore patterns"
+  - Pattern: `**/*.ts`
+  - Ignore: `["node_modules/**"]`
+  - Assert: não encontra arquivos em node_modules/
+- [ ] Teste: "should limit results to maxResults"
+  - Pattern: `**/*`
+  - MaxResults: 10
+  - Assert: retorna no máximo 10 resultados
+- [ ] Teste: "should use default ignore for node_modules and .git"
+  - Assert: default ignore aplicado
+- [ ] Rodar testes: `pnpm test glob.test.ts`
+
+**Critério de aceitação**: 5+ testes passando
+
+---
+
+#### Task 2.2.5: Deprecate SearchFiles (30min)
+- [ ] Marcar `SearchFilesTool` como deprecated
+- [ ] Adicionar `@deprecated Use GlobTool instead` no JSDoc
+- [ ] Atualizar description para apontar para Glob
+- [ ] (Opcional) Remover da lista de tools registradas
+- [ ] Atualizar docs mencionando migration
+
+**Critério de aceitação**: SearchFiles deprecated
+
+---
+
+#### Task 2.2.6: Integration & Documentation (1h)
+- [ ] Exportar `GlobTool` em `glob.ts`
+- [ ] Importar em `src/tools/index.ts`
+- [ ] Adicionar à lista de tools registradas
+- [ ] Atualizar description com exemplos:
+  - [ ] Find all tests: `**/*.test.ts`
+  - [ ] Find components: `src/components/**/*.tsx`
+  - [ ] Exclude dist: `ignore: ["dist/**"]`
+- [ ] Rodar `pnpm run lint`
+- [ ] Rodar `pnpm test` (all)
+- [ ] Commit: `feat: add Glob tool with advanced pattern matching`
+
+**Critério de aceitação**: Tool registrada, SearchFiles deprecated
+
+---
+
+## 2.3 WebFetch Tool
+
+**Esforço Total**: 10 horas  
+**Prioridade**: 🟢 P2  
+**Dependências**: npm install turndown
+
+### Subtasks
+
+#### Task 2.3.1: Install Dependencies (10min)
+- [ ] Executar: `pnpm add turndown`
+- [ ] Executar: `pnpm add -D @types/turndown`
+- [ ] Verificar `package.json` atualizado
+
+**Critério de aceitação**: Dependencies instaladas
+
+---
+
+#### Task 2.3.2: Create WebFetch Tool (1h)
+- [ ] Criar arquivo `src/tools/web/webFetch.ts`
+- [ ] Criar diretório `src/tools/web/` se não existir
+- [ ] Importar `import TurndownService from "turndown"`
+- [ ] Definir `WebFetchSchema`
+  - `url: z.string().url()`
+  - `timeout?: number` (default 10000)
+  - `followRedirects?: boolean`
+- [ ] Criar interface `WebFetchOutput`
+  - `markdown: string`
+  - `url: string`
+  - `statusCode: number`
+  - `contentType: string`
+- [ ] Criar skeleton da tool
+
+**Critério de aceitação**: Tool structure criada
+
+---
+
+#### Task 2.3.3: Implement Fetch Logic (2h)
+- [ ] Implementar `WebFetchTool.execute()`
+- [ ] Criar AbortController com timeout:
+  ```typescript
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  ```
+- [ ] Fazer fetch:
+  ```typescript
+  const response = await fetch(input.url, {
+    signal: controller.signal,
+    redirect: input.followRedirects ? "follow" : "manual",
+  });
+  clearTimeout(timeoutId);
+  ```
+- [ ] Ler response:
+  ```typescript
+  const contentType = response.headers.get("content-type") ?? "text/plain";
+  const text = await response.text();
+  ```
+- [ ] Handle timeout error (AbortError)
+
+**Critério de aceitação**: Fetch funcional com timeout
+
+---
+
+#### Task 2.3.4: HTML to Markdown Conversion (2h)
+- [ ] Implementar conversão HTML:
+  ```typescript
+  if (contentType.includes("text/html")) {
+    const turndown = new TurndownService({
+      headingStyle: "atx",
+      codeBlockStyle: "fenced",
+    });
+    markdown = turndown.turndown(text);
+  }
+  ```
+- [ ] Configurar Turndown:
+  - [ ] Headings: `atx` (## format)
+  - [ ] Code blocks: `fenced` (``` format)
+  - [ ] (Opcional) Custom rules para elementos específicos
+- [ ] Testar com HTML real (fixture)
+
+**Critério de aceitação**: HTML→Markdown funcional
+
+---
+
+#### Task 2.3.5: JSON Pretty-Print (30min)
+- [ ] Implementar branch JSON:
+  ```typescript
+  if (contentType.includes("application/json")) {
+    const json = JSON.parse(text);
+    markdown = "```json\n" + JSON.stringify(json, null, 2) + "\n```";
+  }
+  ```
+- [ ] Handle JSON parse error (try-catch)
+- [ ] Fallback para plain text se parse falhar
+
+**Critério de aceitação**: JSON formatting funcional
+
+---
+
+#### Task 2.3.6: Plain Text Fallback (15min)
+- [ ] Implementar else branch:
+  ```typescript
+  else {
+    markdown = text; // Plain text passthrough
+  }
+  ```
+- [ ] Retornar output com todos os campos
+
+**Critério de aceitação**: Fallback implementado
+
+---
+
+#### Task 2.3.7: Unit Tests (3h)
+- [ ] Criar `src/tools/web/webFetch.test.ts`
+- [ ] Mock `global.fetch`
+- [ ] Teste: "should fetch and convert HTML to markdown"
+  - Mock response: HTML simples
+  - Assert: markdown contém headings/links convertidos
+- [ ] Teste: "should pretty-print JSON responses"
+  - Mock response: JSON object
+  - Assert: markdown contém ``` json block formatado
+- [ ] Teste: "should return plain text for text/plain"
+  - Mock response: plain text
+  - Assert: markdown === text original
+- [ ] Teste: "should timeout after specified duration"
+  - Mock fetch que nunca responde
+  - Timeout: 1000ms
+  - Assert: error contains "timeout" ou "abort"
+- [ ] Teste: "should follow redirects when enabled"
+  - Mock redirect response
+  - Assert: fetch chamado com `redirect: "follow"`
+- [ ] Teste: "should handle fetch errors gracefully"
+  - Mock fetch reject
+  - Assert: `result.success === false`, error message presente
+- [ ] Rodar testes: `pnpm test webFetch.test.ts`
+
+**Critério de aceitação**: 6+ testes passando
+
+---
+
+#### Task 2.3.8: Optional: Response Caching (1h)
+- [ ] (Opcional) Criar simple cache: `Map<url, { markdown, timestamp }>`
+- [ ] TTL: 5 minutos
+- [ ] Check cache antes de fetch
+- [ ] Invalidar cache após TTL
+
+**Critério de aceitação**: Cache funcional (opcional)
+
+---
+
+#### Task 2.3.9: Integration & Documentation (30min)
+- [ ] Exportar `WebFetchTool` em `webFetch.ts`
+- [ ] Criar `src/tools/web/index.ts` e re-exportar
+- [ ] Importar em `src/tools/index.ts`
+- [ ] Adicionar à lista de tools registradas
+- [ ] Atualizar description com exemplos:
+  - [ ] Read API docs: `{ url: "https://docs.anthropic.com/..." }`
+  - [ ] Fetch library docs
+- [ ] Rodar `pnpm run lint`
+- [ ] Rodar `pnpm test` (all)
+- [ ] Commit: `feat: add WebFetch tool with HTML→Markdown conversion`
+
+**Critério de aceitação**: Tool registrada, documentada
+
+---
+
+# FASE 3: Subagents System (P0)
+
+**Duração**: 4 semanas  
+**Esforço Total**: 80 horas  
+**Objetivo**: Sistema completo de subagentes — maior feature
+
+---
+
+## 3.1 Subagent Core Infrastructure
+
+**Esforço Total**: 30 horas  
+**Prioridade**: 🔴 P0
+
+### Week 1: Foundation
+
+#### Task 3.1.1: Create Directory Structure (15min)
+- [ ] Criar diretório `src/core/subagent/`
+- [ ] Criar arquivos vazios:
+  - `subagentTypes.ts`
+  - `subagentRunner.ts`
+  - `subagentRunner.test.ts`
+  - `index.ts`
+
+**Critério de aceitação**: Directory structure criada
+
+---
+
+#### Task 3.1.2: Define Subagent Types (1h)
+- [ ] Criar `src/core/subagent/subagentTypes.ts`
+- [ ] Definir `type SubagentType = "explore" | "shell" | "review" | "test" | "plan"`
+- [ ] Criar interface `SubagentConfig`:
+  - `type: SubagentType`
+  - `allowedTools: readonly string[]`
+  - `maxIterations: number`
+  - `timeout: number`
+  - `isolated: boolean`
+- [ ] Definir `SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig>`
+  - [ ] explore config (allowedTools: ReadFile, Grep, FindReferences, FindSymbols, ListDirectory, Glob)
+  - [ ] shell config (allowedTools: RunCommand, Await)
+  - [ ] review config (allowedTools: ReadFile, GitDiff, GitStatus, Grep, ChangedFiles)
+  - [ ] test config (allowedTools: RunCommand, ReadFile, Await)
+  - [ ] plan config (allowedTools: ReadFile, Grep, WorkspaceGraph, FindReferences)
+
+**Critério de aceitação**: Types definidos, config completo
+
+---
+
+#### Task 3.1.3: Define Request/Result Interfaces (30min)
+- [ ] Criar interface `SubagentRequest`:
+  - `type: SubagentType`
+  - `prompt: string`
+  - `context?: Record<string, unknown>`
+  - `parentStateSnapshot?: unknown`
+- [ ] Criar interface `SubagentResult`:
+  - `success: boolean`
+  - `output: string`
+  - `iterations: number`
+  - `duration: number`
+  - `error?: string`
+  - `metadata?: { toolsCalled, tokensUsed }`
+
+**Critério de aceitação**: Interfaces definidas
+
+---
+
+#### Task 3.1.4: SubagentRunner Class Skeleton (1h)
+- [ ] Criar `src/core/subagent/subagentRunner.ts`
+- [ ] Importar dependencies (RuntimeState, ExecutionEngine, ToolRegistry, Provider)
+- [ ] Criar class `SubagentRunner`:
+  ```typescript
+  export class SubagentRunner {
+    constructor(
+      private readonly provider: Provider,
+      private readonly parentRegistry: ToolRegistry,
+    ) {}
+    
+    async run(request: SubagentRequest): Promise<SubagentResult> {
+      // TODO: implement
+    }
+    
+    private createSubagentState(config, request): RuntimeState {
+      // TODO: implement
+    }
+    
+    private createSubagentRegistry(config): ToolRegistry {
+      // TODO: implement
+    }
+    
+    private buildSubagentPrompt(type): string {
+      // TODO: implement
+    }
+  }
+  ```
+
+**Critério de aceitação**: Class skeleton criada, compila
+
+---
+
+#### Task 3.1.5: Implement createSubagentRegistry (2h)
+- [ ] Implementar `createSubagentRegistry(config: SubagentConfig)`
+- [ ] Criar nova `ToolRegistry()`
+- [ ] Loop por `config.allowedTools`:
+  - [ ] Buscar tool no `parentRegistry.get(toolName)`
+  - [ ] Se existe, registrar no novo registry
+- [ ] Retornar registry isolado
+- [ ] Testar isolamento (registry não tem tools não-allowed)
+
+**Critério de aceitação**: Registry isolado funcional
+
+---
+
+#### Task 3.1.6: Implement createSubagentState (2h)
+- [ ] Implementar `createSubagentState(config, request)`
+- [ ] Branch: `if (config.isolated)`
+  - [ ] Criar novo `RuntimeState({ mode: "agent", systemPrompt })`
+- [ ] Branch: `else` (shared state)
+  - [ ] (TODO: State restoration) Criar novo state por enquanto
+- [ ] System prompt:
+  - [ ] Chamar `this.buildSubagentPrompt(request.type)`
+- [ ] Retornar RuntimeState
+
+**Critério de aceitação**: State creation funcional
+
+---
+
+#### Task 3.1.7: Build System Prompts (3h)
+- [ ] Implementar `buildSubagentPrompt(type: SubagentType): string`
+- [ ] Criar prompts detalhados para cada tipo:
+  - [ ] **explore**: "You are an exploration subagent. Find files, symbols, references. Tools: ReadFile, Grep, FindReferences, FindSymbols, ListDirectory, Glob. Return findings in structured format."
+  - [ ] **shell**: "You are a shell execution subagent. Run commands safely. Tools: RunCommand, Await. Report output and errors."
+  - [ ] **review**: "You are a code review subagent. Analyze for security, quality, conventions. Tools: ReadFile, GitDiff, GitStatus, Grep, ChangedFiles. Return structured list of issues with severity."
+  - [ ] **test**: "You are a test execution subagent. Run tests, report results. Tools: RunCommand, ReadFile, Await. Return pass/fail summary with failure details."
+  - [ ] **plan**: "You are a planning subagent. Design implementation strategies. Tools: ReadFile, Grep, WorkspaceGraph, FindReferences. Return structured plan in Markdown."
+- [ ] Adicionar instruções específicas por tipo
+- [ ] Adicionar output format guidance
+
+**Critério de aceitação**: Prompts detalhados para todos os tipos
+
+---
+
+#### Task 3.1.8: Implement run() Method (4h)
+- [ ] Implementar `SubagentRunner.run(request)`
+- [ ] Get config: `const config = SUBAGENT_CONFIGS[request.type]`
+- [ ] Criar state: `const subagentState = this.createSubagentState(config, request)`
+- [ ] Criar registry: `const subagentRegistry = this.createSubagentRegistry(config)`
+- [ ] Criar ExecutionEngine: `const engine = new ExecutionEngine(subagentState, subagentRegistry, this.provider)`
+- [ ] Run engine:
+  ```typescript
+  const result = await engine.run({
+    userMessage: request.prompt,
+    maxIterations: config.maxIterations,
+    timeout: config.timeout,
+  });
+  ```
+- [ ] Criar SubagentResult:
+  - `success: result.success`
+  - `output: result.finalOutput ?? ""`
+  - `iterations: result.iterations`
+  - `duration: Date.now() - startTime`
+  - `metadata: { toolsCalled, tokensUsed }`
+- [ ] Error handling (try-catch)
+- [ ] Retornar result
+
+**Critério de aceitação**: run() funcional end-to-end
+
+---
+
+#### Task 3.1.9: Unit Tests — createSubagentRegistry (2h)
+- [ ] Criar `src/core/subagent/subagentRunner.test.ts`
+- [ ] Setup: mock parentRegistry com 10 tools
+- [ ] Teste: "should create registry with only allowed tools"
+  - Config: explore (6 allowed tools)
+  - Assert: registry tem exatamente 6 tools
+  - Assert: não tem WriteFile, DeleteFile, etc.
+- [ ] Teste: "should create empty registry if no allowed tools exist"
+  - Config: allowed tools não existem no parent
+  - Assert: registry.list().length === 0
+- [ ] Teste: "should isolate registries (no shared state)"
+  - Criar 2 registries
+  - Modificar um
+  - Assert: outro não afetado
+
+**Critério de aceitação**: 3+ testes passando
+
+---
+
+#### Task 3.1.10: Unit Tests — createSubagentState (2h)
+- [ ] Teste: "should create isolated state for explore subagent"
+  - Config: explore (isolated: true)
+  - Assert: new RuntimeState criado
+  - Assert: mode === "agent"
+- [ ] Teste: "should create state with correct system prompt"
+  - Assert: systemPrompt contém instruções do tipo
+- [ ] Teste: "should handle non-isolated state (plan)"
+  - Config: plan (isolated: false)
+  - Assert: state criado (por enquanto sem restoration)
+
+**Critério de aceitação**: 3+ testes passando
+
+---
+
+#### Task 3.1.11: Unit Tests — run() Integration (4h)
+- [ ] Mock Provider (retornar respostas fake)
+- [ ] Mock parent ToolRegistry
+- [ ] Teste: "should run explore subagent successfully"
+  - Request: `{ type: "explore", prompt: "Find UserService" }`
+  - Mock provider response: "Found in src/services/UserService.ts"
+  - Assert: `result.success === true`
+  - Assert: `result.output` contém "UserService"
+- [ ] Teste: "should respect maxIterations limit"
+  - Mock provider que sempre pede outra iteração
+  - Config: maxIterations 5
+  - Assert: `result.iterations <= 5`
+- [ ] Teste: "should timeout after configured duration"
+  - Mock provider que demora demais
+  - Config: timeout 1000ms
+  - Assert: duration <= 1000ms (com margem)
+- [ ] Teste: "should only allow configured tools"
+  - Mock provider tenta chamar WriteFile
+  - Config: explore (não tem WriteFile)
+  - Assert: tool call falha
+- [ ] Teste: "should handle provider errors gracefully"
+  - Mock provider throw error
+  - Assert: `result.success === false`, error message presente
+- [ ] Rodar testes: `pnpm test subagentRunner.test.ts`
+
+**Critério de aceitação**: 5+ integration tests passando
+
+---
+
+#### Task 3.1.12: ExecutionEngine Refactor (3h)
+- [ ] Modificar `src/core/runtime/executionEngine.ts`
+- [ ] Aceitar custom ToolRegistry no constructor:
+  ```typescript
+  constructor(
+    private readonly state: RuntimeState,
+    private readonly toolRegistry: ToolRegistry, // Injetado
+    private readonly provider: Provider,
+  ) {}
+  ```
+- [ ] Substituir `globalToolRegistry` por `this.toolRegistry`
+- [ ] Atualizar callers (main agent loop) para passar global registry
+- [ ] Rodar todos os testes de ExecutionEngine
+- [ ] Verificar que nada quebrou
+
+**Critério de aceitação**: ExecutionEngine aceita custom registry, testes passam
+
+---
+
+#### Task 3.1.13: Documentation (1h)
+- [ ] Adicionar JSDoc para SubagentRunner
+- [ ] Documentar cada método (purpose, params, returns)
+- [ ] Criar `docs/subagents.md` com arquitetura:
+  - [ ] Tipos de subagents
+  - [ ] Allowed tools por tipo
+  - [ ] System prompts
+  - [ ] Isolation strategy
+  - [ ] Usage examples
+- [ ] Commit: `feat: add SubagentRunner core infrastructure`
+
+**Critério de aceitação**: Documentação completa
+
+---
+
+### Week 2: Task Tool
+
+#### Task 3.2.1: Create Task Tool Skeleton (1h)
+- [ ] Criar arquivo `src/tools/task.ts`
+- [ ] Importar SubagentRunner, types
+- [ ] Definir `TaskSchema`:
+  - `type: z.enum(["explore", "shell", "review", "test", "plan"])`
+  - `prompt: z.string().min(1)`
+  - `context?: z.record(z.unknown())`
+  - `async?: z.boolean()` (default false)
+- [ ] Criar interface `TaskOutput`:
+  - `success: boolean`
+  - `output: string`
+  - `iterations: number`
+  - `duration: number`
+  - `taskId?: string` (for async)
+- [ ] Criar skeleton da tool
+
+**Critério de aceitação**: Tool structure criada
+
+---
+
+#### Task 3.2.2: Task ID Generation (30min)
+- [ ] Criar função `generateTaskId(): string`
+  - Format: `task-${Date.now()}-${counter++}`
+  - Counter global incrementando
+- [ ] Criar storage: `const taskResults = new Map<string, SubagentResult>()`
+- [ ] Criar função `storeTaskResult(taskId, result): void`
+  - Adicionar ao Map
+- [ ] (Opcional) Cleanup de tasks antigas (TTL)
+
+**Critério de aceitação**: Task ID generation funcional
+
+---
+
+#### Task 3.2.3: Synchronous Execution (2h)
+- [ ] Implementar branch sync em `TaskTool.execute()`
+- [ ] Get dependencies from DI container:
+  - `const provider = container.get(TOKENS.Provider)`
+  - `const parentRegistry = container.get(TOKENS.ToolRegistry)`
+- [ ] Criar SubagentRunner: `new SubagentRunner(provider, parentRegistry)`
+- [ ] Run subagent:
+  ```typescript
+  const result = await runner.run({
+    type: input.type as SubagentType,
+    prompt: input.prompt,
+    context: input.context,
+  });
+  ```
+- [ ] Mapear result para TaskOutput
+- [ ] Retornar ToolResult
+
+**Critério de aceitação**: Sync execution funcional
+
+---
+
+#### Task 3.2.4: Asynchronous Execution (2h)
+- [ ] Implementar branch async: `if (input.async)`
+- [ ] Gerar taskId
+- [ ] Fire and forget:
+  ```typescript
+  runner.run({ ... }).then((result) => {
+    storeTaskResult(taskId, result);
+  });
+  ```
+- [ ] Retornar imediatamente com taskId:
+  ```typescript
+  return {
+    success: true,
+    data: {
+      success: true,
+      output: "",
+      iterations: 0,
+      duration: 0,
+      taskId,
+    },
+  };
+  ```
+
+**Critério de aceitação**: Async execution funcional
+
+---
+
+#### Task 3.2.5: Allowed Mode & Approval (30min)
+- [ ] Implementar `allowedInMode(mode)`: apenas `agent`
+- [ ] (Opcional) Implementar `requiresApproval()`:
+  - Background tasks requerem approval?
+  - Ou sempre auto-approve?
+- [ ] Atualizar description com security notes
+
+**Critério de aceitação**: Mode restrictions implementadas
+
+---
+
+#### Task 3.2.6: Unit Tests (4h)
+- [ ] Criar `src/tools/task.test.ts`
+- [ ] Mock SubagentRunner
+- [ ] Teste: "should run explore subagent synchronously"
+  - Input: `{ type: "explore", prompt: "Find X" }`
+  - Mock runner retorna success
+  - Assert: `result.data.success === true`, output presente
+- [ ] Teste: "should run shell subagent synchronously"
+  - Input: `{ type: "shell", prompt: "Run tests" }`
+  - Assert: result contém iterations, duration
+- [ ] Teste: "should run task in background when async=true"
+  - Input: `{ type: "test", prompt: "Run unit tests", async: true }`
+  - Assert: `result.data.taskId` existe
+  - Assert: retorna imediatamente (duration ~0)
+- [ ] Teste: "should store background task results"
+  - Run async task
+  - Wait for completion
+  - Assert: `taskResults.get(taskId)` existe
+- [ ] Teste: "should propagate subagent errors"
+  - Mock runner throw error
+  - Assert: `result.success === false`, error message
+- [ ] Teste: "should only allow in agent mode"
+  - Context: mode "plan"
+  - Assert: tool.allowedInMode("plan") === false
+- [ ] Rodar testes: `pnpm test task.test.ts`
+
+**Critério de aceitação**: 6+ testes passando
+
+---
+
+#### Task 3.2.7: Integration Test — End to End (3h)
+- [ ] Teste real (não mock):
+  - [ ] Setup real ToolRegistry com tools
+  - [ ] Setup real Provider (ou mock realistic)
+  - [ ] Run explore task: "Find all .test.ts files"
+  - [ ] Assert: output contém lista de arquivos
+- [ ] Teste real shell:
+  - [ ] Run: "echo 'Hello World'"
+  - [ ] Assert: output contém "Hello World"
+- [ ] Teste timeout:
+  - [ ] Run task com timeout 1s
+  - [ ] Mock provider que demora 5s
+  - [ ] Assert: timeout respeitado
+
+**Critério de aceitação**: E2E tests passando
+
+---
+
+#### Task 3.2.8: Registration & Documentation (1h)
+- [ ] Exportar `TaskTool` em `task.ts`
+- [ ] Importar em `src/tools/index.ts`
+- [ ] Adicionar à lista de tools registradas
+- [ ] Atualizar description com exemplos detalhados:
+  - [ ] Explore: `{ type: "explore", prompt: "Find UserService usages" }`
+  - [ ] Shell: `{ type: "shell", prompt: "Run npm test" }`
+  - [ ] Review: `{ type: "review", prompt: "Review PR #123" }`
+  - [ ] Test: `{ type: "test", prompt: "Run unit tests for auth module" }`
+  - [ ] Plan: `{ type: "plan", prompt: "Design caching strategy" }`
+- [ ] Documentar async mode
+- [ ] Rodar `pnpm run lint`
+- [ ] Rodar `pnpm test` (all)
+- [ ] Commit: `feat: add Task tool for launching subagents`
+
+**Critério de aceitação**: Tool registrada, documentada
+
+---
+
+### Week 3-4: Polish & Optimizations
+
+#### Task 3.3.1: State Serialization (8h)
+- [ ] (Feature avançado) Implementar serialization de RuntimeState
+- [ ] Criar método `RuntimeState.serialize(): unknown`
+  - Serializar conversationState
+  - Serializar checkpoints (opcional)
+  - Serializar metrics (opcional)
+- [ ] Criar método `RuntimeState.deserialize(snapshot): RuntimeState`
+  - Restaurar state a partir de snapshot
+- [ ] Integrar com `createSubagentState()`:
+  - Se `request.parentStateSnapshot` existe, deserializar
+- [ ] Testes de serialization/deserialization
+
+**Critério de aceitação**: State pode ser passado de parent para child
+
+---
+
+#### Task 3.3.2: Subagent Pooling (6h)
+- [ ] (Otimização) Criar pool de subagent contexts
+- [ ] Reuse RuntimeState + ToolRegistry para mesmo tipo
+- [ ] Evitar criação repetida de objects pesados
+- [ ] Implementar LRU eviction (max 5 contexts cached)
+- [ ] Testes de pooling
+
+**Critério de aceitação**: Performance melhorada (bench)
+
+---
+
+#### Task 3.3.3: Result Streaming (6h)
+- [ ] (Feature avançado) Stream progress updates de subagents
+- [ ] Modificar SubagentRunner para emitir eventos:
+  - `iteration_start`
+  - `tool_called`
+  - `iteration_complete`
+- [ ] Parent pode listen eventos
+- [ ] Testes de streaming
+
+**Critério de aceitação**: Progress updates funcionais
+
+---
+
+#### Task 3.3.4: Resource Limits (4h)
+- [ ] Adicionar resource limits a SubagentConfig:
+  - `maxMemory?: number` (MB)
+  - `maxCpu?: number` (% usage)
+- [ ] Monitor resource usage durante execution
+- [ ] Kill subagent se exceder limites
+- [ ] Testes de resource enforcement
+
+**Critério de aceitação**: Resource limits funcionais
+
+---
+
+#### Task 3.3.5: Error Recovery (4h)
+- [ ] Implementar retry logic para subagent failures
+- [ ] Config: `maxRetries: 2` (default)
+- [ ] Exponential backoff entre retries
+- [ ] Preservar context entre retries
+- [ ] Testes de retry
+
+**Critério de aceitação**: Retry logic funcional
+
+---
+
+#### Task 3.3.6: Metrics Collection (3h)
+- [ ] Coletar métricas de subagents:
+  - Execution time por tipo
+  - Success rate
+  - Tool usage distribution
+  - Iteration counts
+- [ ] Expor via `SubagentRunner.getMetrics()`
+- [ ] Integrar com ToolMetrics global
+- [ ] Dashboard de métricas (opcional)
+
+**Critério de aceitação**: Metrics coletadas
+
+---
+
+#### Task 3.3.7: Comprehensive Testing (6h)
+- [ ] Criar test suite abrangente:
+  - [ ] Todos os 5 tipos de subagents
+  - [ ] Edge cases (empty output, timeout, error)
+  - [ ] Concurrency (multiple subagents paralelos)
+  - [ ] Resource limits
+  - [ ] Retry logic
+  - [ ] State serialization
+- [ ] Integration tests end-to-end
+- [ ] Performance benchmarks
+- [ ] Stress tests (100+ subagents sequenciais)
+
+**Critério de aceitação**: 30+ testes passando
+
+---
+
+#### Task 3.3.8: Documentation — Complete (3h)
+- [ ] Atualizar `docs/subagents.md` com:
+  - [ ] Arquitetura detalhada
+  - [ ] Diagrama de fluxo (parent → child)
+  - [ ] Examples por tipo de subagent
+  - [ ] Performance guidelines
+  - [ ] Troubleshooting
+  - [ ] API reference
+- [ ] Criar tutorial: "How to add a new subagent type"
+- [ ] Adicionar exemplos de código real
+- [ ] Commit: `docs: comprehensive subagent documentation`
+
+**Critério de aceitação**: Docs completos
+
+---
+
+#### Task 3.3.9: Final Integration (2h)
+- [ ] Rodar full test suite: `pnpm test`
+- [ ] Verificar coverage (target: 80%+)
+- [ ] Rodar lint: `pnpm run lint`
+- [ ] Build: `pnpm run build`
+- [ ] Manual testing via provider
+- [ ] Commit: `feat: subagents system complete (explore, shell, review, test, plan)`
+
+**Critério de aceitação**: Sistema completo, todos testes passando
+
+---
+
+## 📊 Progress Tracking Template
+
+Use esta tabela para track progresso:
+
+```markdown
+## Sprint 1 — Phase 1 (Week 1-2)
+
+| Task ID | Descrição | Esforço | Status | Completed |
+|---------|-----------|---------|--------|-----------|
+| 1.1.1 | DeleteFile: Setup & Schema | 30min | ⚪ Todo | - |
+| 1.1.2 | DeleteFile: Security Validation | 45min | ⚪ Todo | - |
+| 1.1.3 | DeleteFile: Core Execute | 1h | ⚪ Todo | - |
+| 1.1.4 | DeleteFile: Unit Tests | 1h | ⚪ Todo | - |
+| 1.1.5 | DeleteFile: Integration | 30min | ⚪ Todo | - |
+| 1.1.6 | DeleteFile: Documentation | 15min | ⚪ Todo | - |
+| ... | ... | ... | ... | ... |
+
+**Status Legend**: ⚪ Todo | 🟡 In Progress | ✅ Done | ❌ Blocked
+```
+
+---
+
+## 🎯 Checkpoints & Reviews
+
+### Checkpoint 1: End of Phase 1 (Week 2)
+- [ ] DeleteFile completo e testado
+- [ ] TodoWrite registrado e funcional
+- [ ] ReadFile suporta imagens (PNG, JPEG, GIF)
+- [ ] **Review**: Code review com time
+- [ ] **Decision**: Go/No-go para Phase 2
+
+### Checkpoint 2: End of Phase 2 (Week 4)
+- [ ] Await tool funcional
+- [ ] Glob substituiu SearchFiles
+- [ ] WebFetch funcional (HTML→Markdown)
+- [ ] **Review**: Performance review
+- [ ] **Decision**: Priorizar optimizations ou avançar para Phase 3
+
+### Checkpoint 3: Subagent MVP (Week 6)
+- [ ] SubagentRunner core completo
+- [ ] Task tool funcional (sync)
+- [ ] Explore + Shell subagents funcionando
+- [ ] **Review**: Architecture review
+- [ ] **Decision**: Prosseguir com outros tipos ou otimizar MVP
+
+### Checkpoint 4: Final (Week 8)
+- [ ] Todos os 5 tipos de subagents
+- [ ] Testes completos (30+)
+- [ ] Metrics & monitoring
+- [ ] Docs completos
+- [ ] **Review**: Final review & launch readiness
+
+---
+
+**Total Subtasks**: 110  
+**Total Estimado**: 120 horas  
+**Documento gerado**: 2026-05-19  
+**Próxima revisão**: Após cada checkpoint

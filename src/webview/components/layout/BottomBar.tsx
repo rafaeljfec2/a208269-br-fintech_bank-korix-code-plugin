@@ -3,7 +3,8 @@
  * Input first, then icon controls with dropdowns
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import { logger } from "../../utils/logger";
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '../../store';
 import { useVSCode } from '../../hooks/useVSCode';
 import Dropdown from '../shared/Dropdown';
@@ -46,6 +47,76 @@ export default function BottomBar() {
     textarea.style.height = `${newHeight}px`;
   }, [input]);
 
+  // Memoized callbacks for QuestionCard (prevent render storm)
+  const handleQuestionSubmit = useCallback(
+    (answers: string[]) => {
+      if (!activeQuestion) return;
+
+      logger.log("[BottomBar] QuestionCard onSubmit:", answers);
+
+      // Send answer to extension
+      sendMessage({
+        type: "answer_question",
+        payload: {
+          questionId: activeQuestion.questionId,
+          answers,
+        },
+      });
+
+      // Delay clearActiveQuestion to avoid race condition
+      setTimeout(() => {
+        clearActiveQuestion();
+      }, 100);
+
+      // Add user response message
+      const chatId = activeChatId ?? createChat("Nova conversa");
+      const answerText = answers.join(", ");
+      addMessage(chatId, {
+        role: "user",
+        content: `✓ Resposta: ${answerText}`,
+      });
+    },
+    [activeQuestion, sendMessage, clearActiveQuestion, addMessage, activeChatId, createChat]
+  );
+
+  const handleQuestionTimeout = useCallback(() => {
+    if (!activeQuestion) return;
+
+    logger.log("[BottomBar] QuestionCard onTimeout");
+
+    // Send default answer
+    const defaultAnswers = Array.isArray(activeQuestion.defaultAnswer)
+      ? activeQuestion.defaultAnswer
+      : activeQuestion.defaultAnswer
+      ? [activeQuestion.defaultAnswer]
+      : [activeQuestion.options[0]?.value ?? ""];
+
+    sendMessage({
+      type: "answer_question",
+      payload: {
+        questionId: activeQuestion.questionId,
+        answers: defaultAnswers,
+      },
+    });
+
+    // Delay clearActiveQuestion to avoid race condition
+    setTimeout(() => {
+      clearActiveQuestion();
+    }, 100);
+
+    // Add timeout message
+    const chatId = activeChatId ?? createChat("Nova conversa");
+    addMessage(chatId, {
+      role: "user",
+      content: `⏱ Timeout - Resposta padrão: ${defaultAnswers.join(", ")}`,
+    });
+  }, [activeQuestion, sendMessage, clearActiveQuestion, addMessage, activeChatId, createChat]);
+
+  const handleQuestionCancel = useCallback(() => {
+    logger.log("[BottomBar] QuestionCard onCancel");
+    clearActiveQuestion();
+  }, [clearActiveQuestion]);
+
   const handleSend = () => {
     if (!input.trim() || isExecuting) return;
 
@@ -65,7 +136,7 @@ export default function BottomBar() {
     }));
 
     // Debug
-    console.log('[BottomBar] Sending message:', {
+    logger.log('[BottomBar] Sending message:', {
       newMessage: messageContent,
       previousCount: previousMessages.length,
       lastPreviousRole: previousMessages[previousMessages.length - 1]?.role,
@@ -133,61 +204,9 @@ export default function BottomBar() {
           mode={activeQuestion.mode}
           options={activeQuestion.options}
           timeoutMs={activeQuestion.timeoutMs}
-          onSubmit={(answers) => {
-            console.log("[BottomBar] QuestionCard onSubmit:", answers);
-
-            // Send answer to extension
-            sendMessage({
-              type: "answer_question",
-              payload: {
-                questionId: activeQuestion.questionId,
-                answers,
-              },
-            });
-
-            // Clear question from footer
-            clearActiveQuestion();
-
-            // Add user response message
-            const chatId = activeChatId ?? createChat("Nova conversa");
-            const answerText = answers.join(", ");
-            addMessage(chatId, {
-              role: "user",
-              content: `✓ Resposta: ${answerText}`,
-            });
-          }}
-          onTimeout={() => {
-            console.log("[BottomBar] QuestionCard onTimeout");
-
-            // Send default answer
-            const defaultAnswers = Array.isArray(activeQuestion.defaultAnswer)
-              ? activeQuestion.defaultAnswer
-              : activeQuestion.defaultAnswer
-              ? [activeQuestion.defaultAnswer]
-              : [activeQuestion.options[0]?.value ?? ""];
-
-            sendMessage({
-              type: "answer_question",
-              payload: {
-                questionId: activeQuestion.questionId,
-                answers: defaultAnswers,
-              },
-            });
-
-            // Clear question from footer
-            clearActiveQuestion();
-
-            // Add timeout message
-            const chatId = activeChatId ?? createChat("Nova conversa");
-            addMessage(chatId, {
-              role: "user",
-              content: `⏱ Timeout - Resposta padrão: ${defaultAnswers.join(", ")}`,
-            });
-          }}
-          onCancel={() => {
-            console.log("[BottomBar] QuestionCard onCancel");
-            clearActiveQuestion();
-          }}
+          onSubmit={handleQuestionSubmit}
+          onTimeout={handleQuestionTimeout}
+          onCancel={handleQuestionCancel}
         />
       </div>
     );

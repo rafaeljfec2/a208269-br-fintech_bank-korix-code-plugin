@@ -394,6 +394,13 @@ export function useRuntimeEvents() {
           case "user_question": {
             const event = runtimeEvent;
 
+            console.log("[useRuntimeEvents] user_question received!", {
+              questionId: event.questionId,
+              title: event.title,
+              question: event.question,
+              optionsCount: event.options.length,
+              mode: event.mode,
+            });
             logger.log("[useRuntimeEvents] user_question received:", event);
 
             // Add visual indicator in chat that a question was asked

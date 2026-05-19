@@ -368,6 +368,70 @@ describe("askUserQuestion", () => {
 
       vi.useRealTimers();
     });
+
+    it("should apply 5-minute safety timeout when timeoutMs is undefined", async () => {
+      vi.useFakeTimers();
+
+      const promise = askUserQuestion(emitter, {
+        title: "Test",
+        question: "Test?",
+        options: [
+          { value: "a", label: "A", description: "Option A" },
+          { value: "b", label: "B", description: "Option B" },
+        ],
+        // No timeoutMs provided
+      });
+
+      // Fast-forward to 5 minutes (300000ms)
+      await vi.advanceTimersByTimeAsync(300000);
+
+      const result = await promise;
+      // Should resolve with first option as default
+      expect(result).toEqual(["a"]);
+
+      vi.useRealTimers();
+    });
+
+    it("should prevent double-resolution when answer arrives during timeout", async () => {
+      vi.useFakeTimers();
+
+      const eventSpy = vi.fn();
+      emitter.onEvent(eventSpy);
+
+      const promise = askUserQuestion(emitter, {
+        title: "Test",
+        question: "Test?",
+        options: [
+          { value: "a", label: "A", description: "Option A" },
+          { value: "b", label: "B", description: "Option B" },
+        ],
+        timeoutMs: 5000,
+        defaultAnswer: "a",
+      });
+
+      const questionId = eventSpy.mock.calls[0][0].questionId;
+
+      // Advance to just before timeout
+      await vi.advanceTimersByTimeAsync(4900);
+
+      // User answers just before timeout
+      emitter.emitEvent({
+        type: "user_answer",
+        questionId,
+        answers: ["b"],
+        isTimeout: false,
+        timestamp: Date.now(),
+      });
+
+      // Complete timeout
+      await vi.advanceTimersByTimeAsync(100);
+
+      const result = await promise;
+      // Should resolve with user answer (b), not default (a)
+      expect(result).toEqual(["b"]);
+
+      vi.useRealTimers();
+    });
   });
 });
 

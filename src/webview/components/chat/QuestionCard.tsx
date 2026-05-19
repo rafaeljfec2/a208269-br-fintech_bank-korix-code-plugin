@@ -5,6 +5,7 @@
  * Supports optional timeout with visual countdown and "Other" text input.
  */
 
+import { logger } from "../../utils/logger";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -50,7 +51,7 @@ export default function QuestionCard({
     onTimeoutRef.current = onTimeout;
   }, [onTimeout]);
 
-  // Timer countdown
+  // Timer countdown (optimized: 1s interval instead of 100ms)
   useEffect(() => {
     if (!timeoutMs) return;
 
@@ -64,7 +65,7 @@ export default function QuestionCard({
         clearInterval(interval);
         onTimeoutRef.current?.();
       }
-    }, 100);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [timeoutMs]); // Only depend on timeoutMs
@@ -96,7 +97,7 @@ export default function QuestionCard({
   );
 
   const handleSubmit = useCallback(() => {
-    console.log("[QuestionCard] handleSubmit called", { selected, otherText });
+    logger.log("[QuestionCard] handleSubmit called", { selected, otherText });
 
     // Build final answers array
     const trimmedOther = otherText.trim();
@@ -104,15 +105,15 @@ export default function QuestionCard({
       ? [...selected.filter((v) => v !== 'other'), trimmedOther]
       : selected;
 
-    console.log("[QuestionCard] Built answers:", answers);
+    logger.log("[QuestionCard] Built answers:", answers);
 
     // Validate: Other must have text with min length
     if (selected.includes('other') && trimmedOther.length < 3) {
-      console.log("[QuestionCard] Validation failed: Other text too short");
+      logger.log("[QuestionCard] Validation failed: Other text too short");
       return; // Don't submit if Other is selected but too short
     }
 
-    console.log("[QuestionCard] Calling onSubmit with:", answers);
+    logger.log("[QuestionCard] Calling onSubmit with:", answers);
     onSubmit(answers);
   }, [selected, otherText, onSubmit]);
 
