@@ -13,15 +13,6 @@ export default function ExecutionFeedback() {
   const completionStats = useStore((state) => state.completionStats);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // DEBUG: Log state changes
-  useEffect(() => {
-    console.log('[ExecutionFeedback] State changed:', {
-      isExecuting,
-      hasCompletionStats: !!completionStats,
-      completionStats,
-      itemsCount: timelineItems?.length ?? 0,
-    });
-  }, [isExecuting, completionStats, timelineItems]);
 
   // Timer for elapsed time - MUST be before early return (React hooks rule)
   useEffect(() => {
@@ -41,7 +32,7 @@ export default function ExecutionFeedback() {
   // Show completion stats for 5 seconds after execution
   if (!isExecuting && completionStats) {
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-[var(--vscode-terminal-ansiGreen)]">
+      <div className="flex items-center gap-1.5 px-1 py-1 mb-2 text-[10px] text-[var(--vscode-terminal-ansiGreen)]">
         <span>✓</span>
         <span>Korix concluído: {completionStats.iterations} iterações • {completionStats.toolCalls} ferramentas • {completionStats.tokens} tokens • {completionStats.duration.toFixed(1)}s</span>
       </div>
@@ -49,16 +40,7 @@ export default function ExecutionFeedback() {
   }
 
   // Early return AFTER all hooks (React rules)
-  if (!isExecuting) {
-    console.log('[ExecutionFeedback] Not executing, returning null');
-    return null;
-  }
-
-  console.log('[ExecutionFeedback] RENDERING during execution', {
-    isExecuting,
-    itemsCount: timelineItems?.length ?? 0,
-    elapsedSeconds,
-  });
+  if (!isExecuting) return null;
 
   // Get the most recent events (last 10)
   // FIX: Guard against undefined to prevent .slice() error
@@ -87,19 +69,13 @@ export default function ExecutionFeedback() {
     }
   }
 
-  console.log('[ExecutionFeedback] Status message:', statusMessage, {
-    primaryEventType: primaryEvent?.type,
-    toolCount,
-    thinkingActive,
-  });
-
   // Build summary with active tools
   const summary: string[] = [];
   if (toolCount > 0) summary.push(`${toolCount} tool${toolCount > 1 ? 's' : ''}`);
   summary.push(`${elapsedSeconds}s`);
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-[var(--vscode-descriptionForeground)]">
+    <div className="flex items-center gap-1.5 px-1 py-1 mb-2 text-[10px] text-[var(--vscode-descriptionForeground)]">
       {/* Spinner */}
       <svg className="w-2.5 h-2.5 animate-spin" viewBox="0 0 24 24">
         <circle
