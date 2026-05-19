@@ -13,6 +13,16 @@ export default function ExecutionFeedback() {
   const completionStats = useStore((state) => state.completionStats);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // DEBUG: Log state changes
+  useEffect(() => {
+    console.log('[ExecutionFeedback] State changed:', {
+      isExecuting,
+      hasCompletionStats: !!completionStats,
+      completionStats,
+      itemsCount: timelineItems?.length ?? 0,
+    });
+  }, [isExecuting, completionStats, timelineItems]);
+
   // Timer for elapsed time - MUST be before early return (React hooks rule)
   useEffect(() => {
     if (!isExecuting) {
@@ -31,7 +41,7 @@ export default function ExecutionFeedback() {
   // Show completion stats for 5 seconds after execution
   if (!isExecuting && completionStats) {
     return (
-      <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-green)] mb-3">
+      <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-green)] mb-2">
         <div className="text-[10px] text-[var(--vscode-terminal-ansiGreen)] opacity-70">
           Concluído com sucesso {completionStats.iterations} iterações • {completionStats.toolCalls} ferramentas • {completionStats.tokens} tokens • {completionStats.duration.toFixed(1)}s
         </div>
@@ -76,7 +86,7 @@ export default function ExecutionFeedback() {
   if (toolCount > 0) summary.push(`🔧 ${toolCount} tool${toolCount > 1 ? 's' : ''}`);
 
   return (
-    <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-blue)] mb-3">
+    <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-blue)] mb-2">
       {/* Primary status */}
       <div className="flex items-center justify-between gap-2 mb-1">
         <div className="flex items-center gap-2 text-xs text-[var(--vscode-foreground)]">

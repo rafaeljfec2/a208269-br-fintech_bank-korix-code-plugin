@@ -8,7 +8,6 @@ import trIcon from '../../assets/tr-icon.svg';
 import ChatMessage from '../chat/ChatMessage';
 import MarkdownContent from '../chat/MarkdownContent';
 import EmptyChatWelcome from '../chat/EmptyChatWelcome';
-import ExecutionFeedback from '../chat/ExecutionFeedback';
 import SettingsPanel from '../settings/SettingsPanel';
 import ActivityLog from '../activity/ActivityLog';
 import RuntimeInspector from '../runtime/RuntimeInspector';
@@ -193,9 +192,6 @@ export default function MainPanel() {
           </div>
         </div>
       )}
-
-      {/* Execution Feedback - SEMPRE mostrar quando executando (tools, bash, etc) */}
-      <ExecutionFeedback />
 
       {/* Streaming content - sem avatar, sem header, COM REF para auto-scroll */}
       {activeChat.isStreaming && activeChat.streamingContent && (

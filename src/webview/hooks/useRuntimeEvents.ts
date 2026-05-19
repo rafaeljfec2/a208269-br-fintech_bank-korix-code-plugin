@@ -313,6 +313,14 @@ export function useRuntimeEvents() {
           case "execution_complete": {
             const event = runtimeEvent;
 
+            logger.log("[RuntimeEvents] execution_complete event:", {
+              success: event.success,
+              iterations: event.iterations,
+              totalToolCalls: event.metrics.totalToolCalls,
+              totalTokens: event.metrics.totalTokens,
+              duration: event.metrics.duration,
+            });
+
             // NOVO: Atualizar métricas de tokens
             store.updateMetrics({
               tokenCount: event.metrics.totalTokens ?? 0,
@@ -326,16 +334,20 @@ export function useRuntimeEvents() {
                 ? event.metrics.duration / 1000
                 : 0;
 
-              store.setCompletionStats({
+              const stats = {
                 iterations: event.iterations,
                 toolCalls: event.metrics.totalToolCalls ?? 0,
                 tokens: event.metrics.totalTokens ?? 0,
                 duration,
                 timestamp: Date.now(),
-              });
+              };
+
+              logger.log("[RuntimeEvents] Setting completion stats:", stats);
+              store.setCompletionStats(stats);
 
               // Auto-clear after 5 seconds
               setTimeout(() => {
+                logger.log("[RuntimeEvents] Auto-clearing completion stats");
                 store.setCompletionStats(null);
               }, 5000);
             }
