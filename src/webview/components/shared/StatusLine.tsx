@@ -4,23 +4,22 @@
 
 import React from 'react';
 import { useStore } from '../../store';
-import { shallow } from 'zustand/shallow';
 
 export default function StatusLine() {
   const isExecuting = useStore((state) => state.isExecuting);
 
-  // FIX: Use shallow comparison to prevent infinite re-renders
-  const { isStreaming, isThinking } = useStore(
-    (state) => {
-      const activeChatId = state.activeChatId;
-      const activeChat = activeChatId ? state.conversations[activeChatId] : null;
-      return {
-        isStreaming: activeChat?.isStreaming ?? false,
-        isThinking: activeChat?.isThinking ?? false,
-      };
-    },
-    shallow
-  );
+  // FIX: Use separate selectors for each primitive value to avoid re-render loops
+  const isStreaming = useStore((state) => {
+    const activeChatId = state.activeChatId;
+    const activeChat = activeChatId ? state.conversations[activeChatId] : null;
+    return activeChat?.isStreaming ?? false;
+  });
+
+  const isThinking = useStore((state) => {
+    const activeChatId = state.activeChatId;
+    const activeChat = activeChatId ? state.conversations[activeChatId] : null;
+    return activeChat?.isThinking ?? false;
+  });
 
   // Se não há atividade, não mostra nada
   if (!isStreaming && !isThinking && !isExecuting) {
