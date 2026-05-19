@@ -63,8 +63,10 @@ export default function ChatMessage({ message }: ChatMessageProps) {
 
   // Chat fluido - SEM avatares, SEM labels ("You", "Korix")
   // Diferenciação visual APENAS por background
+  // Status cards sem content ficam mais compactos (status bar style)
+  const hasOnlyStatusCard = !message.content && message.metadata?.statusCard;
   const messageContainer = clsx(
-    'px-3 py-3 my-2',
+    hasOnlyStatusCard ? 'px-3 py-1' : 'px-3 py-3 my-2',
     message.role === 'user' && 'bg-[var(--vscode-input-background)] rounded-lg' // Container cinza para usuário
   );
 

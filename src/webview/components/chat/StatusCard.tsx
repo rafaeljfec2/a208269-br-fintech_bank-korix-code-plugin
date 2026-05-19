@@ -17,7 +17,7 @@ interface StatusCardProps {
 
 export default function StatusCard({ type, title, subtitle, action }: StatusCardProps) {
   const statusCard = clsx(
-    'flex items-center gap-3 px-4 py-3 rounded-lg border my-3',
+    'flex items-center gap-2 px-3 py-1.5 rounded border mt-2',
     type === 'completed' &&
       'border-[var(--vscode-terminal-ansiGreen)] bg-[var(--vscode-terminal-ansiGreen)]/10',
     type === 'plan_created' &&
@@ -27,7 +27,7 @@ export default function StatusCard({ type, title, subtitle, action }: StatusCard
   );
 
   const statusIcon = clsx(
-    'w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0',
+    'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0',
     type === 'completed' && 'bg-[var(--vscode-terminal-ansiGreen)] text-white',
     type === 'plan_created' && 'bg-[var(--vscode-button-background)] text-white',
     type === 'error' && 'bg-[var(--vscode-terminal-ansiRed)] text-white'
@@ -52,8 +52,8 @@ export default function StatusCard({ type, title, subtitle, action }: StatusCard
 
       {/* Content */}
       <div className="flex-1">
-        <div className="font-medium text-sm">{title}</div>
-        {subtitle && <div className="text-xs opacity-60 mt-0.5">{subtitle}</div>}
+        <div className="font-medium text-xs">{title}</div>
+        {subtitle && <div className="text-[10px] opacity-60">{subtitle}</div>}
       </div>
 
       {/* Action Button */}
