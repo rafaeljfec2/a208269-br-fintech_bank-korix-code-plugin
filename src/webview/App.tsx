@@ -12,7 +12,6 @@ import BottomBar from './components/layout/BottomBar';
 import Sidebar from './components/layout/Sidebar';
 import ResizeHandle from './components/layout/ResizeHandle';
 import MainPanel from './components/layout/MainPanel';
-import StatusLine from './components/shared/StatusLine';
 import ToolApprovalModal from './components/tools/ToolApprovalModal';
 
 export default function App() {
@@ -48,10 +47,7 @@ export default function App() {
         <MainPanel />
       </div>
 
-      {/* Status Line - Compact activity indicator */}
-      <StatusLine />
-
-      {/* Bottom Bar - Input + Controls */}
+      {/* Bottom Bar - Input + Controls + Status */}
       <BottomBar />
 
       {/* Tool Approval Modal - Renders conditionally when approval is needed */}

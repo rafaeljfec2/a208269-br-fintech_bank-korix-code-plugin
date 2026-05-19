@@ -27,6 +27,15 @@ export default function BottomBar() {
   const isExecuting = useStore((state) => state.isExecuting);
   const activeQuestion = useStore((state) => state.activeQuestion);
   const setMode = useStore((state) => state.setMode);
+
+  // DEBUG: Log quando activeQuestion muda
+  useEffect(() => {
+    logger.log('[BottomBar] activeQuestion changed:', {
+      hasQuestion: !!activeQuestion,
+      questionId: activeQuestion?.questionId,
+      title: activeQuestion?.title,
+    });
+  }, [activeQuestion]);
   const setModel = useStore((state) => state.setModel);
   const addMessage = useStore((state) => state.addMessage);
   const activeChatId = useStore((state) => state.activeChatId);
