@@ -10,6 +10,7 @@ export default function ExecutionFeedback() {
   // FIX: Correct property name is 'items' not 'timelineEvents'
   const timelineItems = useStore((state) => state.items);
   const isExecuting = useStore((state) => state.isExecuting);
+  const completionStats = useStore((state) => state.completionStats);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   // Timer for elapsed time - MUST be before early return (React hooks rule)
@@ -26,6 +27,17 @@ export default function ExecutionFeedback() {
 
     return () => clearInterval(interval);
   }, [isExecuting]);
+
+  // Show completion stats for 5 seconds after execution
+  if (!isExecuting && completionStats) {
+    return (
+      <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-green)] mb-3">
+        <div className="text-[10px] text-[var(--vscode-terminal-ansiGreen)] opacity-70">
+          Concluído com sucesso {completionStats.iterations} iterações • {completionStats.toolCalls} ferramentas • {completionStats.tokens} tokens • {completionStats.duration.toFixed(1)}s
+        </div>
+      </div>
+    );
+  }
 
   // Early return AFTER all hooks (React rules)
   if (!isExecuting) return null;

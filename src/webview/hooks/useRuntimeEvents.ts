@@ -312,43 +312,32 @@ export function useRuntimeEvents() {
 
           case "execution_complete": {
             const event = runtimeEvent;
-            const chatId = useStore.getState().activeChatId;
 
             // NOVO: Atualizar métricas de tokens
             store.updateMetrics({
-              inputTokens: event.metrics.inputTokens ?? 0,
-              outputTokens: event.metrics.outputTokens ?? 0,
-              cachedTokens: event.metrics.cachedTokens ?? 0,
-              tokenCount:
-                (event.metrics.inputTokens ?? 0) +
-                (event.metrics.outputTokens ?? 0),
+              tokenCount: event.metrics.totalTokens ?? 0,
+              toolCallCount: event.metrics.totalToolCalls ?? 0,
+              iterationCount: event.iterations ?? 0,
             });
 
-            // Add status card if successful
-            if (event.success && chatId) {
-              const totalTokens =
-                (event.metrics.inputTokens ?? 0) +
-                (event.metrics.outputTokens ?? 0);
-              const duration = event.metrics.totalDuration
-                ? (event.metrics.totalDuration / 1000).toFixed(1)
-                : "0";
+            // Set completion stats for ExecutionFeedback
+            if (event.success) {
+              const duration = event.metrics.duration
+                ? event.metrics.duration / 1000
+                : 0;
 
-              store.addMessage(chatId, {
-                role: "assistant",
-                content: "",
-                metadata: {
-                  statusCard: {
-                    type: "completed",
-                    title: "Concluído com sucesso",
-                    subtitle: [
-                      `${event.iterations} iterações`,
-                      `${event.metrics.totalToolCalls} ferramentas`,
-                      `${totalTokens} tokens`,
-                      `${duration}s`,
-                    ].join(" • "),
-                  },
-                },
+              store.setCompletionStats({
+                iterations: event.iterations,
+                toolCalls: event.metrics.totalToolCalls ?? 0,
+                tokens: event.metrics.totalTokens ?? 0,
+                duration,
+                timestamp: Date.now(),
               });
+
+              // Auto-clear after 5 seconds
+              setTimeout(() => {
+                store.setCompletionStats(null);
+              }, 5000);
             }
             break;
           }
