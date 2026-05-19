@@ -16,25 +16,15 @@ interface StatusCardProps {
 }
 
 export default function StatusCard({ type, title, subtitle, action }: StatusCardProps) {
-  const statusCard = clsx(
-    'flex items-center gap-2 px-3 py-1.5 rounded border mt-2',
-    type === 'completed' &&
-      'border-[var(--vscode-terminal-ansiGreen)] bg-[var(--vscode-terminal-ansiGreen)]/10',
-    type === 'plan_created' &&
-      'border-[var(--vscode-button-background)] bg-[var(--vscode-button-background)]/10',
-    type === 'error' &&
-      'border-[var(--vscode-terminal-ansiRed)] bg-[var(--vscode-terminal-ansiRed)]/10'
-  );
-
-  const statusIcon = clsx(
-    'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0',
-    type === 'completed' && 'bg-[var(--vscode-terminal-ansiGreen)] text-white',
-    type === 'plan_created' && 'bg-[var(--vscode-button-background)] text-white',
-    type === 'error' && 'bg-[var(--vscode-terminal-ansiRed)] text-white'
+  const textColor = clsx(
+    'text-[10px] opacity-50 mt-1',
+    type === 'completed' && 'text-[var(--vscode-terminal-ansiGreen)]',
+    type === 'plan_created' && 'text-[var(--vscode-descriptionForeground)]',
+    type === 'error' && 'text-[var(--vscode-terminal-ansiRed)]'
   );
 
   const actionButton = clsx(
-    'px-3 py-1.5 text-xs rounded',
+    'ml-2 px-2 py-0.5 text-[10px] rounded',
     'bg-[var(--vscode-button-background)]',
     'text-[var(--vscode-button-foreground)]',
     'hover:bg-[var(--vscode-button-hoverBackground)]',
@@ -42,21 +32,11 @@ export default function StatusCard({ type, title, subtitle, action }: StatusCard
   );
 
   return (
-    <div className={statusCard}>
-      {/* Icon */}
-      <div className={statusIcon}>
-        {type === 'completed' && '✓'}
-        {type === 'plan_created' && '📋'}
-        {type === 'error' && '✗'}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1">
-        <div className="font-medium text-xs">{title}</div>
-        {subtitle && <div className="text-[10px] opacity-60">{subtitle}</div>}
-      </div>
-
-      {/* Action Button */}
+    <div className="flex items-center gap-1">
+      <span className={textColor}>
+        {title}
+        {subtitle && ` ${subtitle}`}
+      </span>
       {action && (
         <button type="button" className={actionButton} onClick={action.onClick}>
           {action.label}
