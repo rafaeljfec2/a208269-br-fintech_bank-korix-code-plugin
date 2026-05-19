@@ -58,13 +58,16 @@ export const ProblemsTool: Tool<ProblemsInput, Problem[]> = {
     return true; // Allowed in all modes
   },
 
-  execute(input: ProblemsInput, _context: ToolContext): ToolResult<Problem[]> {
+  execute(
+    input: ProblemsInput,
+    _context: ToolContext,
+  ): Promise<ToolResult<Problem[]>> {
     const startTime = Date.now();
 
     try {
       const problems = getProblems(input);
 
-      return {
+      return Promise.resolve({
         success: true,
         data: problems,
         metadata: {
@@ -72,9 +75,9 @@ export const ProblemsTool: Tool<ProblemsInput, Problem[]> = {
           approved: true,
           timestamp: startTime,
         },
-      };
+      });
     } catch (error) {
-      return {
+      return Promise.resolve({
         success: false,
         error: (error as Error).message,
         metadata: {
@@ -82,7 +85,7 @@ export const ProblemsTool: Tool<ProblemsInput, Problem[]> = {
           approved: true,
           timestamp: startTime,
         },
-      };
+      });
     }
   },
 };

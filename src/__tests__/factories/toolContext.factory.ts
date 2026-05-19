@@ -22,8 +22,8 @@ export function createMockToolContext(
 ): ToolContext {
   const defaultExecution: ExecutionContext = {
     mode: "agent",
-    sessionId: "test-session-" + Math.random().toString(36).substring(7),
-    userId: "test-user",
+    workspaceRoot: "/test/workspace",
+    openFiles: [],
   };
 
   return {
@@ -46,8 +46,8 @@ export function createMockToolContextWithMode(
   return createMockToolContext({
     execution: {
       mode,
-      sessionId: `test-${mode}-session`,
-      userId: "test-user",
+      workspaceRoot: "/test/workspace",
+      openFiles: [],
     },
   });
 }

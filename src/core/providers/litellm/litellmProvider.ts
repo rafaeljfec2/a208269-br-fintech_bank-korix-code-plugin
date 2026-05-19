@@ -329,7 +329,7 @@ export class LiteLLMProvider implements AIProvider {
               type: "tool_use",
               id: tc.id,
               name: tc.name,
-              input: tc.input,
+              input: toRecordInput(tc.input),
             });
           }
 
@@ -404,4 +404,12 @@ export class LiteLLMProvider implements AIProvider {
   private isClaude4x(model: string): boolean {
     return /claude-(opus|sonnet|haiku)-4.[0-9]+/i.test(model);
   }
+}
+
+function toRecordInput(input: unknown): Record<string, unknown> {
+  if (input && typeof input === "object" && !Array.isArray(input)) {
+    return input as Record<string, unknown>;
+  }
+
+  return { value: input };
 }

@@ -14,7 +14,22 @@ export interface ToolExecution {
   readonly timestamp: number;
 }
 
+export interface ThinkingTimelineItem {
+  readonly id: string;
+  readonly stage: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly status: "pending" | "success" | "warning" | "error";
+  readonly timestamp: number;
+  readonly durationMs?: number;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
 export interface MessageMetadata {
+  readonly thinking?: {
+    readonly items: readonly ThinkingTimelineItem[];
+    readonly isExpanded: boolean;
+  };
   readonly execution?: {
     readonly tools: ToolExecution[];
     readonly isExpanded: boolean;
@@ -78,6 +93,7 @@ export interface ChatSession {
   readonly thinkingContent?: string;
   readonly isThinking?: boolean;
   readonly activeMessageTools?: ToolExecution[];
+  readonly activeThinkingItems?: ThinkingTimelineItem[];
 }
 
 export interface ChatSlice {
@@ -112,6 +128,11 @@ export interface ChatSlice {
     updates: Partial<ToolExecution>,
   ) => void;
   readonly clearActiveMessageTools: (chatId: string) => void;
+  readonly addActiveThinkingItem: (
+    chatId: string,
+    item: ThinkingTimelineItem,
+  ) => void;
+  readonly clearActiveThinkingItems: (chatId: string) => void;
   readonly removeQuestionFromMessage: (
     chatId: string,
     messageId: string,
@@ -274,6 +295,11 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
 
       // Only add a new message if there was actual streaming content
       if (chat.streamingContent && chat.streamingContent.trim().length > 0) {
+        const totalDuration = (chat.activeMessageTools ?? []).reduce(
+          (sum, tool) => sum + tool.duration,
+          0,
+        );
+
         updatedChat.messages = [
           ...chat.messages,
           {
@@ -281,6 +307,25 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
             role: "assistant" as const,
             content: chat.streamingContent,
             timestamp: Date.now(),
+            metadata: {
+              ...(chat.activeThinkingItems && chat.activeThinkingItems.length > 0
+                ? {
+                    thinking: {
+                      items: chat.activeThinkingItems,
+                      isExpanded: false,
+                    },
+                  }
+                : {}),
+              ...(chat.activeMessageTools && chat.activeMessageTools.length > 0
+                ? {
+                    execution: {
+                      tools: chat.activeMessageTools,
+                      isExpanded: false,
+                      totalDuration,
+                    },
+                  }
+                : {}),
+            },
           },
         ];
         logger.log("[ChatSlice] Added assistant message", {
@@ -326,29 +371,13 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
   finalizeThinking: (chatId) =>
     set((state: ChatSlice) => {
       const chat = state.conversations[chatId];
-      if (!chat || !chat.thinkingContent) return state;
-
-      // Adicionar thinking block como mensagem do sistema
-      const thinkingMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "system" as const,
-        content: chat.thinkingContent,
-        timestamp: Date.now(),
-        metadata: {
-          statusCard: {
-            type: "plan_created" as const,
-            title: "Raciocínio",
-            subtitle: "Modelo processou o contexto",
-          },
-        },
-      };
+      if (!chat) return state;
 
       return {
         conversations: {
           ...state.conversations,
           [chatId]: {
             ...chat,
-            messages: [...chat.messages, thinkingMessage],
             thinkingContent: "",
             isThinking: false,
           },
@@ -446,6 +475,38 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
           [chatId]: {
             ...chat,
             activeMessageTools: undefined,
+          },
+        },
+      };
+    }),
+
+  addActiveThinkingItem: (chatId, item) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) return state;
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            activeThinkingItems: [...(chat.activeThinkingItems ?? []), item],
+          },
+        },
+      };
+    }),
+
+  clearActiveThinkingItems: (chatId) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) return state;
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            activeThinkingItems: undefined,
           },
         },
       };

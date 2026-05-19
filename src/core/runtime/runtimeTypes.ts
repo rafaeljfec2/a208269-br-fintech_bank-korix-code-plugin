@@ -6,6 +6,13 @@
  */
 
 import type { Message, ExecutionContext } from "../types";
+import type {
+  EvidencePack,
+  ExecutionGraphSnapshot,
+  ObservationSummary,
+  ResponseValidationResult,
+  ThinkingRunProfile,
+} from "./thinking/types";
 
 /**
  * Task to be executed by the agent runtime
@@ -110,6 +117,15 @@ export interface MemorySnapshot {
   readonly shortTerm: ReadonlyMap<string, unknown>;
   readonly conversationContext: readonly string[];
   readonly lastCheckpointId?: string;
+  readonly thinking?: ThinkingMemorySnapshot;
+}
+
+export interface ThinkingMemorySnapshot {
+  readonly taskProfile?: ThinkingRunProfile;
+  readonly evidencePack?: EvidencePack;
+  readonly observationSummaries: readonly ObservationSummary[];
+  readonly validationResult?: ResponseValidationResult;
+  readonly executionGraph?: ExecutionGraphSnapshot;
 }
 
 /**

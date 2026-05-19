@@ -38,7 +38,7 @@ export class GetDiagnosticsTool implements Tool<
   execute(
     input: GetDiagnosticsInput,
     _context: ToolContext,
-  ): ToolResult<DiagnosticInfo[]> {
+  ): Promise<ToolResult<DiagnosticInfo[]>> {
     try {
       const diagnostics: DiagnosticInfo[] = [];
 
@@ -69,7 +69,7 @@ export class GetDiagnosticsTool implements Tool<
         }
       }
 
-      return {
+      return Promise.resolve({
         success: true,
         data: diagnostics,
         metadata: {
@@ -77,10 +77,10 @@ export class GetDiagnosticsTool implements Tool<
           approved: true,
           timestamp: Date.now(),
         },
-      };
+      });
     } catch (error) {
       const err = error as Error;
-      return {
+      return Promise.resolve({
         success: false,
         error: `Failed to get diagnostics: ${err.message}`,
         metadata: {
@@ -88,7 +88,7 @@ export class GetDiagnosticsTool implements Tool<
           approved: true,
           timestamp: Date.now(),
         },
-      };
+      });
     }
   }
 
@@ -134,7 +134,7 @@ export class GetOpenFilesTool implements Tool<
   execute(
     _input: Record<string, never>,
     _context: ToolContext,
-  ): ToolResult<OpenFileInfo[]> {
+  ): Promise<ToolResult<OpenFileInfo[]>> {
     try {
       const openFiles: OpenFileInfo[] = vscode.workspace.textDocuments.map(
         (doc) => ({
@@ -144,7 +144,7 @@ export class GetOpenFilesTool implements Tool<
         }),
       );
 
-      return {
+      return Promise.resolve({
         success: true,
         data: openFiles,
         metadata: {
@@ -152,10 +152,10 @@ export class GetOpenFilesTool implements Tool<
           approved: true,
           timestamp: Date.now(),
         },
-      };
+      });
     } catch (error) {
       const err = error as Error;
-      return {
+      return Promise.resolve({
         success: false,
         error: `Failed to get open files: ${err.message}`,
         metadata: {
@@ -163,7 +163,7 @@ export class GetOpenFilesTool implements Tool<
           approved: true,
           timestamp: Date.now(),
         },
-      };
+      });
     }
   }
 }
@@ -196,12 +196,12 @@ export class GetCurrentFileTool implements Tool<
   execute(
     _input: Record<string, never>,
     _context: ToolContext,
-  ): ToolResult<CurrentFileInfo | null> {
+  ): Promise<ToolResult<CurrentFileInfo | null>> {
     try {
       const editor = vscode.window.activeTextEditor;
 
       if (!editor) {
-        return {
+        return Promise.resolve({
           success: true,
           data: null,
           metadata: {
@@ -209,7 +209,7 @@ export class GetCurrentFileTool implements Tool<
             approved: true,
             timestamp: Date.now(),
           },
-        };
+        });
       }
 
       const result: CurrentFileInfo = {
@@ -231,7 +231,7 @@ export class GetCurrentFileTool implements Tool<
         };
       }
 
-      return {
+      return Promise.resolve({
         success: true,
         data: result,
         metadata: {
@@ -239,10 +239,10 @@ export class GetCurrentFileTool implements Tool<
           approved: true,
           timestamp: Date.now(),
         },
-      };
+      });
     } catch (error) {
       const err = error as Error;
-      return {
+      return Promise.resolve({
         success: false,
         error: `Failed to get current file: ${err.message}`,
         metadata: {
@@ -250,7 +250,7 @@ export class GetCurrentFileTool implements Tool<
           approved: true,
           timestamp: Date.now(),
         },
-      };
+      });
     }
   }
 }

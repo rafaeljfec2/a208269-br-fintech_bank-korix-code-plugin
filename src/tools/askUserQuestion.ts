@@ -72,6 +72,7 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
     input: AskUserQuestionInput,
     _context: ToolContext,
   ): Promise<ToolResult<UserAnswers>> {
+    const startTime = Date.now();
     console.log("[AskUserQuestionTool] execute() called with input:", JSON.stringify(input, null, 2));
 
     try {
@@ -117,8 +118,9 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
         success: true,
         data: answers,
         metadata: {
-          questionCount: input.questions.length,
-          timestamp: Date.now(),
+          duration: Date.now() - startTime,
+          approved: true,
+          timestamp: startTime,
         },
       };
     } catch (error) {
@@ -127,6 +129,11 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
       return {
         success: false,
         error: `AskUserQuestion failed: ${(error as Error).message}\n${(error as Error).stack}`,
+        metadata: {
+          duration: Date.now() - startTime,
+          approved: true,
+          timestamp: startTime,
+        },
       };
     }
   },

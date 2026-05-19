@@ -17,6 +17,13 @@ import type {
   MemorySnapshot,
   ToolCallRecord,
 } from "./runtimeTypes";
+import type {
+  EvidencePack,
+  ExecutionGraphSnapshot,
+  ObservationSummary,
+  ResponseValidationResult,
+  ThinkingRunProfile,
+} from "./thinking/types";
 
 /**
  * Conversation state (immutable via getters)
@@ -150,6 +157,11 @@ class MemoryState {
   private shortTerm = new Map<string, unknown>();
   private conversationContext: string[] = [];
   private lastCheckpointId?: string;
+  private taskProfile?: ThinkingRunProfile;
+  private evidencePack?: EvidencePack;
+  private observationSummaries: ObservationSummary[] = [];
+  private validationResult?: ResponseValidationResult;
+  private executionGraph?: ExecutionGraphSnapshot;
 
   set(key: string, value: unknown): void {
     this.shortTerm.set(key, value);
@@ -167,11 +179,38 @@ class MemoryState {
     this.lastCheckpointId = checkpointId;
   }
 
+  setTaskProfile(profile: ThinkingRunProfile): void {
+    this.taskProfile = profile;
+  }
+
+  setEvidencePack(evidence: EvidencePack): void {
+    this.evidencePack = evidence;
+  }
+
+  addObservationSummary(summary: ObservationSummary): void {
+    this.observationSummaries.push(summary);
+  }
+
+  setValidationResult(validation: ResponseValidationResult): void {
+    this.validationResult = validation;
+  }
+
+  setExecutionGraph(graph: ExecutionGraphSnapshot): void {
+    this.executionGraph = graph;
+  }
+
   getSnapshot(): MemorySnapshot {
     return {
       shortTerm: new Map(this.shortTerm),
       conversationContext: [...this.conversationContext],
       lastCheckpointId: this.lastCheckpointId,
+      thinking: {
+        taskProfile: this.taskProfile,
+        evidencePack: this.evidencePack,
+        observationSummaries: [...this.observationSummaries],
+        validationResult: this.validationResult,
+        executionGraph: this.executionGraph,
+      },
     };
   }
 
@@ -179,6 +218,11 @@ class MemoryState {
     this.shortTerm = new Map(snapshot.shortTerm);
     this.conversationContext = [...snapshot.conversationContext];
     this.lastCheckpointId = snapshot.lastCheckpointId;
+    this.taskProfile = snapshot.thinking?.taskProfile;
+    this.evidencePack = snapshot.thinking?.evidencePack;
+    this.observationSummaries = [...(snapshot.thinking?.observationSummaries ?? [])];
+    this.validationResult = snapshot.thinking?.validationResult;
+    this.executionGraph = snapshot.thinking?.executionGraph;
   }
 }
 
@@ -267,6 +311,26 @@ export class RuntimeState {
 
   setCheckpoint(checkpointId: string): void {
     this.memory.setCheckpoint(checkpointId);
+  }
+
+  setThinkingTaskProfile(profile: ThinkingRunProfile): void {
+    this.memory.setTaskProfile(profile);
+  }
+
+  setThinkingEvidencePack(evidence: EvidencePack): void {
+    this.memory.setEvidencePack(evidence);
+  }
+
+  addObservationSummary(summary: ObservationSummary): void {
+    this.memory.addObservationSummary(summary);
+  }
+
+  setResponseValidation(validation: ResponseValidationResult): void {
+    this.memory.setValidationResult(validation);
+  }
+
+  setExecutionGraph(graph: ExecutionGraphSnapshot): void {
+    this.memory.setExecutionGraph(graph);
   }
 
   // === Snapshot/Restore ===

@@ -75,13 +75,13 @@ export const WorkspaceGraphTool: Tool<
   execute(
     input: WorkspaceGraphInput,
     _context: ToolContext,
-  ): ToolResult<WorkspaceGraphResult> {
+  ): Promise<ToolResult<WorkspaceGraphResult>> {
     const startTime = Date.now();
 
     try {
       const graph = buildWorkspaceGraph(input);
 
-      return {
+      return Promise.resolve({
         success: true,
         data: graph,
         metadata: {
@@ -89,9 +89,9 @@ export const WorkspaceGraphTool: Tool<
           approved: true,
           timestamp: startTime,
         },
-      };
+      });
     } catch (error) {
-      return {
+      return Promise.resolve({
         success: false,
         error: (error as Error).message,
         metadata: {
@@ -99,7 +99,7 @@ export const WorkspaceGraphTool: Tool<
           approved: true,
           timestamp: startTime,
         },
-      };
+      });
     }
   },
 };

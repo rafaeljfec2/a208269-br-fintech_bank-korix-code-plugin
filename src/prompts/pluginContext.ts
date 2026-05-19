@@ -53,6 +53,7 @@ export class PluginContextBuilder {
       this.loadOutputStyle(),
 
       // === IDENTIDADE E PRINCÍPIOS ===
+      this.getModelInfo(options.providerType, options.model),
       this.loadMarkdown("base.md"),
 
       // === CRÍTICO: MODOS DE OPERAÇÃO (NÃO-NEGOCIÁVEL) ===

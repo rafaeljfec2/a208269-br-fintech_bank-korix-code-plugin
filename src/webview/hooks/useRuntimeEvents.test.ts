@@ -29,6 +29,8 @@ describe("useRuntimeEvents", () => {
   const mockCreateChat = vi.fn();
   const mockUpdateActiveMessageMetadata = vi.fn();
   const mockClearActiveMessageTools = vi.fn();
+  const mockAddActiveThinkingItem = vi.fn();
+  const mockClearActiveThinkingItems = vi.fn();
   // Activity Log mocks
   const mockStartContext = vi.fn();
   const mockEndContext = vi.fn();
@@ -56,6 +58,8 @@ describe("useRuntimeEvents", () => {
       createChat: mockCreateChat,
       updateActiveMessageMetadata: mockUpdateActiveMessageMetadata,
       clearActiveMessageTools: mockClearActiveMessageTools,
+      addActiveThinkingItem: mockAddActiveThinkingItem,
+      clearActiveThinkingItems: mockClearActiveThinkingItems,
       // Activity Log state
       startContext: mockStartContext,
       endContext: mockEndContext,
@@ -230,6 +234,44 @@ describe("useRuntimeEvents", () => {
     });
   });
 
+  describe("runtime_event: thinking_step", () => {
+    it("should add safe thinking item", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "thinking_step",
+                  item: {
+                    id: "think-1",
+                    stage: "analyzing_request",
+                    title: "Analyzing request",
+                    summary: "answer task, low risk",
+                    status: "success",
+                    timestamp: 123,
+                  },
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          id: "think-1",
+          title: "Analyzing request",
+          summary: "answer task, low risk",
+        }),
+      );
+    });
+  });
+
   describe("runtime_event: tool_call", () => {
     it("should handle tool_call event", () => {
       renderHook(() => useRuntimeEvents());
@@ -316,6 +358,7 @@ describe("useRuntimeEvents", () => {
       expect(mockCreateChat).toHaveBeenCalledWith("Nova conversa");
       // Should call finalizeStreaming with emergency chat ID
       expect(mockFinalizeStreaming).toHaveBeenCalledWith("test-chat-id");
+      expect(mockClearActiveThinkingItems).toHaveBeenCalledWith("test-chat-id");
       // Should add system message explaining emergency chat
       expect(mockAddMessage).toHaveBeenCalledWith(
         "test-chat-id",

@@ -21,6 +21,7 @@ import { IterationGuard } from "./iterationGuard";
 import { CancellationManager } from "./cancellation";
 import { RuntimeState } from "./runtimeState";
 import type { StepResult } from "./runtimeTypes";
+import { ObservationEngine } from "./thinking/ObservationEngine";
 
 interface PendingToolCall {
   id: string;
@@ -32,6 +33,7 @@ export class ExecutionEngine {
   private currentTextBuffer = "";
   private currentThinkingBuffer = "";
   private pendingToolCalls: PendingToolCall[] = [];
+  private readonly observationEngine = new ObservationEngine();
 
   constructor(
     private readonly provider: AIProvider,
@@ -168,7 +170,7 @@ export class ExecutionEngine {
 
   private processEvent(
     event: ProviderEvent,
-    _state: RuntimeState,
+    state: RuntimeState,
     result: StepResult,
   ): void {
     switch (event.type) {
@@ -204,7 +206,7 @@ export class ExecutionEngine {
         });
 
         try {
-          const parsedInput = JSON.parse(event.arguments);
+          const parsedInput: unknown = JSON.parse(event.arguments);
           this.logger.info("Successfully parsed tool input", {
             name: event.name,
             input: JSON.stringify(parsedInput, null, 2).substring(0, 500),
@@ -233,7 +235,9 @@ export class ExecutionEngine {
           // Emit error event so the webview knows something went wrong
           this.eventEmitter.emitEvent({
             type: "error",
-            error: new Error(`Failed to parse tool arguments for ${event.name}: ${(error as Error).message}`),
+            error: `Failed to parse tool arguments for ${event.name}: ${(error as Error).message}`,
+            iteration: state.getExecution().currentIteration,
+            recoverable: false,
             timestamp: Date.now(),
           });
         }
@@ -338,6 +342,11 @@ export class ExecutionEngine {
 
       const result = taskResult.result;
       const duration = result.metadata?.duration ?? 0;
+      const observationSummary = this.observationEngine.summarizeToolResult(
+        toolCall.name,
+        result.success ? result.data : { error: result.error },
+        result.success,
+      );
 
       // Record metrics
       this.metrics.recordToolCall(toolCall.name);
@@ -348,6 +357,7 @@ export class ExecutionEngine {
         duration,
         result.success,
       );
+      state.addObservationSummary(observationSummary);
 
       // Auto cache invalidation after successful writes
       if (result.success) {
@@ -367,9 +377,14 @@ export class ExecutionEngine {
 
       // Add tool result message (including interactive tools)
       // Interactive tools MUST be included so the LLM knows the user's answer
+      const toolContent = this.observationEngine.toToolMessageContent(
+        observationSummary,
+        result.data ?? { error: result.error },
+      );
+
       state.addMessage({
         role: "tool",
-        content: JSON.stringify(result.data ?? { error: result.error }),
+        content: toolContent,
         timestamp: Date.now(),
         metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
       });

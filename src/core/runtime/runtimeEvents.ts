@@ -9,6 +9,13 @@ import { EventEmitter } from "events";
 import type { Disposable } from "./disposable";
 import { SimpleDisposable } from "./disposable";
 import type { RuntimeMetricsSnapshot } from "./runtimeTypes";
+import type {
+  EvidencePack,
+  ExecutionGraphSnapshot,
+  ObservationSummary,
+  ResponseValidationResult,
+  ThinkingTimelineItem,
+} from "./thinking/types";
 
 /**
  * Lifecycle events
@@ -47,6 +54,45 @@ export interface TokenEvent {
 export interface ThinkingEvent {
   readonly type: "thinking";
   readonly content: string;
+  readonly timestamp: number;
+}
+
+/**
+ * Safe thinking/orchestration events
+ */
+export interface ThinkingStepEvent {
+  readonly type: "thinking_step";
+  readonly item: ThinkingTimelineItem;
+  readonly timestamp: number;
+}
+
+export interface ContextEvidenceEvent {
+  readonly type: "context_evidence";
+  readonly evidence: EvidencePack;
+  readonly timestamp: number;
+}
+
+export interface ObservationSummaryEvent {
+  readonly type: "observation_summary";
+  readonly summary: ObservationSummary;
+  readonly timestamp: number;
+}
+
+export interface ReflectionSummaryEvent {
+  readonly type: "reflection_summary";
+  readonly item: ThinkingTimelineItem;
+  readonly timestamp: number;
+}
+
+export interface ResponseValidationEvent {
+  readonly type: "response_validation";
+  readonly validation: ResponseValidationResult;
+  readonly timestamp: number;
+}
+
+export interface ExecutionGraphUpdateEvent {
+  readonly type: "execution_graph_update";
+  readonly graph: ExecutionGraphSnapshot;
   readonly timestamp: number;
 }
 
@@ -249,6 +295,13 @@ export type RuntimeEvent =
   // Provider
   | TokenEvent
   | ThinkingEvent
+  // Safe thinking orchestration
+  | ThinkingStepEvent
+  | ContextEvidenceEvent
+  | ObservationSummaryEvent
+  | ReflectionSummaryEvent
+  | ResponseValidationEvent
+  | ExecutionGraphUpdateEvent
   | DoneEvent
   // Tools
   | ToolCallEvent
@@ -282,11 +335,55 @@ export type RuntimeEvent =
  * Typed event emitter for runtime events
  */
 export class RuntimeEventEmitter extends EventEmitter {
+  private responseBuffering = false;
+  private readonly responseBuffer: TokenEvent[] = [];
+
   /**
    * Emit a runtime event
    */
   emitEvent(event: RuntimeEvent): boolean {
+    if (event.type === "token" && this.responseBuffering) {
+      this.responseBuffer.push(event);
+      return true;
+    }
+
     return super.emit("event", event);
+  }
+
+  beginResponseBuffering(): void {
+    this.responseBuffering = true;
+    this.responseBuffer.length = 0;
+  }
+
+  endResponseBuffering(): void {
+    this.responseBuffering = false;
+    this.responseBuffer.length = 0;
+  }
+
+  getBufferedResponse(): string {
+    return this.responseBuffer.map((event) => event.content).join("");
+  }
+
+  isResponseBufferingEmpty(): boolean {
+    return this.responseBuffer.length === 0;
+  }
+
+  flushBufferedResponse(replacementText?: string): void {
+    const text = replacementText ?? this.getBufferedResponse();
+    const timestamp = Date.now();
+
+    this.responseBuffering = false;
+    this.responseBuffer.length = 0;
+
+    if (text.length === 0) {
+      return;
+    }
+
+    super.emit("event", {
+      type: "token",
+      content: text,
+      timestamp,
+    } satisfies TokenEvent);
   }
 
   /**

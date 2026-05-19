@@ -139,29 +139,129 @@ export function useRuntimeEvents() {
           }
 
           case "thinking": {
-            const event = runtimeEvent;
-            const chatId = useStore.getState().activeChatId;
-
-            // Append thinking content
-            if (chatId && event.content) {
-              store.appendThinkingToken(chatId, event.content);
-            }
-
             store.addTimelineEvent({
               type: "thinking",
               description: "Reasoning...",
               status: "pending",
             });
 
-            // NOVO: Adicionar thinking ao activity log
+            // Provider thinking is intentionally not rendered raw.
             if (currentActivityContextIdRef.current) {
               store.addActivityItem(currentActivityContextIdRef.current, {
                 category: "thinking",
                 context: "Thinking",
-                description: "Model is reasoning",
+                description: "Provider reasoning signal received",
                 status: "pending",
               });
             }
+            break;
+          }
+
+          case "thinking_step": {
+            const event = runtimeEvent;
+            const chatId = useStore.getState().activeChatId ?? useStore.getState().createChat("Nova conversa");
+
+            store.addActiveThinkingItem(chatId, {
+              id: event.item.id,
+              stage: event.item.stage,
+              title: event.item.title,
+              summary: event.item.summary,
+              status: event.item.status,
+              timestamp: event.item.timestamp,
+              durationMs: event.item.durationMs,
+              metadata: event.item.metadata,
+            });
+
+            store.addTimelineEvent({
+              type: "thinking",
+              description: event.item.title,
+              status: event.item.status === "error" ? "error" : event.item.status === "pending" ? "pending" : "success",
+              metadata: {
+                stage: event.item.stage,
+                summary: event.item.summary,
+              },
+            });
+
+            if (currentActivityContextIdRef.current) {
+              store.addActivityItem(currentActivityContextIdRef.current, {
+                category: "thinking",
+                context: event.item.title,
+                description: event.item.summary,
+                status: event.item.status === "error" ? "error" : event.item.status === "pending" ? "pending" : "success",
+              });
+            }
+            break;
+          }
+
+          case "context_evidence": {
+            const event = runtimeEvent;
+            store.addTimelineEvent({
+              type: "thinking",
+              description: event.evidence.summary,
+              status: event.evidence.items.length > 0 ? "success" : "error",
+              metadata: {
+                itemCount: event.evidence.items.length,
+                totalTokens: event.evidence.totalTokens,
+              },
+            });
+            break;
+          }
+
+          case "observation_summary": {
+            const event = runtimeEvent;
+            store.addTimelineEvent({
+              type: "thinking",
+              description: event.summary.summary,
+              status: event.summary.success ? "success" : "error",
+              metadata: {
+                sourceName: event.summary.sourceName,
+                truncated: event.summary.truncated,
+              },
+            });
+            break;
+          }
+
+          case "reflection_summary": {
+            const event = runtimeEvent;
+            const chatId = useStore.getState().activeChatId ?? useStore.getState().createChat("Nova conversa");
+            store.addActiveThinkingItem(chatId, {
+              id: event.item.id,
+              stage: event.item.stage,
+              title: event.item.title,
+              summary: event.item.summary,
+              status: event.item.status,
+              timestamp: event.item.timestamp,
+              durationMs: event.item.durationMs,
+              metadata: event.item.metadata,
+            });
+            break;
+          }
+
+          case "response_validation": {
+            const event = runtimeEvent;
+            store.addTimelineEvent({
+              type: "thinking",
+              description: event.validation.summary,
+              status: event.validation.status === "passed" ? "success" : "error",
+              metadata: {
+                riskFlags: event.validation.riskFlags,
+                evidenceCount: event.validation.evidenceCount,
+              },
+            });
+            break;
+          }
+
+          case "execution_graph_update": {
+            const event = runtimeEvent;
+            store.addTimelineEvent({
+              type: "thinking",
+              description: `Execution graph updated (${event.graph.nodes.length} nodes)`,
+              status: "success",
+              metadata: {
+                nodes: event.graph.nodes.length,
+                edges: event.graph.edges.length,
+              },
+            });
             break;
           }
 
@@ -294,6 +394,7 @@ export function useRuntimeEvents() {
             store.finalizeStreaming(chatId);
             // Clear active message tools for next message
             store.clearActiveMessageTools(chatId);
+            store.clearActiveThinkingItems(chatId);
 
             logger.log("[RuntimeEvents] Setting isExecuting=false");
             store.setExecuting(false);

@@ -168,8 +168,8 @@ export class LiteLLMNormalizer {
 
   private normalizeContentBlockStart(
     event: ContentBlockStartEvent,
-    correlation: CorrelationContext,
-    timestamp: number,
+    _correlation: CorrelationContext,
+    _timestamp: number,
   ): ProviderEvent[] {
     const events: ProviderEvent[] = [];
     const block = event.content_block;
@@ -182,8 +182,8 @@ export class LiteLLMNormalizer {
     // Tool use block: inicializa acumulador de JSON
     if (block.type === "tool_use") {
       this.currentToolCall = {
-        id: block.id,
-        name: block.name,
+        id: block.id ?? `tool-${event.index ?? 0}`,
+        name: block.name ?? "unknown_tool",
         jsonChunks: [],
         index: event.index ?? 0, // Capture index from event, default to 0 for single tool calls
       };

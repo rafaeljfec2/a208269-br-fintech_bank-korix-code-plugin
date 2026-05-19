@@ -10,9 +10,15 @@ import ExecutionTimeline from './ExecutionTimeline';
 import StatusCard from './StatusCard';
 import StreamingIndicator from './StreamingIndicator';
 import QuestionCard from './QuestionCard';
+import ThinkingContainer from '../thinking/ThinkingContainer';
 import type { ToolExecution } from './ToolExecutionItem';
+import type { ThinkingTimelineItem } from '../../store/slices/chatSlice';
 
 interface MessageMetadata {
+  readonly thinking?: {
+    readonly items: readonly ThinkingTimelineItem[];
+    readonly isExpanded: boolean;
+  };
   readonly execution?: {
     readonly tools: ToolExecution[];
     readonly isExpanded: boolean;
@@ -90,6 +96,14 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           title={message.metadata.statusCard.title}
           subtitle={message.metadata.statusCard.subtitle}
           action={message.metadata.statusCard.action}
+        />
+      )}
+
+      {/* Safe Thinking Timeline */}
+      {message.metadata?.thinking && message.metadata.thinking.items.length > 0 && (
+        <ThinkingContainer
+          items={message.metadata.thinking.items}
+          defaultExpanded={message.metadata.thinking.isExpanded}
         />
       )}
 

@@ -29,6 +29,7 @@ import type { ToolRegistry } from "../../harness/toolRegistry";
 import { AgentExecutor } from "./agentExecutor";
 import { SettingsHandler } from "./settingsHandler";
 import { ConnectionTester } from "./connectionTester";
+import type { ContextEngine } from "../../context/contextEngine";
 
 export class MessageHandler {
   private readonly logger: Logger;
@@ -39,6 +40,7 @@ export class MessageHandler {
   private readonly checkpointManager: CheckpointManager;
   private readonly permissionManager: PermissionManager;
   private readonly toolRegistry: ToolRegistry;
+  private readonly contextEngine: ContextEngine;
   private readonly agentLoopFactory: AgentLoopFactory;
   private readonly toolApprovalHandler: ToolApprovalHandler;
   private readonly checkpointHandler: CheckpointHandler;
@@ -68,6 +70,7 @@ export class MessageHandler {
       TOKENS.PermissionManager,
     );
     this.toolRegistry = container.get<ToolRegistry>(TOKENS.ToolRegistry);
+    this.contextEngine = container.get<ContextEngine>(TOKENS.ContextEngine);
 
     const terminalManager = container.get<TerminalSessionManager>(
       TOKENS.SessionManager,
@@ -104,6 +107,7 @@ export class MessageHandler {
       this.agentLoopFactory,
       this.toolRegistry,
       this.eventEmitter,
+      this.contextEngine,
     );
     this.settingsHandler = new SettingsHandler(
       webview,
