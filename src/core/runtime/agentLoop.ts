@@ -172,7 +172,10 @@ export class AgentLoop {
         const isEndTurn =
           stepResult.stopReason === "end_turn" ||
           stepResult.stopReason === "stop";
-        if (isEndTurn && !stepResult.hadToolCalls) {
+
+        // Stop if end_turn with no regular tool calls
+        // OR if we had interactive tool calls (force one question at a time)
+        if ((isEndTurn && !stepResult.hadToolCalls) || stepResult.hadInteractiveToolCalls) {
           completed = true;
         }
       }

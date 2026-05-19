@@ -134,7 +134,7 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       expect(result.hadInteractiveToolCalls).toBe(true);
     });
 
-    it("should skip tool_result message for interactive tools", () => {
+    it("should add tool_result message for ALL tools including interactive", () => {
       const tool: Tool = {
         name: "AskUserQuestion",
         description: "Ask user",
@@ -146,9 +146,11 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       };
 
       const toolCall = { id: "1", name: "AskUserQuestion", input: {} };
-      const shouldAddMessage = !tool.isInteractive;
+      // Changed: Now ALL tools add messages, including interactive ones
+      // This allows LLM to see user answers and respond appropriately
+      const shouldAddMessage = true;
 
-      expect(shouldAddMessage).toBe(false);
+      expect(shouldAddMessage).toBe(true);
     });
 
     it("should add tool_result message for regular tools", () => {
@@ -198,9 +200,12 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       const isEndTurn =
         stepResult.stopReason === "end_turn" ||
         stepResult.stopReason === "stop";
-      const shouldComplete = isEndTurn && !stepResult.hadToolCalls;
+      // Updated logic: complete if end_turn+no_tools OR if interactive tools present
+      const shouldComplete =
+        (isEndTurn && !stepResult.hadToolCalls) ||
+        stepResult.hadInteractiveToolCalls;
 
-      // Should complete because hadInteractiveToolCalls doesn't prevent completion
+      // Should complete because hadInteractiveToolCalls forces stop (prevents loops)
       expect(shouldComplete).toBe(true);
     });
 

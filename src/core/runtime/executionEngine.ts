@@ -365,17 +365,14 @@ export class ExecutionEngine {
         timestamp: Date.now(),
       });
 
-      // Add tool result message (skip for interactive tools)
-      const toolDef = this.toolRegistry.get(toolCall.name);
-      if (!toolDef?.isInteractive) {
-        state.addMessage({
-          role: "tool",
-          content: JSON.stringify(result.data ?? { error: result.error }),
-          timestamp: Date.now(),
-          metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
-        });
-      }
-      // Interactive tools don't add message → result won't be sent to provider
+      // Add tool result message (including interactive tools)
+      // Interactive tools MUST be included so the LLM knows the user's answer
+      state.addMessage({
+        role: "tool",
+        content: JSON.stringify(result.data ?? { error: result.error }),
+        timestamp: Date.now(),
+        metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
+      });
     }
   }
 
