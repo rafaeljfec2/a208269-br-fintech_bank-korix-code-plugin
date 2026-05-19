@@ -49,7 +49,16 @@ export default function ExecutionFeedback() {
   }
 
   // Early return AFTER all hooks (React rules)
-  if (!isExecuting) return null;
+  if (!isExecuting) {
+    console.log('[ExecutionFeedback] Not executing, returning null');
+    return null;
+  }
+
+  console.log('[ExecutionFeedback] RENDERING during execution', {
+    isExecuting,
+    itemsCount: timelineItems?.length ?? 0,
+    elapsedSeconds,
+  });
 
   // Get the most recent events (last 10)
   // FIX: Guard against undefined to prevent .slice() error
@@ -77,6 +86,12 @@ export default function ExecutionFeedback() {
       statusMessage = 'Digitando...';
     }
   }
+
+  console.log('[ExecutionFeedback] Status message:', statusMessage, {
+    primaryEventType: primaryEvent?.type,
+    toolCount,
+    thinkingActive,
+  });
 
   // Build summary with active tools
   const summary: string[] = [];
