@@ -132,6 +132,10 @@ export interface ChatSlice {
     chatId: string,
     item: ThinkingTimelineItem,
   ) => void;
+  readonly appendThinkingItemToLastAssistant: (
+    chatId: string,
+    item: ThinkingTimelineItem,
+  ) => void;
   readonly clearActiveThinkingItems: (chatId: string) => void;
   readonly removeQuestionFromMessage: (
     chatId: string,
@@ -491,6 +495,47 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
           [chatId]: {
             ...chat,
             activeThinkingItems: [...(chat.activeThinkingItems ?? []), item],
+          },
+        },
+      };
+    }),
+
+  appendThinkingItemToLastAssistant: (chatId, item) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat) return state;
+
+      const lastAssistantIndex = [...chat.messages]
+        .reverse()
+        .findIndex((message) => message.role === "assistant");
+
+      if (lastAssistantIndex === -1) return state;
+
+      const messageIndex = chat.messages.length - 1 - lastAssistantIndex;
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: {
+            ...chat,
+            messages: chat.messages.map((message, index) => {
+              if (index !== messageIndex) {
+                return message;
+              }
+
+              const existingItems = message.metadata?.thinking?.items ?? [];
+
+              return {
+                ...message,
+                metadata: {
+                  ...message.metadata,
+                  thinking: {
+                    items: [...existingItems, item],
+                    isExpanded: message.metadata?.thinking?.isExpanded ?? false,
+                  },
+                },
+              };
+            }),
           },
         },
       };

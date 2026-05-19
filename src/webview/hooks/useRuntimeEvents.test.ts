@@ -22,6 +22,7 @@ describe("useRuntimeEvents", () => {
   const mockSetExecuting = vi.fn();
   const mockSetIteration = vi.fn();
   const mockUpdateMetrics = vi.fn();
+  const mockSetCompletionStats = vi.fn();
   const mockSetMode = vi.fn();
   const mockSetModel = vi.fn();
   const mockCreateSession = vi.fn();
@@ -30,6 +31,7 @@ describe("useRuntimeEvents", () => {
   const mockUpdateActiveMessageMetadata = vi.fn();
   const mockClearActiveMessageTools = vi.fn();
   const mockAddActiveThinkingItem = vi.fn();
+  const mockAppendThinkingItemToLastAssistant = vi.fn();
   const mockClearActiveThinkingItems = vi.fn();
   // Activity Log mocks
   const mockStartContext = vi.fn();
@@ -51,6 +53,7 @@ describe("useRuntimeEvents", () => {
       setExecuting: mockSetExecuting,
       setIteration: mockSetIteration,
       updateMetrics: mockUpdateMetrics,
+      setCompletionStats: mockSetCompletionStats,
       setMode: mockSetMode,
       setModel: mockSetModel,
       createSession: mockCreateSession,
@@ -59,6 +62,7 @@ describe("useRuntimeEvents", () => {
       updateActiveMessageMetadata: mockUpdateActiveMessageMetadata,
       clearActiveMessageTools: mockClearActiveMessageTools,
       addActiveThinkingItem: mockAddActiveThinkingItem,
+      appendThinkingItemToLastAssistant: mockAppendThinkingItemToLastAssistant,
       clearActiveThinkingItems: mockClearActiveThinkingItems,
       // Activity Log state
       startContext: mockStartContext,
@@ -300,6 +304,14 @@ describe("useRuntimeEvents", () => {
         metadata: { toolName: "ReadFile", input: { path: "test.ts" } },
       });
       expect(mockUpdateMetrics).toHaveBeenCalled();
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "tool_call",
+          title: "Calling ReadFile",
+          summary: "Tool execution requested by the agent loop.",
+        }),
+      );
     });
   });
 
@@ -368,6 +380,59 @@ describe("useRuntimeEvents", () => {
         }),
       );
       expect(mockSetExecuting).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe("runtime_event: execution_complete", () => {
+    it("should append completion event to the finalized assistant message", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "done",
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "execution_complete",
+                  success: true,
+                  iterations: 2,
+                  metrics: {
+                    totalToolCalls: 3,
+                    totalTokens: 128,
+                    duration: 456,
+                  },
+                  timestamp: 789,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAppendThinkingItemToLastAssistant).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "execution_complete",
+          title: "Execution completed",
+          summary: "2 iteration(s), 3 tool call(s), 128 token(s).",
+        }),
+      );
     });
   });
 

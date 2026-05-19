@@ -5,12 +5,30 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../store";
 import type { ExtensionToWebviewMessage } from "../../shared/protocol";
-import type { ToolExecution } from "../store/slices/chatSlice";
+import type {
+  ThinkingTimelineItem,
+  ToolExecution,
+} from "../store/slices/chatSlice";
 import { logger } from "../utils/logger";
+
+type AgentEventStatus = ThinkingTimelineItem["status"];
+
+interface AgentEventListInput {
+  readonly stage: string;
+  readonly title: string;
+  readonly summary?: string;
+  readonly status?: AgentEventStatus;
+  readonly timestamp?: number;
+  readonly durationMs?: number;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
 
 export function useRuntimeEvents() {
   // Track current activity context - usar ref para persistir entre renders
   const currentActivityContextIdRef = useRef<string | null>(null);
+  const eventListCounterRef = useRef(0);
+  const lastCompletedChatIdRef = useRef<string | null>(null);
+  const responseStreamingNotedRef = useRef(false);
 
   // Token batching - acumula tokens e faz flush periódico para reduzir re-renders
   const tokenBufferRef = useRef<{ chatId: string; tokens: string[] } | null>(
@@ -53,6 +71,44 @@ export function useRuntimeEvents() {
         flushTimerRef.current = window.setTimeout(flushTokens, 50) as unknown as number;
       }
     };
+
+    const createEventListItem = (
+      input: AgentEventListInput,
+    ): ThinkingTimelineItem => {
+      eventListCounterRef.current += 1;
+
+      return {
+        id: `agent-event-${Date.now()}-${eventListCounterRef.current}`,
+        stage: input.stage,
+        title: input.title,
+        summary: input.summary ?? "",
+        status: input.status ?? "success",
+        timestamp: input.timestamp ?? Date.now(),
+        durationMs: input.durationMs,
+        metadata: input.metadata,
+      };
+    };
+
+    const addActiveEventItem = (input: AgentEventListInput): string => {
+      const currentStore = useStore.getState();
+      const chatId =
+        currentStore.activeChatId ?? currentStore.createChat("Nova conversa");
+      currentStore.addActiveThinkingItem(chatId, createEventListItem(input));
+      return chatId;
+    };
+
+    const appendCompletedEventItem = (
+      chatId: string | null,
+      input: AgentEventListInput,
+    ) => {
+      if (!chatId) {
+        return;
+      }
+
+      useStore
+        .getState()
+        .appendThinkingItemToLastAssistant(chatId, createEventListItem(input));
+    };
     const handleMessage = (event: MessageEvent<ExtensionToWebviewMessage>) => {
       // Usar getState() para evitar dependências no useEffect e múltiplos listeners
       const store = useStore.getState();
@@ -74,12 +130,21 @@ export function useRuntimeEvents() {
             switch (runtimeEvent.type) {
           case "iteration_start": {
             const event = runtimeEvent;
+            lastCompletedChatIdRef.current = null;
+            responseStreamingNotedRef.current = false;
             store.setIteration(event.iteration);
             store.setExecuting(true);
             store.addTimelineEvent({
               type: "iteration",
               description: `Iteration ${event.iteration} started`,
               status: "pending",
+            });
+            addActiveEventItem({
+              stage: "iteration_start",
+              title: `Iteration ${event.iteration} started`,
+              summary: "Agent loop started an execution step.",
+              status: "pending",
+              timestamp: event.timestamp,
             });
 
             // NOVO: Criar contexto de atividade para iteração
@@ -102,6 +167,16 @@ export function useRuntimeEvents() {
               description: `Iteration ${event.iteration} completed`,
               status: "success",
               metadata: { hadToolCalls: event.hadToolCalls },
+            });
+            addActiveEventItem({
+              stage: "iteration_complete",
+              title: `Iteration ${event.iteration} completed`,
+              summary: event.hadToolCalls
+                ? "Completed after tool activity."
+                : "Completed without tool calls.",
+              status: "success",
+              timestamp: event.timestamp,
+              durationMs: event.duration,
             });
 
             // NOVO: Finalizar contexto de atividade
@@ -133,6 +208,17 @@ export function useRuntimeEvents() {
               store.finalizeThinking(chatId);
             }
 
+            if (!responseStreamingNotedRef.current) {
+              addActiveEventItem({
+                stage: "token_stream",
+                title: "Streaming final response",
+                summary: "Validated assistant text is being sent to chat.",
+                status: "pending",
+                timestamp: event.timestamp,
+              });
+              responseStreamingNotedRef.current = true;
+            }
+
             // Usar batching para reduzir re-renders (flush a cada 50ms)
             bufferToken(chatId, event.content);
             break;
@@ -143,6 +229,13 @@ export function useRuntimeEvents() {
               type: "thinking",
               description: "Reasoning...",
               status: "pending",
+            });
+            addActiveEventItem({
+              stage: "provider_thinking",
+              title: "Provider reasoning signal",
+              summary: "Internal provider thinking received; raw reasoning hidden.",
+              status: "pending",
+              timestamp: runtimeEvent.timestamp,
             });
 
             // Provider thinking is intentionally not rendered raw.
@@ -204,6 +297,17 @@ export function useRuntimeEvents() {
                 totalTokens: event.evidence.totalTokens,
               },
             });
+            addActiveEventItem({
+              stage: "context_evidence",
+              title: "Workspace evidence checked",
+              summary: event.evidence.summary,
+              status: event.evidence.items.length > 0 ? "success" : "warning",
+              timestamp: event.timestamp,
+              metadata: {
+                itemCount: event.evidence.items.length,
+                totalTokens: event.evidence.totalTokens,
+              },
+            });
             break;
           }
 
@@ -213,6 +317,17 @@ export function useRuntimeEvents() {
               type: "thinking",
               description: event.summary.summary,
               status: event.summary.success ? "success" : "error",
+              metadata: {
+                sourceName: event.summary.sourceName,
+                truncated: event.summary.truncated,
+              },
+            });
+            addActiveEventItem({
+              stage: "observation_summary",
+              title: `Observed ${event.summary.sourceName}`,
+              summary: event.summary.summary,
+              status: event.summary.success ? "success" : "error",
+              timestamp: event.timestamp,
               metadata: {
                 sourceName: event.summary.sourceName,
                 truncated: event.summary.truncated,
@@ -248,6 +363,22 @@ export function useRuntimeEvents() {
                 evidenceCount: event.validation.evidenceCount,
               },
             });
+            addActiveEventItem({
+              stage: "response_validation",
+              title: "Answer validated",
+              summary: event.validation.summary,
+              status:
+                event.validation.status === "passed"
+                  ? "success"
+                  : event.validation.status === "warning"
+                  ? "warning"
+                  : "error",
+              timestamp: event.timestamp,
+              metadata: {
+                riskFlags: event.validation.riskFlags,
+                evidenceCount: event.validation.evidenceCount,
+              },
+            });
             break;
           }
 
@@ -257,6 +388,17 @@ export function useRuntimeEvents() {
               type: "thinking",
               description: `Execution graph updated (${event.graph.nodes.length} nodes)`,
               status: "success",
+              metadata: {
+                nodes: event.graph.nodes.length,
+                edges: event.graph.edges.length,
+              },
+            });
+            appendCompletedEventItem(lastCompletedChatIdRef.current, {
+              stage: "execution_graph_update",
+              title: "Execution graph updated",
+              summary: `${event.graph.nodes.length} nodes, ${event.graph.edges.length} edges.`,
+              status: "success",
+              timestamp: event.timestamp,
               metadata: {
                 nodes: event.graph.nodes.length,
                 edges: event.graph.edges.length,
@@ -273,6 +415,14 @@ export function useRuntimeEvents() {
               type: "tool",
               description: `Tool: ${event.name}`,
               status: "pending",
+              metadata: { toolName: event.name, input: event.input },
+            });
+            addActiveEventItem({
+              stage: "tool_call",
+              title: `Calling ${event.name}`,
+              summary: "Tool execution requested by the agent loop.",
+              status: "pending",
+              timestamp: event.timestamp,
               metadata: { toolName: event.name, input: event.input },
             });
             store.updateMetrics({
@@ -317,6 +467,15 @@ export function useRuntimeEvents() {
               type: "tool",
               description: `Tool ${event.name} completed`,
               status: event.success ? "success" : "error",
+              metadata: { toolName: event.name },
+            });
+            addActiveEventItem({
+              stage: "tool_result",
+              title: `${event.name} ${event.success ? "completed" : "failed"}`,
+              summary: `Tool finished in ${event.duration ?? 0}ms.`,
+              status: event.success ? "success" : "error",
+              timestamp: event.timestamp,
+              durationMs: event.duration,
               metadata: { toolName: event.name },
             });
 
@@ -375,6 +534,14 @@ export function useRuntimeEvents() {
 
             // Transfer activeMessageTools to message metadata
             const activeChat = useStore.getState().conversations[chatId];
+            addActiveEventItem({
+              stage: "done",
+              title: "Provider turn completed",
+              summary: "Final response stream is ready to commit.",
+              status: "success",
+              timestamp: runtimeEvent.timestamp,
+              metadata: { stopReason: runtimeEvent.stopReason },
+            });
             if (activeChat?.activeMessageTools) {
               const totalDuration = activeChat.activeMessageTools.reduce(
                 (sum, t) => sum + t.duration,
@@ -392,9 +559,11 @@ export function useRuntimeEvents() {
 
             logger.log("[RuntimeEvents] Calling finalizeStreaming for chat:", chatId);
             store.finalizeStreaming(chatId);
+            lastCompletedChatIdRef.current = chatId;
             // Clear active message tools for next message
             store.clearActiveMessageTools(chatId);
             store.clearActiveThinkingItems(chatId);
+            responseStreamingNotedRef.current = false;
 
             logger.log("[RuntimeEvents] Setting isExecuting=false");
             store.setExecuting(false);
@@ -421,6 +590,22 @@ export function useRuntimeEvents() {
               totalTokens: event.metrics.totalTokens,
               duration: event.metrics.duration,
             });
+            appendCompletedEventItem(
+              lastCompletedChatIdRef.current ?? useStore.getState().activeChatId,
+              {
+                stage: "execution_complete",
+                title: event.success ? "Execution completed" : "Execution failed",
+                summary: `${event.iterations} iteration(s), ${event.metrics.totalToolCalls} tool call(s), ${event.metrics.totalTokens} token(s).`,
+                status: event.success ? "success" : "error",
+                timestamp: event.timestamp,
+                durationMs: event.metrics.duration,
+                metadata: {
+                  iterations: event.iterations,
+                  totalToolCalls: event.metrics.totalToolCalls,
+                  totalTokens: event.metrics.totalTokens,
+                },
+              },
+            );
 
             // NOVO: Atualizar métricas de tokens
             store.updateMetrics({
@@ -462,11 +647,20 @@ export function useRuntimeEvents() {
               store.finalizeStreaming(chatId);
             }
             store.setExecuting(false);
+            responseStreamingNotedRef.current = false;
             store.addTimelineEvent({
               type: "error",
               description: event.error,
               status: "error",
               metadata: { error: event.error },
+            });
+            addActiveEventItem({
+              stage: "runtime_error",
+              title: "Runtime error",
+              summary: event.error,
+              status: "error",
+              timestamp: event.timestamp,
+              metadata: { recoverable: event.recoverable },
             });
             break;
           }
@@ -479,6 +673,14 @@ export function useRuntimeEvents() {
               status: "success",
               metadata: { checkpointId: event.checkpointId },
             });
+            addActiveEventItem({
+              stage: "checkpoint_created",
+              title: "Checkpoint created",
+              summary: `${event.filesChanged ?? 0} changed file(s) captured.`,
+              status: "success",
+              timestamp: event.timestamp,
+              metadata: { checkpointId: event.checkpointId },
+            });
             break;
           }
 
@@ -488,6 +690,14 @@ export function useRuntimeEvents() {
               type: "checkpoint",
               description: "Checkpoint restored",
               status: "success",
+              metadata: { checkpointId: event.checkpointId },
+            });
+            addActiveEventItem({
+              stage: "checkpoint_restored",
+              title: "Checkpoint restored",
+              summary: "Runtime state restored from checkpoint.",
+              status: "success",
+              timestamp: event.timestamp,
               metadata: { checkpointId: event.checkpointId },
             });
             break;
@@ -517,6 +727,14 @@ export function useRuntimeEvents() {
                   subtitle: `${event.options.length} opções disponíveis no formulário abaixo`,
                 },
               },
+            });
+            addActiveEventItem({
+              stage: "user_question",
+              title: `Asked ${event.title}`,
+              summary: `${event.options.length} option(s) presented to the user.`,
+              status: "pending",
+              timestamp: event.timestamp,
+              metadata: { questionId: event.questionId, mode: event.mode },
             });
 
             // Set active question in footer
@@ -548,6 +766,16 @@ export function useRuntimeEvents() {
 
             // Clear active question from UI
             store.clearActiveQuestion();
+            addActiveEventItem({
+              stage: "user_answer",
+              title: "User answered",
+              summary: event.isTimeout
+                ? "Question timed out."
+                : event.answers.join(", "),
+              status: event.isTimeout ? "warning" : "success",
+              timestamp: event.timestamp,
+              metadata: { questionId: event.questionId },
+            });
 
             // Activity log
             if (currentActivityContextIdRef.current) {
@@ -572,6 +800,17 @@ export function useRuntimeEvents() {
               status: "error",
               metadata: { timeSinceActivity: event.timeSinceActivity, iteration: event.iteration },
             });
+            addActiveEventItem({
+              stage: "stall_detected",
+              title: "Stall detected",
+              summary: `${stallSeconds}s without runtime activity.`,
+              status: "error",
+              timestamp: event.timestamp,
+              metadata: {
+                timeSinceActivity: event.timeSinceActivity,
+                iteration: event.iteration,
+              },
+            });
 
             if (currentActivityContextIdRef.current) {
               store.addActivityItem(currentActivityContextIdRef.current, {
@@ -591,6 +830,14 @@ export function useRuntimeEvents() {
               type: "error",
               description: `Duplicate tool: ${event.toolName} (${event.count}x)`,
               status: "error",
+              metadata: { toolName: event.toolName, count: event.count },
+            });
+            addActiveEventItem({
+              stage: "duplicate_tool_detected",
+              title: "Duplicate tool detected",
+              summary: `${event.toolName} called ${event.count} times.`,
+              status: "warning",
+              timestamp: event.timestamp,
               metadata: { toolName: event.toolName, count: event.count },
             });
 
@@ -614,6 +861,14 @@ export function useRuntimeEvents() {
               status: "error",
               metadata: { reason: event.reason, iteration: event.iteration },
             });
+            addActiveEventItem({
+              stage: "loop_warning",
+              title: "Loop warning",
+              summary: event.reason,
+              status: "warning",
+              timestamp: event.timestamp,
+              metadata: { iteration: event.iteration },
+            });
 
             if (currentActivityContextIdRef.current) {
               store.addActivityItem(currentActivityContextIdRef.current, {
@@ -636,6 +891,14 @@ export function useRuntimeEvents() {
               status: "pending",
               metadata: { action: event.action, attempt: event.attempt },
             });
+            addActiveEventItem({
+              stage: "recovery_started",
+              title: `Recovery started: ${event.action}`,
+              summary: `Attempt ${event.attempt}.`,
+              status: "pending",
+              timestamp: event.timestamp,
+              metadata: { action: event.action, attempt: event.attempt },
+            });
             break;
           }
 
@@ -647,6 +910,14 @@ export function useRuntimeEvents() {
               description: `Recovery ${event.success ? "succeeded" : "failed"}: ${event.action}`,
               status: event.success ? "success" : "error",
               metadata: { action: event.action, success: event.success },
+            });
+            addActiveEventItem({
+              stage: "recovery_complete",
+              title: `Recovery ${event.success ? "completed" : "failed"}`,
+              summary: event.action,
+              status: event.success ? "success" : "error",
+              timestamp: event.timestamp,
+              metadata: { action: event.action },
             });
             break;
           }
@@ -660,12 +931,21 @@ export function useRuntimeEvents() {
               store.finalizeStreaming(chatId);
             }
             store.setExecuting(false);
+            responseStreamingNotedRef.current = false;
 
             store.addTimelineEvent({
               type: "error",
               description: `Cancelled: ${event.reason}`,
               status: "error",
               metadata: { reason: event.reason, iteration: event.iteration },
+            });
+            addActiveEventItem({
+              stage: "cancelled",
+              title: "Execution cancelled",
+              summary: event.reason,
+              status: "error",
+              timestamp: event.timestamp,
+              metadata: { iteration: event.iteration },
             });
 
             if (currentActivityContextIdRef.current) {
@@ -685,6 +965,13 @@ export function useRuntimeEvents() {
               description: "Execution paused",
               status: "pending",
             });
+            addActiveEventItem({
+              stage: "paused",
+              title: "Execution paused",
+              summary: `Paused at iteration ${runtimeEvent.iteration}.`,
+              status: "pending",
+              timestamp: runtimeEvent.timestamp,
+            });
 
             if (currentActivityContextIdRef.current) {
               store.addActivityItem(currentActivityContextIdRef.current, {
@@ -702,6 +989,13 @@ export function useRuntimeEvents() {
               type: "checkpoint",
               description: "Execution resumed",
               status: "success",
+            });
+            addActiveEventItem({
+              stage: "resumed",
+              title: "Execution resumed",
+              summary: `Resumed at iteration ${runtimeEvent.iteration}.`,
+              status: "success",
+              timestamp: runtimeEvent.timestamp,
             });
 
             if (currentActivityContextIdRef.current) {
@@ -725,6 +1019,14 @@ export function useRuntimeEvents() {
               status: "pending",
               metadata: { toolName: event.name },
             });
+            addActiveEventItem({
+              stage: "tool_approval_required",
+              title: `Approval required: ${event.name}`,
+              summary: "Waiting for user approval before tool execution.",
+              status: "pending",
+              timestamp: event.timestamp,
+              metadata: { toolName: event.name },
+            });
             break;
           }
 
@@ -735,6 +1037,14 @@ export function useRuntimeEvents() {
               type: "tool",
               description: `Tool approved: ${event.name}`,
               status: "success",
+              metadata: { toolName: event.name },
+            });
+            addActiveEventItem({
+              stage: "tool_approved",
+              title: `Tool approved: ${event.name}`,
+              summary: "User approved tool execution.",
+              status: "success",
+              timestamp: event.timestamp,
               metadata: { toolName: event.name },
             });
             break;
@@ -748,6 +1058,14 @@ export function useRuntimeEvents() {
               description: `Tool denied: ${event.name} - ${event.reason}`,
               status: "error",
               metadata: { toolName: event.name, reason: event.reason },
+            });
+            addActiveEventItem({
+              stage: "tool_denied",
+              title: `Tool denied: ${event.name}`,
+              summary: event.reason,
+              status: "error",
+              timestamp: event.timestamp,
+              metadata: { toolName: event.name },
             });
 
             if (currentActivityContextIdRef.current) {
@@ -771,6 +1089,14 @@ export function useRuntimeEvents() {
               status: "success",
               metadata: { file: event.file, lineNumber: event.lineNumber, operation: event.operation },
             });
+            addActiveEventItem({
+              stage: "patch_applied",
+              title: "Patch applied",
+              summary: `${event.operation} at ${event.file}:${event.lineNumber}.`,
+              status: "success",
+              timestamp: event.timestamp,
+              metadata: { file: event.file, operation: event.operation },
+            });
             break;
           }
 
@@ -782,6 +1108,14 @@ export function useRuntimeEvents() {
               description: `Patch failed: ${event.file} - ${event.error}`,
               status: "error",
               metadata: { file: event.file, error: event.error },
+            });
+            addActiveEventItem({
+              stage: "patch_failed",
+              title: "Patch failed",
+              summary: `${event.file}: ${event.error}`,
+              status: "error",
+              timestamp: event.timestamp,
+              metadata: { file: event.file },
             });
 
             if (currentActivityContextIdRef.current) {

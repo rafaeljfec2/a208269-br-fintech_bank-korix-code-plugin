@@ -168,7 +168,11 @@ export default function MainPanel() {
 
       {/* Safe thinking timeline - no raw provider thinking */}
       {activeThinkingItems && activeThinkingItems.length > 0 && (
-        <ThinkingContainer items={activeThinkingItems} defaultExpanded={true} />
+        <ThinkingContainer
+          items={activeThinkingItems}
+          defaultExpanded={false}
+          active={true}
+        />
       )}
 
       {/* Streaming content - sem avatar, sem header, COM REF para auto-scroll */}

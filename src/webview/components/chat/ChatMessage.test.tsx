@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import ChatMessage from './ChatMessage';
 import type { Message } from './ChatMessage';
 
@@ -52,7 +52,7 @@ describe('ChatMessage', () => {
     expect(screen.getByText('3 steps')).toBeInTheDocument();
   });
 
-  it('should render execution timeline when metadata contains execution', () => {
+  it('should not render a separate execution timeline when metadata contains execution', () => {
     const messageWithExecution: Message = {
       ...baseMessage,
       metadata: {
@@ -74,8 +74,8 @@ describe('ChatMessage', () => {
     };
 
     render(<ChatMessage message={messageWithExecution} />);
-    expect(screen.getByText('Execução')).toBeInTheDocument();
-    expect(screen.getByText('1 ferramenta')).toBeInTheDocument();
+    expect(screen.queryByText('Execução')).not.toBeInTheDocument();
+    expect(screen.queryByText('1 ferramenta')).not.toBeInTheDocument();
   });
 
   it('should not render execution timeline when tools array is empty', () => {
@@ -94,51 +94,30 @@ describe('ChatMessage', () => {
     expect(screen.queryByText('Execução')).not.toBeInTheDocument();
   });
 
-  it('should toggle timeline expansion on click', () => {
-    const messageWithExecution: Message = {
+  it('should render thinking event list when metadata contains thinking', () => {
+    const messageWithThinking: Message = {
       ...baseMessage,
       metadata: {
-        execution: {
-          tools: [
+        thinking: {
+          items: [
             {
-              id: '1',
-              name: 'Read',
-              description: 'Read file test.ts',
+              id: 'think-1',
+              stage: 'tool_result',
+              title: 'ReadFile completed',
+              summary: 'Tool finished in 120ms.',
               status: 'success',
-              duration: 1000,
               timestamp: Date.now(),
             },
           ],
           isExpanded: false,
-          totalDuration: 1000,
         },
       },
     };
 
-    const { rerender } = render(<ChatMessage message={messageWithExecution} />);
+    render(<ChatMessage message={messageWithThinking} />);
 
-    // Initially collapsed - tool description not visible
-    expect(screen.queryByText('Read file test.ts')).not.toBeInTheDocument();
-
-    // Click to expand
-    const header = screen.getByText('Execução').closest('div');
-    fireEvent.click(header!);
-
-    // Force re-render with expanded state (simulating state update)
-    const expandedMessage: Message = {
-      ...messageWithExecution,
-      metadata: {
-        ...messageWithExecution.metadata,
-        execution: {
-          ...messageWithExecution.metadata!.execution!,
-          isExpanded: true,
-        },
-      },
-    };
-    rerender(<ChatMessage message={expandedMessage} />);
-
-    // Now tool description should be visible
-    expect(screen.getByText('Read file test.ts')).toBeInTheDocument();
+    expect(screen.getByText('thought')).toBeInTheDocument();
+    expect(screen.queryByText('ReadFile completed')).not.toBeInTheDocument();
   });
 
   it('should display streaming indicator when isStreaming is true', () => {

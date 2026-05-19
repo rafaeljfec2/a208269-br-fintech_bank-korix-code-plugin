@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import type { ThinkingTimelineItem } from '../../store/slices/chatSlice';
@@ -6,21 +6,40 @@ import type { ThinkingTimelineItem } from '../../store/slices/chatSlice';
 interface ThinkingContainerProps {
   readonly items: readonly ThinkingTimelineItem[];
   readonly defaultExpanded?: boolean;
+  readonly active?: boolean;
 }
 
 export default function ThinkingContainer({
   items,
   defaultExpanded = false,
+  active = false,
 }: ThinkingContainerProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [dotCount, setDotCount] = useState(3);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      setDotCount((current) => (current >= 3 ? 1 : current + 1));
+    }, 420);
+
+    return () => window.clearInterval(timer);
+  }, [active]);
 
   if (items.length === 0) {
     return null;
   }
 
-  const summary = buildCompactSummary(items);
-  const warnings = items.filter((item) => item.status === 'warning').length;
-  const errors = items.filter((item) => item.status === 'error').length;
+  const visibleItems = active ? items : buildCompletedItems(items);
+  if (visibleItems.length === 0) {
+    return null;
+  }
+
+  const dots = '.'.repeat(dotCount);
+  const headerLabel = active ? `thinking ${dots}` : 'thought';
 
   const headerClass = clsx(
     'group inline-flex max-w-full items-center gap-1.5 py-1 cursor-pointer',
@@ -37,21 +56,7 @@ export default function ThinkingContainer({
         onClick={() => setExpanded(!expanded)}
       >
         <span className="w-3 text-[10px]">{expanded ? '⌄' : '›'}</span>
-        <span className="text-[10px] opacity-80">⌕</span>
-        <span className="truncate">{summary}</span>
-        <span className="text-[10px] opacity-70">
-          {items.length} {items.length === 1 ? 'step' : 'steps'}
-        </span>
-        {warnings > 0 && (
-          <span className="text-[10px] text-[var(--vscode-terminal-ansiYellow)]">
-            {warnings} warning
-          </span>
-        )}
-        {errors > 0 && (
-          <span className="text-[10px] text-[var(--vscode-terminal-ansiRed)]">
-            {errors} error
-          </span>
-        )}
+        <span className="truncate">{headerLabel}</span>
       </button>
 
       <AnimatePresence>
@@ -64,8 +69,12 @@ export default function ThinkingContainer({
             className="overflow-hidden"
           >
             <div className="mt-1 ml-6 space-y-1 text-[11px] leading-snug text-[var(--vscode-descriptionForeground)]">
-              {items.map((item) => (
-                <ThinkingTimelineRow key={item.id} item={item} />
+              {visibleItems.map((item) => (
+                <ThinkingTimelineRow
+                  key={item.id}
+                  item={item}
+                  compact={!active}
+                />
               ))}
             </div>
           </motion.div>
@@ -77,8 +86,10 @@ export default function ThinkingContainer({
 
 function ThinkingTimelineRow({
   item,
+  compact = false,
 }: {
   readonly item: ThinkingTimelineItem;
+  readonly compact?: boolean;
 }) {
   const iconClass = clsx(
     'w-3 flex-shrink-0 text-[10px]',
@@ -102,7 +113,7 @@ function ThinkingTimelineRow({
       <span className={iconClass}>{icon}</span>
       <div className="min-w-0 flex-1 truncate">
         <span>{item.title}</span>
-        {item.summary && (
+        {!compact && item.summary && (
           <span className="opacity-75"> - {item.summary}</span>
         )}
       </div>
@@ -110,29 +121,106 @@ function ThinkingTimelineRow({
   );
 }
 
-function buildCompactSummary(items: readonly ThinkingTimelineItem[]): string {
-  const stages = new Set(items.map((item) => item.stage));
-  const labels: string[] = [];
+function buildCompletedItems(
+  items: readonly ThinkingTimelineItem[],
+): readonly ThinkingTimelineItem[] {
+  const completed: ThinkingTimelineItem[] = [];
 
-  if (stages.has('analyzing_request')) {
-    labels.push('Analyzed request');
+  addNormalizedItem(completed, items, {
+    stages: ["analyzing_request"],
+    title: "Analyzed request",
+  });
+
+  addNormalizedItem(completed, items, {
+    stages: ["context_evidence", "checking_context", "collecting_evidence"],
+    title: "Checked context",
+  });
+
+  addToolSummary(completed, items);
+
+  addNormalizedItem(completed, items, {
+    stages: [
+      "observation_summary",
+      "summarizing_observation",
+      "reflection_summary",
+      "reflecting",
+    ],
+    title: "Reviewed observations",
+  });
+
+  addNormalizedItem(completed, items, {
+    stages: ["response_validation", "validating_response"],
+    title: "Validated answer",
+  });
+
+  addNormalizedItem(completed, items, {
+    stages: ["execution_complete", "done"],
+    title: "Completed",
+  });
+
+  if (completed.length > 0) {
+    return completed;
   }
 
-  if (stages.has('checking_context') || stages.has('collecting_evidence')) {
-    labels.push('Checked context');
+  const last = items[items.length - 1];
+  return last
+    ? [
+        {
+          ...last,
+          id: `${last.id}-completed-fallback`,
+          title: "Completed",
+          summary: "",
+          status: last.status === "error" ? "error" : "success",
+        },
+      ]
+    : [];
+}
+
+function addNormalizedItem(
+  target: ThinkingTimelineItem[],
+  items: readonly ThinkingTimelineItem[],
+  options: {
+    readonly stages: readonly string[];
+    readonly title: string;
+  },
+): void {
+  const source = [...items]
+    .reverse()
+    .find((item) => options.stages.includes(item.stage));
+
+  if (!source) {
+    return;
   }
 
-  if (stages.has('summarizing_observation') || stages.has('reflecting')) {
-    labels.push('Reviewed observations');
+  target.push({
+    ...source,
+    id: `${source.id}-completed-${options.title}`,
+    title: options.title,
+    summary: "",
+    status: source.status === "pending" ? "success" : source.status,
+  });
+}
+
+function addToolSummary(
+  target: ThinkingTimelineItem[],
+  items: readonly ThinkingTimelineItem[],
+): void {
+  const toolResults = items.filter((item) => item.stage === "tool_result");
+  if (toolResults.length === 0) {
+    return;
   }
 
-  if (stages.has('validating_response')) {
-    labels.push('Validated answer');
+  const hasFailure = toolResults.some((item) => item.status === "error");
+  const lastTool = toolResults[toolResults.length - 1];
+  if (!lastTool) {
+    return;
   }
 
-  if (labels.length === 0) {
-    return items[items.length - 1]?.title ?? 'Thinking activity';
-  }
-
-  return labels.slice(0, 3).join(', ');
+  target.push({
+    ...lastTool,
+    id: `${lastTool.id}-completed-tools`,
+    title: `Used ${toolResults.length} ${toolResults.length === 1 ? "tool" : "tools"}`,
+    summary: "",
+    status: hasFailure ? "error" : "success",
+  });
 }

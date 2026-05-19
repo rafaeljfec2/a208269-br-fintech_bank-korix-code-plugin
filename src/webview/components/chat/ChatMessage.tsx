@@ -1,18 +1,19 @@
 /**
- * ChatMessage - Main message component with markdown, timeline, and status cards
+ * ChatMessage - Main message component with markdown and compact runtime events
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import MarkdownContent from './MarkdownContent';
-import ExecutionTimeline from './ExecutionTimeline';
 import StatusCard from './StatusCard';
 import StreamingIndicator from './StreamingIndicator';
 import QuestionCard from './QuestionCard';
 import ThinkingContainer from '../thinking/ThinkingContainer';
-import type { ToolExecution } from './ToolExecutionItem';
-import type { ThinkingTimelineItem } from '../../store/slices/chatSlice';
+import type {
+  ThinkingTimelineItem,
+  ToolExecution,
+} from '../../store/slices/chatSlice';
 
 interface MessageMetadata {
   readonly thinking?: {
@@ -63,10 +64,6 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ message }: ChatMessageProps) {
-  const [timelineExpanded, setTimelineExpanded] = useState(
-    message.metadata?.execution?.isExpanded ?? false
-  );
-
   // Chat fluido - SEM avatares, SEM labels ("You", "Korix")
   // Diferenciação visual APENAS por background
   const messageContainer = clsx(
@@ -118,15 +115,6 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           timeoutMs={message.metadata.question.timeoutMs}
           onSubmit={message.metadata.question.onSubmit}
           onTimeout={message.metadata.question.onTimeout}
-        />
-      )}
-
-      {/* Execution Timeline */}
-      {message.metadata?.execution && message.metadata.execution.tools.length > 0 && (
-        <ExecutionTimeline
-          tools={message.metadata.execution.tools}
-          isExpanded={timelineExpanded}
-          onToggle={() => setTimelineExpanded(!timelineExpanded)}
         />
       )}
     </motion.div>

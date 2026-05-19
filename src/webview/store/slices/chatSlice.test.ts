@@ -86,6 +86,36 @@ describe("chatSlice", () => {
     });
   });
 
+  describe("thinking timeline", () => {
+    it("should append thinking event to the last assistant message", () => {
+      const {
+        addMessage,
+        appendThinkingItemToLastAssistant,
+      } = store.getState();
+
+      addMessage(chatId, { role: "user", content: "Hello" });
+      addMessage(chatId, { role: "assistant", content: "Hi" });
+
+      appendThinkingItemToLastAssistant(chatId, {
+        id: "event-1",
+        stage: "execution_complete",
+        title: "Execution completed",
+        summary: "1 iteration(s), 0 tool call(s), 32 token(s).",
+        status: "success",
+        timestamp: 123,
+      });
+
+      const state = store.getState();
+      const chat = state.conversations[chatId];
+      const assistantMessage = chat?.messages[1];
+
+      expect(assistantMessage?.metadata?.thinking?.items).toHaveLength(1);
+      expect(assistantMessage?.metadata?.thinking?.items[0]?.title).toBe(
+        "Execution completed",
+      );
+    });
+  });
+
   describe("clearChat", () => {
     it("should clear all messages and streaming state", () => {
       const { addMessage, appendStreamingToken, clearChat } = store.getState();
