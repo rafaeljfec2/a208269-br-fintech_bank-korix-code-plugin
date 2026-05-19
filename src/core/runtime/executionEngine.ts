@@ -151,14 +151,9 @@ export class ExecutionEngine {
         this.pendingToolCalls = [];
       }
 
-      // FIX: Emit "done" AFTER all tools are executed, not when streaming finishes
-      // This ensures the webview doesn't clear state while tools are still running
-      this.eventEmitter.emitEvent({
-        type: "done",
-        stopReason: result.stopReason,
-        usage: undefined,
-        timestamp: Date.now(),
-      });
+      // NOTE: Don't emit "done" here! The agentLoop emits it when the entire
+      // loop completes, not after each iteration. Emitting here would send
+      // multiple "done" events if the loop has multiple iterations.
 
       return result;
     } catch (error) {
@@ -166,14 +161,7 @@ export class ExecutionEngine {
       result.error = (error as Error).message;
       result.recoverable = this.isRecoverable(error as Error);
 
-      // FIX: Also emit "done" on error to ensure webview can recover
-      this.eventEmitter.emitEvent({
-        type: "done",
-        stopReason: "error",
-        usage: undefined,
-        timestamp: Date.now(),
-      });
-
+      // NOTE: Don't emit "done" here either - agentLoop handles it
       throw error;
     }
   }

@@ -181,6 +181,14 @@ export class AgentLoop {
       state.stopExecution();
       const metricsSnapshot = this.metrics.finalize();
 
+      // FIX: Emit "done" when the entire loop completes, not after each iteration
+      yield {
+        type: "done",
+        stopReason: "end_turn",
+        usage: undefined,
+        timestamp: Date.now(),
+      };
+
       yield {
         type: "execution_complete",
         success: true,
@@ -200,6 +208,14 @@ export class AgentLoop {
       state.stopExecution();
       const metricsSnapshot = this.metrics.finalize();
       const err = error as Error;
+
+      // FIX: Also emit "done" on error to ensure webview can recover
+      yield {
+        type: "done",
+        stopReason: "error",
+        usage: undefined,
+        timestamp: Date.now(),
+      };
 
       yield {
         type: "execution_complete",
