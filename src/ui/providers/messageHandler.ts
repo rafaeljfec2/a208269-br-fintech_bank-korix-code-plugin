@@ -103,6 +103,7 @@ export class MessageHandler {
       this.configManager,
       this.agentLoopFactory,
       this.toolRegistry,
+      this.eventEmitter,
     );
     this.settingsHandler = new SettingsHandler(
       webview,
@@ -124,6 +125,10 @@ export class MessageHandler {
    */
   private setupEventForwarding(): void {
     const subscription = this.eventEmitter.onEvent((event) => {
+      this.logger.debug("[MessageHandler] Forwarding event to webview", {
+        type: event.type,
+      });
+
       const message: ExtensionToWebviewMessage = {
         type: "runtime_event",
         payload: { event },
@@ -132,6 +137,9 @@ export class MessageHandler {
       this.webview.postMessage(message).then(
         () => {
           // Success - event forwarded
+          this.logger.debug("[MessageHandler] Event forwarded successfully", {
+            type: event.type,
+          });
         },
         (error) => {
           this.logger.error(

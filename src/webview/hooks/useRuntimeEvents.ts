@@ -252,6 +252,14 @@ export function useRuntimeEvents() {
               isExecuting: useStore.getState().isExecuting,
             });
 
+            // FIX: Flush pending tokens immediately and cancel timer
+            // This prevents race condition where timer fires AFTER finalizeStreaming
+            if (flushTimerRef.current) {
+              clearTimeout(flushTimerRef.current);
+              flushTimerRef.current = null;
+            }
+            flushTokens(); // Flush any remaining buffered tokens NOW
+
             // FIX: Garantir que há chat ativo ANTES de processar
             let chatId = useStore.getState().activeChatId;
             if (!chatId) {

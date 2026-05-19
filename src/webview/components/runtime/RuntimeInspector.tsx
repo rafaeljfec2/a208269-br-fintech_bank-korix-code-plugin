@@ -12,7 +12,8 @@ export default function RuntimeInspector() {
   const metrics = useStore((state) => state.metrics);
   const timelineItems = useStore((state) => state.items);
 
-  const recentEvents = timelineItems.slice(-10).reverse();
+  // FIX: Guard against undefined to prevent .slice() error
+  const recentEvents = (timelineItems ?? []).slice(-10).reverse();
 
   return (
     <div className="border border-[var(--vscode-panel-border)] rounded overflow-hidden bg-[var(--vscode-input-background)]">

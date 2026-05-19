@@ -10,6 +10,7 @@ import type { ProviderConfigManager } from "../../providers/config";
 import type { AgentLoopFactory } from "./agentLoopFactory";
 import { PluginContextBuilder } from "../../prompts/pluginContext";
 import type { ToolRegistry } from "../../harness/toolRegistry";
+import type { RuntimeEventEmitter } from "../../core/runtime/runtimeEvents";
 
 export class AgentExecutor {
   constructor(
@@ -18,6 +19,7 @@ export class AgentExecutor {
     private readonly configManager: ProviderConfigManager,
     private readonly agentLoopFactory: AgentLoopFactory,
     private readonly toolRegistry: ToolRegistry,
+    private readonly eventEmitter: RuntimeEventEmitter,
   ) {}
 
   /**
@@ -101,8 +103,14 @@ export class AgentExecutor {
       try {
         for await (const event of generator) {
           try {
-            this.logger.debug("Runtime event", { type: event.type });
-            // Events are auto-forwarded via RuntimeEventEmitter subscription
+            this.logger.debug("Runtime event from generator", {
+              type: event.type,
+            });
+
+            // FIX: Re-emit generator events via RuntimeEventEmitter
+            // AgentLoop yields lifecycle events (done, execution_complete, etc)
+            // but they must be explicitly emitted to reach MessageHandler → webview
+            this.eventEmitter.emitEvent(event);
           } catch (eventError) {
             this.logger.error("Failed to process runtime event", eventError);
             // Continue iteration - don't let event processing errors stop the loop

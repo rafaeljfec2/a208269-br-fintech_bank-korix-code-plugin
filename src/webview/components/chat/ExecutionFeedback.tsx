@@ -7,27 +7,12 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../../store';
 
 export default function ExecutionFeedback() {
-  const timelineEvents = useStore((state) => state.timelineEvents);
+  // FIX: Correct property name is 'items' not 'timelineEvents'
+  const timelineItems = useStore((state) => state.items);
   const isExecuting = useStore((state) => state.isExecuting);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // Don't show if not executing
-  if (!isExecuting) return null;
-
-  // Get the most recent events (last 10)
-  const recentEvents = timelineEvents.slice(-10).reverse();
-
-  // Find active events (pending)
-  const activeEvents = recentEvents.filter((e) => e.status === 'pending');
-
-  // Get the most recent active event
-  const primaryEvent = activeEvents[0];
-
-  // Count by type for summary
-  const toolCount = activeEvents.filter((e) => e.type === 'tool').length;
-  const thinkingActive = activeEvents.some((e) => e.type === 'thinking');
-
-  // Timer for elapsed time
+  // Timer for elapsed time - MUST be before early return (React hooks rule)
   useEffect(() => {
     if (!isExecuting) {
       setElapsedSeconds(0);
@@ -41,6 +26,23 @@ export default function ExecutionFeedback() {
 
     return () => clearInterval(interval);
   }, [isExecuting]);
+
+  // Early return AFTER all hooks (React rules)
+  if (!isExecuting) return null;
+
+  // Get the most recent events (last 10)
+  // FIX: Guard against undefined to prevent .slice() error
+  const recentEvents = (timelineItems ?? []).slice(-10).reverse();
+
+  // Find active events (pending)
+  const activeEvents = recentEvents.filter((e) => e.status === 'pending');
+
+  // Get the most recent active event
+  const primaryEvent = activeEvents[0];
+
+  // Count by type for summary
+  const toolCount = activeEvents.filter((e) => e.type === 'tool').length;
+  const thinkingActive = activeEvents.some((e) => e.type === 'thinking');
 
   // Build status message
   let statusMessage = 'Processando...';
