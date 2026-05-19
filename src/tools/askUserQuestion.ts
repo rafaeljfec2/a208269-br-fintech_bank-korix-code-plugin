@@ -49,19 +49,24 @@ type UserAnswers = Record<string, string | string[]>;
 
 export const AskUserQuestionTool: Tool<AskUserQuestionInput, UserAnswers> = {
   name: "AskUserQuestion",
-  description: `CRITICAL: You MUST use this tool when the user asks for recommendations or multiple options exist.
+  description: `Present structured multiple-choice questions when the user must CHOOSE between valid technical approaches.
 
-ALWAYS use AskUserQuestion when:
-- User asks "which X?", "what Y?", "recommend Z"
-- Multiple valid options exist (databases, frameworks, approaches, strategies)
-- User needs to choose between alternatives
-- Making architectural or technology decisions
+Use this tool ONLY when:
+- User explicitly asks to "choose between" or "compare" options
+- Multiple valid technical solutions exist AND user preference matters
+- User says "show me options" or "present alternatives"
 
-Present 2-4 options with clear descriptions. User can select or provide custom "Other" text.
+DO NOT use for:
+- Questions with factual answers (explain directly)
+- Trivial/social queries (respond directly)
+- Technical questions with one correct answer
 
-Example: User asks "qual banco de dados você recomenda?" → IMMEDIATELY use AskUserQuestion with PostgreSQL, MongoDB, MySQL, Redis options. DO NOT answer in plain text.`,
+Present 2-4 options with clear trade-offs. User can select or provide custom input.
+
+Example: "which database should I use for 1M users: Postgres or MongoDB?" → Present comparison with trade-offs.`,
 
   schema: AskUserQuestionInputSchema,
+  isInteractive: true,
 
   async execute(
     input: AskUserQuestionInput,
