@@ -98,7 +98,7 @@ export class ExecutionEngine {
       // Add assistant message if text or tool calls were generated
       if (this.currentTextBuffer || this.pendingToolCalls.length > 0) {
         // Build content: text + tool calls
-        let content = this.currentTextBuffer || "";
+        const content = this.currentTextBuffer || "";
 
         // Anthropic format: assistant message with tool_use blocks
         // For now, just add text - tool calls are tracked separately
@@ -118,17 +118,62 @@ export class ExecutionEngine {
         });
       }
 
-      // Execute pending tool calls
+      // Execute pending tool calls (separate regular vs interactive)
       if (this.pendingToolCalls.length > 0) {
-        await this.executeToolCalls(state);
-        result.hadToolCalls = true;
+        const regularTools: typeof this.pendingToolCalls = [];
+        const interactiveTools: typeof this.pendingToolCalls = [];
+
+        // Separate tool calls by type
+        for (const toolCall of this.pendingToolCalls) {
+          const toolDef = this.toolRegistry.get(toolCall.name);
+          if (toolDef?.isInteractive) {
+            interactiveTools.push(toolCall);
+          } else {
+            regularTools.push(toolCall);
+          }
+        }
+
+        // Execute regular tools first (these trigger loop continuation)
+        if (regularTools.length > 0) {
+          this.pendingToolCalls = regularTools;
+          await this.executeToolCalls(state);
+          result.hadToolCalls = true;
+        }
+
+        // Execute interactive tools (these don't trigger loop continuation)
+        if (interactiveTools.length > 0) {
+          this.pendingToolCalls = interactiveTools;
+          await this.executeToolCalls(state);
+          result.hadInteractiveToolCalls = true;
+        }
+
+        // Clear pending tools
+        this.pendingToolCalls = [];
       }
+
+      // FIX: Emit "done" AFTER all tools are executed, not when streaming finishes
+      // This ensures the webview doesn't clear state while tools are still running
+      this.eventEmitter.emitEvent({
+        type: "done",
+        stopReason: result.stopReason,
+        usage: undefined,
+        timestamp: Date.now(),
+      });
 
       return result;
     } catch (error) {
       this.logger.error("Execution step failed", error);
       result.error = (error as Error).message;
       result.recoverable = this.isRecoverable(error as Error);
+
+      // FIX: Also emit "done" on error to ensure webview can recover
+      this.eventEmitter.emitEvent({
+        type: "done",
+        stopReason: "error",
+        usage: undefined,
+        timestamp: Date.now(),
+      });
+
       throw error;
     }
   }
@@ -161,18 +206,49 @@ export class ExecutionEngine {
         break;
 
       case "tool_call_complete":
-        this.pendingToolCalls.push({
-          id: event.id,
+        this.logger.info("tool_call_complete received", {
           name: event.name,
-          input: JSON.parse(event.arguments),
-        });
-        this.eventEmitter.emitEvent({
-          type: "tool_call",
           id: event.id,
-          name: event.name,
-          input: JSON.parse(event.arguments),
-          timestamp: Date.now(),
+          argsLength: event.arguments.length,
         });
+        this.logger.debug("Raw JSON arguments", {
+          args: event.arguments.substring(0, 500),
+        });
+
+        try {
+          const parsedInput = JSON.parse(event.arguments);
+          this.logger.info("Successfully parsed tool input", {
+            name: event.name,
+            input: JSON.stringify(parsedInput, null, 2).substring(0, 500),
+          });
+
+          this.pendingToolCalls.push({
+            id: event.id,
+            name: event.name,
+            input: parsedInput,
+          });
+
+          this.eventEmitter.emitEvent({
+            type: "tool_call",
+            id: event.id,
+            name: event.name,
+            input: parsedInput,
+            timestamp: Date.now(),
+          });
+        } catch (error) {
+          this.logger.error("CRITICAL: Failed to parse JSON for tool", {
+            name: event.name,
+            rawArgs: event.arguments,
+            error: (error as Error).message,
+          });
+
+          // Emit error event so the webview knows something went wrong
+          this.eventEmitter.emitEvent({
+            type: "error",
+            error: new Error(`Failed to parse tool arguments for ${event.name}: ${(error as Error).message}`),
+            timestamp: Date.now(),
+          });
+        }
         break;
 
       case "usage":
@@ -187,12 +263,7 @@ export class ExecutionEngine {
           | "max_tokens"
           | "stop_sequence"
           | undefined;
-        this.eventEmitter.emitEvent({
-          type: "done",
-          stopReason: event.reason,
-          usage: undefined,
-          timestamp: Date.now(),
-        });
+        // NOTE: Don't emit "done" here! It's emitted after tool execution in step()
         break;
 
       case "error":
@@ -306,13 +377,17 @@ export class ExecutionEngine {
         timestamp: Date.now(),
       });
 
-      // Add tool result message
-      state.addMessage({
-        role: "tool",
-        content: JSON.stringify(result.data ?? { error: result.error }),
-        timestamp: Date.now(),
-        metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
-      });
+      // Add tool result message (skip for interactive tools)
+      const toolDef = this.toolRegistry.get(toolCall.name);
+      if (!toolDef?.isInteractive) {
+        state.addMessage({
+          role: "tool",
+          content: JSON.stringify(result.data ?? { error: result.error }),
+          timestamp: Date.now(),
+          metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
+        });
+      }
+      // Interactive tools don't add message → result won't be sent to provider
     }
   }
 
