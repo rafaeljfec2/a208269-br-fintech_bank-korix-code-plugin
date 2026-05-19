@@ -41,10 +41,9 @@ export default function ExecutionFeedback() {
   // Show completion stats for 5 seconds after execution
   if (!isExecuting && completionStats) {
     return (
-      <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-green)] mb-2">
-        <div className="text-[10px] text-[var(--vscode-terminal-ansiGreen)] opacity-70">
-          Concluído com sucesso {completionStats.iterations} iterações • {completionStats.toolCalls} ferramentas • {completionStats.tokens} tokens • {completionStats.duration.toFixed(1)}s
-        </div>
+      <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-[var(--vscode-terminal-ansiGreen)]">
+        <span>✓</span>
+        <span>Korix concluído: {completionStats.iterations} iterações • {completionStats.toolCalls} ferramentas • {completionStats.tokens} tokens • {completionStats.duration.toFixed(1)}s</span>
       </div>
     );
   }
@@ -66,61 +65,46 @@ export default function ExecutionFeedback() {
   const toolCount = activeEvents.filter((e) => e.type === 'tool').length;
   const thinkingActive = activeEvents.some((e) => e.type === 'thinking');
 
-  // Build status message
+  // Build status message for "Korix [action]..."
   let statusMessage = 'Processando...';
-  let icon = '⚙️';
 
   if (primaryEvent) {
-    icon = getIconForEventType(primaryEvent.type);
-    statusMessage = primaryEvent.description;
-
-    // Add metadata if tool
-    if (primaryEvent.type === 'tool' && primaryEvent.metadata?.toolName) {
-      statusMessage = `${primaryEvent.metadata.toolName}`;
+    if (primaryEvent.type === 'thinking') {
+      statusMessage = 'Pensando...';
+    } else if (primaryEvent.type === 'tool' && primaryEvent.metadata?.toolName) {
+      statusMessage = `Executando ${primaryEvent.metadata.toolName}`;
+    } else {
+      statusMessage = 'Digitando...';
     }
   }
 
-  // Build summary
+  // Build summary with active tools
   const summary: string[] = [];
-  if (thinkingActive) summary.push('🧠 Pensando');
-  if (toolCount > 0) summary.push(`🔧 ${toolCount} tool${toolCount > 1 ? 's' : ''}`);
+  if (toolCount > 0) summary.push(`${toolCount} tool${toolCount > 1 ? 's' : ''}`);
+  summary.push(`${elapsedSeconds}s`);
 
   return (
-    <div className="px-3 py-2 bg-[var(--vscode-input-background)]/30 rounded border-l-2 border-[var(--vscode-charts-blue)] mb-2">
-      {/* Primary status */}
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <div className="flex items-center gap-2 text-xs text-[var(--vscode-foreground)]">
-          <span className="animate-pulse">{icon}</span>
-          <span className="font-medium">{statusMessage}</span>
-        </div>
-        <span className="text-[10px] text-[var(--vscode-descriptionForeground)] tabular-nums">
-          {elapsedSeconds}s
-        </span>
-      </div>
-
-      {/* Summary of active operations */}
-      {summary.length > 0 && (
-        <div className="text-[10px] text-[var(--vscode-descriptionForeground)] opacity-70">
-          {summary.join(' • ')}
-        </div>
-      )}
+    <div className="flex items-center gap-1.5 px-3 py-1 text-[10px] text-[var(--vscode-descriptionForeground)]">
+      {/* Spinner */}
+      <svg className="w-2.5 h-2.5 animate-spin" viewBox="0 0 24 24">
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+          fill="none"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
+      <span>Korix {statusMessage}</span>
+      {summary.length > 0 && <span className="opacity-50">• {summary.join(' • ')}</span>}
     </div>
   );
 }
 
-function getIconForEventType(type: string): string {
-  switch (type) {
-    case 'tool':
-      return '🔧';
-    case 'thinking':
-      return '🧠';
-    case 'iteration':
-      return '🔄';
-    case 'checkpoint':
-      return '💾';
-    case 'error':
-      return '⚠️';
-    default:
-      return '⚙️';
-  }
-}
