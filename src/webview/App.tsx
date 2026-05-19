@@ -5,6 +5,7 @@
 
 import React, { useEffect } from 'react';
 import { useRuntimeEvents } from './hooks/useRuntimeEvents';
+import { useExecutionTimeout } from './hooks/useExecutionTimeout';
 import { useStore } from './store';
 import TabBar from './components/layout/TopBar';
 import BottomBar from './components/layout/BottomBar';
@@ -19,6 +20,9 @@ export default function App() {
 
   // Setup event streaming from extension
   useRuntimeEvents();
+
+  // Safety timeout: force clear execution state after 120s
+  useExecutionTimeout();
 
   // Create initial conversation if none exists
   useEffect(() => {

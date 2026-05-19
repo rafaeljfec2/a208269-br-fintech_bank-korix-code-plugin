@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "../store";
 import type { ExtensionToWebviewMessage } from "../../shared/protocol";
 import type { ToolExecution } from "../store/slices/chatSlice";
+import { logger } from "../utils/logger";
 
 export function useRuntimeEvents() {
   // Track current activity context - usar ref para persistir entre renders
@@ -245,36 +246,59 @@ export function useRuntimeEvents() {
           }
 
           case "done": {
-            console.log("[RuntimeEvents] Done event received - finalizing streaming");
-            const chatId = useStore.getState().activeChatId;
+            logger.log("[RuntimeEvents] Done event received", {
+              timestamp: Date.now(),
+              activeChatId: useStore.getState().activeChatId,
+              isExecuting: useStore.getState().isExecuting,
+            });
 
-            if (chatId) {
-              // Transfer activeMessageTools to message metadata
-              const activeChat = useStore.getState().conversations[chatId];
-              if (activeChat?.activeMessageTools) {
-                const totalDuration = activeChat.activeMessageTools.reduce(
-                  (sum, t) => sum + t.duration,
-                  0,
-                );
+            // FIX: Garantir que há chat ativo ANTES de processar
+            let chatId = useStore.getState().activeChatId;
+            if (!chatId) {
+              logger.warn("[RuntimeEvents] No activeChatId, creating emergency chat");
+              chatId = useStore.getState().createChat("Nova conversa");
 
-                store.updateActiveMessageMetadata(chatId, {
-                  execution: {
-                    tools: activeChat.activeMessageTools,
-                    isExpanded: false,
-                    totalDuration,
-                  },
-                });
-              }
-
-              console.log("[RuntimeEvents] Calling finalizeStreaming for chat:", chatId);
-              store.finalizeStreaming(chatId);
-              // Clear active message tools for next message
-              store.clearActiveMessageTools(chatId);
-            } else {
-              console.warn("[RuntimeEvents] No activeChatId found when done event received");
+              // Adicionar mensagem de sistema explicativa
+              store.addMessage(chatId, {
+                role: "system",
+                content: "⚠️ Chat criado automaticamente para recuperar estado inconsistente.",
+              });
             }
 
+            // Transfer activeMessageTools to message metadata
+            const activeChat = useStore.getState().conversations[chatId];
+            if (activeChat?.activeMessageTools) {
+              const totalDuration = activeChat.activeMessageTools.reduce(
+                (sum, t) => sum + t.duration,
+                0,
+              );
+
+              store.updateActiveMessageMetadata(chatId, {
+                execution: {
+                  tools: activeChat.activeMessageTools,
+                  isExpanded: false,
+                  totalDuration,
+                },
+              });
+            }
+
+            logger.log("[RuntimeEvents] Calling finalizeStreaming for chat:", chatId);
+            store.finalizeStreaming(chatId);
+            // Clear active message tools for next message
+            store.clearActiveMessageTools(chatId);
+
+            logger.log("[RuntimeEvents] Setting isExecuting=false");
             store.setExecuting(false);
+
+            // Verificação de estado final
+            const finalState = useStore.getState();
+            const finalChat = chatId ? finalState.conversations[chatId] : null;
+            logger.log("[RuntimeEvents] Final state after done:", {
+              isExecuting: finalState.isExecuting,
+              isStreaming: finalChat?.isStreaming,
+              hasStreamingContent: !!finalChat?.streamingContent,
+            });
+
             break;
           }
 
@@ -362,7 +386,7 @@ export function useRuntimeEvents() {
           case "user_question": {
             const event = runtimeEvent;
 
-            console.log("[useRuntimeEvents] user_question received:", event);
+            logger.log("[useRuntimeEvents] user_question received:", event);
 
             // Add visual indicator in chat that a question was asked
             const chatId = useStore.getState().activeChatId ?? useStore.getState().createChat("Nova conversa");
@@ -656,13 +680,13 @@ export function useRuntimeEvents() {
 
           default: {
             // Unhandled event type - log warning but don't crash
-            console.warn("[RuntimeEvents] Unhandled event type:", runtimeEvent);
+            logger.warn("[RuntimeEvents] Unhandled event type:", runtimeEvent);
             break;
           }
         }
           } catch (eventError) {
             // Event-specific error - log but don't crash the listener
-            console.error("[RuntimeEvents] Error processing runtime event:", {
+            logger.error("[RuntimeEvents] Error processing runtime event:", {
               eventType: runtimeEvent.type,
               error: eventError,
               event: runtimeEvent,
@@ -678,7 +702,7 @@ export function useRuntimeEvents() {
               });
             } catch {
               // If timeline update fails, just log
-              console.error("[RuntimeEvents] Failed to add event error to timeline");
+              logger.error("[RuntimeEvents] Failed to add event error to timeline");
             }
           }
         }
@@ -694,7 +718,7 @@ export function useRuntimeEvents() {
         }
       } catch (error) {
         // Top-level error - log and continue listening
-        console.error("[RuntimeEvents] Critical error in message handler:", {
+        logger.error("[RuntimeEvents] Critical error in message handler:", {
           messageType: message.type,
           error,
           message,
@@ -709,7 +733,7 @@ export function useRuntimeEvents() {
           });
         } catch {
           // If even timeline fails, just log
-          console.error("[RuntimeEvents] Failed to add critical error to timeline");
+          logger.error("[RuntimeEvents] Failed to add critical error to timeline");
         }
       }
     };

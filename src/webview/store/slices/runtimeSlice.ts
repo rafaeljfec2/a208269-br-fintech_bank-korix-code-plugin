@@ -2,6 +2,8 @@
  * Runtime slice - execution state and metrics
  */
 
+import { logger } from "../../utils/logger";
+
 export interface RuntimeMetrics {
   readonly tokenCount: number;
   readonly toolCallCount: number;
@@ -26,7 +28,9 @@ export interface RuntimeSlice {
   readonly setModel: (model: string) => void;
 }
 
-export const createRuntimeSlice = (set: any): RuntimeSlice => ({
+export const createRuntimeSlice = (
+  set: (partial: Partial<RuntimeSlice> | ((state: RuntimeSlice) => Partial<RuntimeSlice>)) => void
+): RuntimeSlice => ({
   isExecuting: false,
   currentIteration: 0,
   metrics: {
@@ -40,7 +44,14 @@ export const createRuntimeSlice = (set: any): RuntimeSlice => ({
   mode: "agent",
   model: "claude-opus-4-7",
 
-  setExecuting: (isExecuting) => set({ isExecuting }),
+  setExecuting: (isExecuting) =>
+    set((state: RuntimeSlice) => {
+      logger.log("[RuntimeSlice] setExecuting transition", {
+        from: state.isExecuting,
+        to: isExecuting,
+      });
+      return { isExecuting };
+    }),
 
   setIteration: (iteration) => set({ currentIteration: iteration }),
 

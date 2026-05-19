@@ -28,6 +28,7 @@ describe("useRuntimeEvents", () => {
   const mockAppendOutput = vi.fn();
   const mockCreateChat = vi.fn();
   const mockUpdateActiveMessageMetadata = vi.fn();
+  const mockClearActiveMessageTools = vi.fn();
   // Activity Log mocks
   const mockStartContext = vi.fn();
   const mockEndContext = vi.fn();
@@ -54,6 +55,7 @@ describe("useRuntimeEvents", () => {
       appendOutput: mockAppendOutput,
       createChat: mockCreateChat,
       updateActiveMessageMetadata: mockUpdateActiveMessageMetadata,
+      clearActiveMessageTools: mockClearActiveMessageTools,
       // Activity Log state
       startContext: mockStartContext,
       endContext: mockEndContext,
@@ -310,8 +312,18 @@ describe("useRuntimeEvents", () => {
         );
       });
 
-      // finalizeStreaming only called if activeChatId exists (currently null in mock)
-      expect(mockFinalizeStreaming).not.toHaveBeenCalled();
+      // Should create emergency chat when activeChatId is null
+      expect(mockCreateChat).toHaveBeenCalledWith("Nova conversa");
+      // Should call finalizeStreaming with emergency chat ID
+      expect(mockFinalizeStreaming).toHaveBeenCalledWith("test-chat-id");
+      // Should add system message explaining emergency chat
+      expect(mockAddMessage).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          role: "system",
+          content: expect.stringContaining("⚠️ Chat criado automaticamente"),
+        }),
+      );
       expect(mockSetExecuting).toHaveBeenCalledWith(false);
     });
   });

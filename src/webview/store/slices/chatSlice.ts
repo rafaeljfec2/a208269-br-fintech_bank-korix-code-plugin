@@ -3,6 +3,7 @@
  */
 
 import type { StateCreator } from "zustand";
+import { logger } from "../../utils/logger";
 
 export interface ToolExecution {
   readonly id: string;
@@ -248,26 +249,56 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
 
   finalizeStreaming: (chatId) =>
     set((state: ChatSlice) => {
+      logger.log("[ChatSlice] finalizeStreaming called", { chatId });
+
       const chat = state.conversations[chatId];
-      if (!chat || !chat.streamingContent) return state;
+      if (!chat) {
+        logger.warn("[ChatSlice] finalizeStreaming: chat not found", { chatId });
+        return state;
+      }
+
+      logger.log("[ChatSlice] Current streaming state", {
+        isStreaming: chat.isStreaming,
+        streamingContentLength: chat.streamingContent.length,
+        isThinking: chat.isThinking,
+      });
+
+      // ALWAYS clear isStreaming, even if streamingContent is empty
+      // to prevent "Digitando..." from getting stuck
+      const updatedChat = {
+        ...chat,
+        streamingContent: "",
+        isStreaming: false,
+        isThinking: false,
+      };
+
+      // Only add a new message if there was actual streaming content
+      if (chat.streamingContent && chat.streamingContent.trim().length > 0) {
+        updatedChat.messages = [
+          ...chat.messages,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant" as const,
+            content: chat.streamingContent,
+            timestamp: Date.now(),
+          },
+        ];
+        logger.log("[ChatSlice] Added assistant message", {
+          contentLength: chat.streamingContent.length,
+        });
+      } else {
+        logger.log("[ChatSlice] No streaming content to add as message");
+      }
+
+      logger.log("[ChatSlice] finalizeStreaming complete", {
+        isStreaming: updatedChat.isStreaming,
+        messageCount: updatedChat.messages.length,
+      });
 
       return {
         conversations: {
           ...state.conversations,
-          [chatId]: {
-            ...chat,
-            messages: [
-              ...chat.messages,
-              {
-                id: crypto.randomUUID(),
-                role: "assistant" as const,
-                content: chat.streamingContent,
-                timestamp: Date.now(),
-              },
-            ],
-            streamingContent: "",
-            isStreaming: false,
-          },
+          [chatId]: updatedChat,
         },
       };
     }),
