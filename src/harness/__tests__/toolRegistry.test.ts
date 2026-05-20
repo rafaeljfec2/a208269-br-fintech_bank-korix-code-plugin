@@ -80,6 +80,60 @@ describe("ToolRegistry", () => {
     });
   });
 
+  describe("mode restrictions", () => {
+    it("should expose no tools in ask mode", () => {
+      registry.register(createMockTool("ReadFile"));
+      registry.register(createMockTool("AskUserQuestion"));
+
+      expect(registry.listForMode("ask")).toEqual([]);
+      expect(registry.toProviderDefinitions("ask")).toEqual([]);
+    });
+
+    it("should expose only read-only tools in plan mode", () => {
+      registry.register(createMockTool("ReadFile"));
+      registry.register(createMockTool("SearchFiles"));
+      registry.register(createMockTool("WriteFile"));
+      registry.register(createMockTool("RunCommand"));
+      registry.register(createMockTool("AskUserQuestion"));
+
+      const toolNames = registry.listForMode("plan").map((tool) => tool.name);
+
+      expect(toolNames).toEqual(["ReadFile", "SearchFiles"]);
+    });
+
+    it("should expose all locally allowed tools in agent mode", () => {
+      registry.register(createMockTool("ReadFile"));
+      registry.register(createMockTool("WriteFile"));
+      registry.register(createMockTool("RunCommand"));
+      registry.register(createMockTool("AskUserQuestion"));
+
+      const toolNames = registry.listForMode("agent").map((tool) => tool.name);
+
+      expect(toolNames).toEqual([
+        "ReadFile",
+        "WriteFile",
+        "RunCommand",
+        "AskUserQuestion",
+      ]);
+    });
+
+    it("should block direct tool execution in ask mode", async () => {
+      registry.register(createMockTool("ReadFile"));
+
+      const result = await registry.execute("ReadFile", { value: "x" }, {
+        execution: {
+          mode: "ask",
+          workspaceRoot: "/repo",
+          openFiles: [],
+        },
+        workspaceRoot: "/repo",
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Tool "ReadFile" not allowed in ask mode');
+    });
+  });
+
   describe("unregister", () => {
     it("should remove a registered tool", () => {
       const tool = createMockTool("test");

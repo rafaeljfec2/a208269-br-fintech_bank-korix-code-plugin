@@ -89,6 +89,19 @@ describe("TaskAnalyzer", () => {
     expect(profile.requiresToolUse).toBe(true);
   });
 
+  it("should not collect workspace evidence in ask mode", () => {
+    const profile = new TaskAnalyzer().analyze(
+      "faça leitura de tres arquivos aleatorios",
+      {
+        ...context,
+        mode: "ask",
+      },
+    );
+
+    expect(profile.requiresWorkspaceEvidence).toBe(false);
+    expect(profile.requiresToolUse).toBe(true);
+  });
+
   it("should classify implementation as modification risk", () => {
     const profile = new TaskAnalyzer().analyze(
       "Implemente retry no login",

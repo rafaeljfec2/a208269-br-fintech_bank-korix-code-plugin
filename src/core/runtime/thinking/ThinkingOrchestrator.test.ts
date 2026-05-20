@@ -10,7 +10,7 @@ import type { ThinkingRunInput } from "./types";
 describe("ThinkingOrchestrator", () => {
   it("should validate and flush workspace responses after supervised execution", async () => {
     const context: ThinkingRunInput["context"] = {
-      mode: "ask",
+      mode: "plan",
       workspaceRoot: "/workspace",
       openFiles: ["/workspace/src/app.ts"],
     };

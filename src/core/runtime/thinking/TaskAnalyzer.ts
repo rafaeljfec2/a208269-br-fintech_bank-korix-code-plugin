@@ -73,7 +73,9 @@ export class TaskAnalyzer {
     const intent = this.detectIntent(normalized);
     const riskLevel = this.detectRisk(normalized, intent);
     const requiresInteractiveChoice = this.requiresInteractiveChoice(normalized);
-    const requiresWorkspaceAccess = this.requestsWorkspaceAccess(normalized);
+    const requestsWorkspaceAccess = this.requestsWorkspaceAccess(normalized);
+    const requiresWorkspaceAccess =
+      context.mode !== "ask" && requestsWorkspaceAccess;
     const requiresWorkspaceEvidence = this.requiresWorkspaceEvidence(
       normalized,
       context,
@@ -89,7 +91,7 @@ export class TaskAnalyzer {
       requiresWorkspaceEvidence,
       requiresToolUse:
         requiresInteractiveChoice ||
-        requiresWorkspaceAccess ||
+        requestsWorkspaceAccess ||
         requiresWorkspaceEvidence ||
         riskLevel !== "low",
       mentionedSymbols,
@@ -141,6 +143,10 @@ export class TaskAnalyzer {
     intent: ThinkingIntent,
     requiresWorkspaceAccess: boolean,
   ): boolean {
+    if (context.mode === "ask") {
+      return false;
+    }
+
     if (this.isPastedStructuredContentQuestion(message)) {
       return false;
     }

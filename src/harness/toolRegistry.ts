@@ -55,6 +55,24 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   allowedInMode?(mode: ExecutionContext["mode"]): boolean;
 }
 
+const READ_ONLY_TOOL_NAMES = new Set([
+  "ReadFile",
+  "ListDirectory",
+  "FileChunks",
+  "SearchFiles",
+  "Grep",
+  "FindReferences",
+  "FindSymbols",
+  "GitStatus",
+  "GitDiff",
+  "ChangedFiles",
+  "Problems",
+  "GetDiagnostics",
+  "WorkspaceGraph",
+  "GetOpenFiles",
+  "GetCurrentFile",
+]);
+
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
   private readonly cache: ToolCache;
@@ -99,11 +117,12 @@ export class ToolRegistry {
   }
 
   listForMode(mode: ExecutionContext["mode"]): Tool[] {
+    if (mode === "ask") {
+      return [];
+    }
+
     return this.list().filter((tool) => {
-      if (!tool.allowedInMode) {
-        return true;
-      }
-      return tool.allowedInMode(mode);
+      return this.isToolAllowedInMode(tool, mode);
     });
   }
 
@@ -134,7 +153,7 @@ export class ToolRegistry {
       }
 
       // Check if tool is allowed in current mode
-      if (tool.allowedInMode && !tool.allowedInMode(context.execution.mode)) {
+      if (!this.isToolAllowedInMode(tool, context.execution.mode)) {
         const error = `Tool "${name}" not allowed in ${context.execution.mode} mode`;
         this.recordMetric(name, startTime, false, cached, input, null, error);
         return {
@@ -258,6 +277,21 @@ export class ToolRegistry {
       description: tool.description,
       input_schema: this.zodToJsonSchema(tool.schema),
     }));
+  }
+
+  private isToolAllowedInMode(
+    tool: Tool,
+    mode: ExecutionContext["mode"],
+  ): boolean {
+    if (mode === "ask") {
+      return false;
+    }
+
+    if (mode === "plan" && !READ_ONLY_TOOL_NAMES.has(tool.name)) {
+      return false;
+    }
+
+    return tool.allowedInMode?.(mode) ?? true;
   }
 
   private zodToJsonSchema(schema: z.ZodSchema): {

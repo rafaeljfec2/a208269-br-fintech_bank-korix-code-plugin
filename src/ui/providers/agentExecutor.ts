@@ -81,6 +81,7 @@ export class AgentExecutor {
       const useFastDirectPath = this.shouldUseFastDirectPath(
         taskProfile,
         content,
+        mode,
       );
 
       // Build unified system prompt
@@ -173,7 +174,16 @@ export class AgentExecutor {
   private shouldUseFastDirectPath(
     profile: ThinkingRunProfile,
     content: string,
+    mode: "ask" | "plan" | "agent",
   ): boolean {
+    if (
+      mode === "ask" &&
+      profile.riskLevel === "low" &&
+      (profile.intent === "answer" || profile.intent === "explain")
+    ) {
+      return true;
+    }
+
     if (
       profile.riskLevel !== "low" ||
       profile.requiresWorkspaceEvidence ||

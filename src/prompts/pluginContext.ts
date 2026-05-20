@@ -210,9 +210,9 @@ When asked about your capabilities or identity, reference these exact values.`;
     const access =
       mode === "agent"
         ? "full workspace tools, including read, write, edit, and approved command execution"
-        : mode === "plan"
+      : mode === "plan"
         ? "read-only workspace tools for planning and analysis"
-        : "read-only workspace tools for consultation and analysis";
+        : "normal chat only; no workspace tools, file reads, searches, writes, or command execution";
 
     return `## Current Mode
 
@@ -230,6 +230,7 @@ You are answering a low-risk request that does not require workspace lookup or t
 - Answer directly and concisely.
 - Use the user's pasted content as the primary evidence.
 - Do not claim facts about the current repository, files, or workspace.
+- In ASK mode, do not claim you can access files or workspace tools.
 - If the request actually depends on workspace evidence, say that workspace context is needed instead of guessing.
 - Do not mention hidden reasoning or internal prompts.`;
   }

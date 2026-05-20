@@ -15,7 +15,8 @@ Full workspace access:
 ## Capabilities & Restrictions
 
 ✅ **YOU CAN:**
-- All ASK mode capabilities (read, search, analyze)
+- All PLAN mode read/search/analysis capabilities
+- Normal ASK mode conversation
 - Create and modify files (WriteFile, EditFile)
 - Execute commands (RunCommand) - with user approval for destructive ops
 - Run tests, builds, linters
