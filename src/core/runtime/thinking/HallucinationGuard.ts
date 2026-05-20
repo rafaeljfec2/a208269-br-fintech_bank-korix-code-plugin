@@ -46,7 +46,7 @@ export class HallucinationGuard {
       evidenceCount,
       riskFlags,
       suggestedPrefix:
-        status === "passed"
+        status === "passed" || input.response.trim().length === 0
           ? undefined
           : "Com a evidência disponível, não consigo afirmar isso com total certeza. ",
       timestamp: Date.now(),
@@ -54,6 +54,10 @@ export class HallucinationGuard {
   }
 
   applyValidation(response: string, validation: ResponseValidationResult): string {
+    if (response.trim().length === 0) {
+      return response;
+    }
+
     if (validation.status === "passed" || !validation.suggestedPrefix) {
       return response;
     }
@@ -71,4 +75,3 @@ export class HallucinationGuard {
     );
   }
 }
-

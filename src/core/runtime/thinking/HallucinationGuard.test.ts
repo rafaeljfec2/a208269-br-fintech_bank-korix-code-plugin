@@ -39,5 +39,28 @@ describe("HallucinationGuard", () => {
 
     expect(result.status).toBe("passed");
   });
-});
 
+  it("should not turn an empty response into an uncertainty-only message", () => {
+    const guard = new HallucinationGuard();
+    const result = guard.validate({
+      profile,
+      response: "",
+      observations: [
+        {
+          id: "obs-question",
+          sourceType: "runtime",
+          sourceName: "AskUserQuestion",
+          success: true,
+          summary: "AskUserQuestion completed: mongodb",
+          importantLines: [],
+          rawSize: 7,
+          truncated: false,
+          timestamp: Date.now(),
+        },
+      ],
+    });
+
+    expect(result.riskFlags).toContain("empty_response");
+    expect(guard.applyValidation("", result)).toBe("");
+  });
+});

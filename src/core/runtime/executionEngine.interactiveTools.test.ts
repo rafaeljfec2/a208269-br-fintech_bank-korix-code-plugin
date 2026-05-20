@@ -187,7 +187,7 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
   });
 
   describe("AgentLoop Completion Logic", () => {
-    it("should complete when isEndTurn and no hadToolCalls", () => {
+    it("should not complete immediately after an interactive tool call", () => {
       const stepResult: StepResult = {
         stopReason: "end_turn",
         hadToolCalls: false,
@@ -200,13 +200,13 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       const isEndTurn =
         stepResult.stopReason === "end_turn" ||
         stepResult.stopReason === "stop";
-      // Updated logic: complete if end_turn+no_tools OR if interactive tools present
-      const shouldComplete =
-        (isEndTurn && !stepResult.hadToolCalls) ||
-        stepResult.hadInteractiveToolCalls;
+      // Interactive tools produce a tool_result message with the user's answer.
+      // The loop must continue so the provider can use that observation.
+      const hadAnyToolCalls =
+        stepResult.hadToolCalls || stepResult.hadInteractiveToolCalls;
+      const shouldComplete = isEndTurn && !hadAnyToolCalls;
 
-      // Should complete because hadInteractiveToolCalls forces stop (prevents loops)
-      expect(shouldComplete).toBe(true);
+      expect(shouldComplete).toBe(false);
     });
 
     it("should NOT complete when hadToolCalls is true", () => {

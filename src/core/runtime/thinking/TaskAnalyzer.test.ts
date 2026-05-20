@@ -32,6 +32,17 @@ describe("TaskAnalyzer", () => {
     expect(profile.mentionedSymbols).toContain("AuthService");
   });
 
+  it("should not treat common database option names as workspace symbols", () => {
+    const profile = new TaskAnalyzer().analyze(
+      "Qual banco de dados usar (PostgreSQL, MongoDB, MySQL, Redis) me dê 4 opções de escolha",
+      context,
+    );
+
+    expect(profile.intent).toBe("answer");
+    expect(profile.requiresWorkspaceEvidence).toBe(false);
+    expect(profile.mentionedSymbols).toEqual([]);
+  });
+
   it("should classify implementation as modification risk", () => {
     const profile = new TaskAnalyzer().analyze(
       "Implemente retry no login",
@@ -43,4 +54,3 @@ describe("TaskAnalyzer", () => {
     expect(profile.requiresToolUse).toBe(true);
   });
 });
-

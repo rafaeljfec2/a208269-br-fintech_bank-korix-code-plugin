@@ -6,6 +6,67 @@ import type {
 } from "./types";
 
 export class TaskAnalyzer {
+  private readonly commonTechnologyTerms = new Set([
+    "angular",
+    "aws",
+    "azure",
+    "docker",
+    "drizzle",
+    "express",
+    "gcp",
+    "graphql",
+    "grpc",
+    "javascript",
+    "jwt",
+    "kubernetes",
+    "mongodb",
+    "mysql",
+    "nestjs",
+    "node",
+    "oauth",
+    "postgres",
+    "postgresql",
+    "prisma",
+    "react",
+    "redis",
+    "rest",
+    "sequelize",
+    "sqlite",
+    "typeorm",
+    "typescript",
+    "vue",
+  ]);
+
+  private readonly workspaceSymbolSuffixes = [
+    "Adapter",
+    "Client",
+    "Component",
+    "Config",
+    "Controller",
+    "Dto",
+    "DTO",
+    "Engine",
+    "Entity",
+    "Factory",
+    "Guard",
+    "Handler",
+    "Hook",
+    "Manager",
+    "Middleware",
+    "Model",
+    "Module",
+    "Provider",
+    "Repository",
+    "Resolver",
+    "Router",
+    "Schema",
+    "Service",
+    "Store",
+    "Tool",
+    "UseCase",
+    "View",
+  ];
+
   analyze(message: string, context: ExecutionContext): ThinkingRunProfile {
     const normalized = message.toLowerCase();
     const mentionedSymbols = this.extractMentionedSymbols(message);
@@ -103,12 +164,36 @@ export class TaskAnalyzer {
     const identifierMatches = message.matchAll(/\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?\b/g);
     for (const match of identifierMatches) {
       const value = match[0];
-      if (/[A-Z_]/.test(value) && value.length > 2) {
+      if (this.isLikelyWorkspaceSymbol(value)) {
         symbols.add(value);
       }
     }
 
     return [...symbols].slice(0, 12);
+  }
+
+  private isLikelyWorkspaceSymbol(value: string): boolean {
+    if (value.length <= 2) {
+      return false;
+    }
+
+    if (this.commonTechnologyTerms.has(value.toLowerCase())) {
+      return false;
+    }
+
+    if (value.includes(".")) {
+      return true;
+    }
+
+    if (/^[A-Z][A-Z0-9_]+$/.test(value) && value.includes("_")) {
+      return true;
+    }
+
+    if (/^[a-z_$][\w$]*[A-Z][\w$]*$/.test(value)) {
+      return true;
+    }
+
+    return this.workspaceSymbolSuffixes.some((suffix) => value.endsWith(suffix));
   }
 
   private extractConstraints(
@@ -144,4 +229,3 @@ export class TaskAnalyzer {
     return `${intent} task, ${riskLevel} risk, ${evidence}`;
   }
 }
-

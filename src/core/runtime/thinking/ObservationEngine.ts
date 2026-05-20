@@ -114,6 +114,10 @@ export class ObservationEngine {
   private inferSourceType(
     toolName: string,
   ): ObservationSummary["sourceType"] {
+    if (toolName === "AskUserQuestion") {
+      return "runtime";
+    }
+
     if (toolName === "RunCommand") {
       return "terminal";
     }
@@ -129,4 +133,3 @@ export class ObservationEngine {
     return "tool";
   }
 }
-
