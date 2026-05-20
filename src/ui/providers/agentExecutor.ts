@@ -91,6 +91,7 @@ export class AgentExecutor {
 
       const systemPrompt = useFastDirectPath
         ? contextBuilder.buildDirectAnswer({
+            mode,
             providerType,
             model: providerConfig.model,
           })

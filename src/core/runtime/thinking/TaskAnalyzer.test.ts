@@ -77,6 +77,18 @@ describe("TaskAnalyzer", () => {
     expect(profile.mentionedSymbols).toContain("AuthService.findUser");
   });
 
+  it("should require tools for explicit workspace file reading requests", () => {
+    const profile = new TaskAnalyzer().analyze(
+      "faça leitura de tres arquivos aleatorios",
+      context,
+    );
+
+    expect(profile.intent).toBe("answer");
+    expect(profile.riskLevel).toBe("low");
+    expect(profile.requiresWorkspaceEvidence).toBe(true);
+    expect(profile.requiresToolUse).toBe(true);
+  });
+
   it("should classify implementation as modification risk", () => {
     const profile = new TaskAnalyzer().analyze(
       "Implemente retry no login",

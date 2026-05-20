@@ -108,11 +108,12 @@ export class PluginContextBuilder {
    * latency cost.
    */
   buildDirectAnswer(
-    options: Pick<ContextBuildOptions, "providerType" | "model">,
+    options: Pick<ContextBuildOptions, "mode" | "providerType" | "model">,
   ): string {
     const sections = [
       this.loadOutputStyle(),
       this.getModelInfo(options.providerType, options.model),
+      this.getCurrentModeInfo(options.mode),
       this.loadMarkdown("base.md"),
       this.getDirectAnswerPolicy(),
     ];
@@ -202,6 +203,23 @@ ${toolList}
 **Model**: ${model}
 
 When asked about your capabilities or identity, reference these exact values.`;
+  }
+
+  private getCurrentModeInfo(mode: "ask" | "plan" | "agent"): string {
+    const modeLabel = mode.toUpperCase();
+    const access =
+      mode === "agent"
+        ? "full workspace tools, including read, write, edit, and approved command execution"
+        : mode === "plan"
+        ? "read-only workspace tools for planning and analysis"
+        : "read-only workspace tools for consultation and analysis";
+
+    return `## Current Mode
+
+**Mode**: ${modeLabel}
+**Access**: ${access}
+
+If asked what mode you are in, answer with the current mode above. Do not mention internal routing paths such as fast direct answer.`;
   }
 
   private getDirectAnswerPolicy(): string {

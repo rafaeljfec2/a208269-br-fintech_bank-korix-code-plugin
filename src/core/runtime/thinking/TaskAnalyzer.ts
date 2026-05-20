@@ -73,11 +73,13 @@ export class TaskAnalyzer {
     const intent = this.detectIntent(normalized);
     const riskLevel = this.detectRisk(normalized, intent);
     const requiresInteractiveChoice = this.requiresInteractiveChoice(normalized);
+    const requiresWorkspaceAccess = this.requestsWorkspaceAccess(normalized);
     const requiresWorkspaceEvidence = this.requiresWorkspaceEvidence(
       normalized,
       context,
       mentionedSymbols,
       intent,
+      requiresWorkspaceAccess,
     );
     const constraints = this.extractConstraints(normalized, context);
 
@@ -86,7 +88,10 @@ export class TaskAnalyzer {
       riskLevel,
       requiresWorkspaceEvidence,
       requiresToolUse:
-        requiresInteractiveChoice || requiresWorkspaceEvidence || riskLevel !== "low",
+        requiresInteractiveChoice ||
+        requiresWorkspaceAccess ||
+        requiresWorkspaceEvidence ||
+        riskLevel !== "low",
       mentionedSymbols,
       constraints,
       summary: this.buildSummary(intent, riskLevel, requiresWorkspaceEvidence),
@@ -134,9 +139,14 @@ export class TaskAnalyzer {
     context: ExecutionContext,
     mentionedSymbols: readonly string[],
     intent: ThinkingIntent,
+    requiresWorkspaceAccess: boolean,
   ): boolean {
     if (this.isPastedStructuredContentQuestion(message)) {
       return false;
+    }
+
+    if (requiresWorkspaceAccess) {
+      return true;
     }
 
     if (context.currentFile || context.openFiles.length > 0) {
@@ -261,6 +271,23 @@ export class TaskAnalyzer {
 
   private normalizeForIntent(message: string): string {
     return message.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  private requestsWorkspaceAccess(message: string): boolean {
+    const normalized = this.normalizeForIntent(message);
+
+    if (/\b(readfile|filechunks|searchfiles|grep|findsymbols|findreferences|getcurrentfile|getopenfiles)\b/i.test(message)) {
+      return true;
+    }
+
+    const hasWorkspaceTarget = /\b(arquivo|arquivos|file|files|workspace|repo|repositorio|projeto|codebase|diretorio|diretorios|pasta|pastas)\b/.test(
+      normalized,
+    );
+    const hasReadAction = /\b(leia|ler|leitura|abrir|abra|abre|liste|listar|lista|busque|buscar|procure|procurar|pesquise|pesquisar|read|open|list|search|find|grep|scan|inspecione|inspecionar)\b/.test(
+      normalized,
+    );
+
+    return hasWorkspaceTarget && hasReadAction;
   }
 
   private extractConstraints(
