@@ -48,9 +48,6 @@ export class LiteLLMNormalizer {
     const events: ProviderEvent[] = [];
     const timestamp = Date.now();
 
-    // DEBUG: Log EVERY event from LiteLLM
-    console.log("[LiteLLMNormalizer] Received event:", event.type, JSON.stringify(event).substring(0, 200));
-
     switch (event.type) {
       case "message_start":
         // Emite usage inicial (input tokens)
@@ -78,20 +75,10 @@ export class LiteLLMNormalizer {
         // Fim do bloco - emitir tool_call_complete se for tool call
         if (this.currentToolCall) {
           const fullJson = this.currentToolCall.jsonChunks.join("");
-          console.log(
-            `[LiteLLMNormalizer] content_block_stop for tool ${this.currentToolCall.name} - assembled ${this.currentToolCall.jsonChunks.length} chunks (${fullJson.length} chars)`,
-          );
-          console.log(
-            `[LiteLLMNormalizer] Full JSON:`,
-            fullJson.substring(0, 1000),
-          );
 
           // Validate JSON is parseable before emitting
           try {
             JSON.parse(fullJson);
-            console.log(
-              `[LiteLLMNormalizer] JSON validation OK, emitting tool_call_complete`,
-            );
           } catch (error) {
             console.error(
               `[LiteLLMNormalizer] WARNING: Assembled JSON is INVALID for tool ${this.currentToolCall.name}`,

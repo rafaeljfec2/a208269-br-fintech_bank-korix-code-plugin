@@ -153,16 +153,6 @@ export class LiteLLMProvider implements AIProvider {
         : this.getTemperature(input.temperature),
     };
 
-    // DEBUG: Log tools payload being sent to LiteLLM
-    if (request.tools) {
-      console.log("[LiteLLMProvider] Sending request with tools:", {
-        toolCount: request.tools.length,
-        toolNames: request.tools.map((t) => t.name),
-        toolsPreview: JSON.stringify(request.tools.slice(0, 2), null, 2), // First 2 tools
-        hasAskUserQuestion: request.tools.some((t) => t.name === "AskUserQuestion"),
-      });
-    }
-
     return request;
   }
 
@@ -358,21 +348,11 @@ export class LiteLLMProvider implements AIProvider {
   private convertTools(
     tools: readonly import("../../providers/types").ToolDefinition[],
   ): readonly AnthropicTool[] {
-    const converted = tools.map((tool) => ({
+    return tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.input_schema,
     }));
-
-    // DEBUG: Log AskUserQuestion if present
-    const askTool = converted.find((t) => t.name === "AskUserQuestion");
-    if (askTool) {
-      console.log("[LiteLLMProvider] ===== AskUserQuestion FULL PAYLOAD =====");
-      console.log(JSON.stringify(askTool, null, 2));
-      console.log("[LiteLLMProvider] ===== END PAYLOAD =====");
-    }
-
-    return converted;
   }
 
   /**

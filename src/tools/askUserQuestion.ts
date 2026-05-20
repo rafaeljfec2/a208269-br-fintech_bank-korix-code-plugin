@@ -106,16 +106,13 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
     _context: ToolContext,
   ): Promise<ToolResult<UserAnswers>> {
     const startTime = Date.now();
-    console.log("[AskUserQuestionTool] execute() called with input:", JSON.stringify(input, null, 2));
 
     try {
       // Get RuntimeEventEmitter from DI container
       const container = getGlobalContainer();
-      console.log("[AskUserQuestionTool] Got container");
 
       const emitter =
         container.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
-      console.log("[AskUserQuestionTool] Got emitter:", !!emitter);
 
       if (!emitter) {
         throw new Error("RuntimeEventEmitter not available in DI container");
@@ -125,8 +122,6 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
       const answers: UserAnswers = {};
 
       for (const q of input.questions) {
-        console.log("[AskUserQuestionTool] Asking question:", q.question);
-
         const userAnswers = await askUserQuestion(emitter, {
           title: q.header,
           question: q.question,
@@ -139,13 +134,9 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
           timeoutMs: 60000, // 1 minute timeout
         });
 
-        console.log("[AskUserQuestionTool] Received answers:", userAnswers);
-
         // Store answers keyed by question text
         answers[q.question] = q.multiSelect ? userAnswers : userAnswers[0] ?? "";
       }
-
-      console.log("[AskUserQuestionTool] All questions answered:", answers);
 
       return {
         success: true,

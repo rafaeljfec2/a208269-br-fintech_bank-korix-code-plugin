@@ -29,6 +29,14 @@ interface PendingToolCall {
   input: unknown;
 }
 
+interface ExecutedToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly success: boolean;
+  readonly data?: unknown;
+  readonly error?: string;
+}
+
 export class ExecutionEngine {
   private currentTextBuffer = "";
   private currentThinkingBuffer = "";
@@ -143,10 +151,24 @@ export class ExecutionEngine {
         }
 
         // Execute interactive tools (these don't trigger loop continuation)
+        let interactiveOutcomes: readonly ExecutedToolCall[] = [];
         if (interactiveTools.length > 0) {
           this.pendingToolCalls = interactiveTools;
-          await this.executeToolCalls(state);
+          interactiveOutcomes = await this.executeToolCalls(state);
           result.hadInteractiveToolCalls = true;
+
+          if (
+            this.shouldCompleteAfterInteractiveTools(
+              state,
+              regularTools.length > 0,
+              interactiveTools,
+              interactiveOutcomes,
+            )
+          ) {
+            result.completeAfterInteractiveToolCalls = true;
+            result.syntheticResponse =
+              this.buildInteractiveCompletionResponse(interactiveOutcomes);
+          }
         }
 
         // Clear pending tools
@@ -268,10 +290,10 @@ export class ExecutionEngine {
     }
   }
 
-  private async executeToolCalls(state: RuntimeState): Promise<void> {
+  private async executeToolCalls(state: RuntimeState): Promise<readonly ExecutedToolCall[]> {
     // Early exit if no tools to execute
     if (this.pendingToolCalls.length === 0) {
-      return;
+      return [];
     }
 
     // Check permissions for tools that explicitly require approval.
@@ -337,6 +359,7 @@ export class ExecutionEngine {
     // Execute via scheduler (parallel when possible)
     const scheduler = this.toolRegistry.getScheduler();
     const taskResults = await scheduler.scheduleMany(tasks, executor);
+    const outcomes: ExecutedToolCall[] = [];
 
     // Process results in order
     for (let i = 0; i < approvedCalls.length; i++) {
@@ -348,6 +371,14 @@ export class ExecutionEngine {
       }
 
       const result = taskResult.result;
+      outcomes.push({
+        id: toolCall.id,
+        name: toolCall.name,
+        success: result.success,
+        data: result.data,
+        error: result.error,
+      });
+
       const duration = result.metadata?.duration ?? 0;
       const observationSummary = this.observationEngine.summarizeToolResult(
         toolCall.name,
@@ -396,6 +427,92 @@ export class ExecutionEngine {
         metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
       });
     }
+
+    return outcomes;
+  }
+
+  private shouldCompleteAfterInteractiveTools(
+    state: RuntimeState,
+    hadRegularToolCalls: boolean,
+    interactiveTools: readonly PendingToolCall[],
+    interactiveOutcomes: readonly ExecutedToolCall[],
+  ): boolean {
+    if (hadRegularToolCalls || interactiveTools.length === 0) {
+      return false;
+    }
+
+    if (!interactiveTools.every((toolCall) => toolCall.name === "AskUserQuestion")) {
+      return false;
+    }
+
+    if (!interactiveOutcomes.every((outcome) => outcome.success)) {
+      return false;
+    }
+
+    if (this.currentTextBuffer.trim().length > 0) {
+      return false;
+    }
+
+    const conversation = state.getConversation();
+    const userMessages = conversation.messages.filter(
+      (message) => message.role === "user",
+    );
+    const latestUserMessage = userMessages[userMessages.length - 1]?.content ?? "";
+
+    return this.isDirectQuestionPresentationRequest(latestUserMessage);
+  }
+
+  private isDirectQuestionPresentationRequest(message: string): boolean {
+    const normalized = message
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    const asksForQuestion =
+      /\b(faca|crie|gere|monte|elabore|pergunte|ask|make|create|generate)\b/.test(
+        normalized,
+      ) && /\b(pergunta|question)\b/.test(normalized);
+    const asksForOptions =
+      /\b(opcao|opcoes|option|options|alternativa|alternativas|choices)\b/.test(
+        normalized,
+      );
+
+    return asksForQuestion && asksForOptions;
+  }
+
+  private buildInteractiveCompletionResponse(
+    outcomes: readonly ExecutedToolCall[],
+  ): string {
+    const answer = outcomes
+      .flatMap((outcome) => this.extractAnswers(outcome.data))
+      .filter((item) => item.trim().length > 0)
+      .join(", ");
+
+    if (!answer) {
+      return "Resposta registrada.";
+    }
+
+    return `Resposta registrada: ${answer}.`;
+  }
+
+  private extractAnswers(value: unknown): string[] {
+    if (typeof value === "string") {
+      return [value];
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item));
+    }
+
+    if (this.isRecord(value)) {
+      return Object.values(value).flatMap((item) => this.extractAnswers(item));
+    }
+
+    return [];
+  }
+
+  private isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
   private buildToolContext(

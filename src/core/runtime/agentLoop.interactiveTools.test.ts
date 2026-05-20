@@ -70,4 +70,59 @@ describe("AgentLoop interactive tools", () => {
     expect(events.filter((event) => event.type === "iteration_start")).toHaveLength(2);
     expect(result?.iterations).toBe(2);
   });
+
+  it("should finish without a provider follow-up when an interactive tool supplies a final response", async () => {
+    const context: ExecutionContext = {
+      mode: "ask",
+      workspaceRoot: "/workspace",
+      openFiles: [],
+    };
+    const firstStep: StepResult = {
+      hadToolCalls: false,
+      hadInteractiveToolCalls: true,
+      completeAfterInteractiveToolCalls: true,
+      syntheticResponse: "Resposta registrada: rock.",
+      hadThinking: false,
+      tokenCount: 0,
+      stopReason: "end_turn",
+      recoverable: true,
+    };
+    const step = vi.fn<[], Promise<StepResult>>().mockResolvedValue(firstStep);
+    const engine = { step } as unknown as ExecutionEngine;
+    const logger = new Logger({ level: "error" });
+    const eventEmitter = new RuntimeEventEmitter();
+    const emittedEvents: RuntimeEvent[] = [];
+    eventEmitter.onEvent((event) => emittedEvents.push(event));
+    const checkpointManager = new CheckpointManager(logger);
+    const loop = new AgentLoop(
+      engine,
+      checkpointManager,
+      new RecoveryManager(logger, checkpointManager, eventEmitter),
+      new IterationGuard(logger, eventEmitter),
+      new CancellationManager(logger, eventEmitter),
+      new RuntimeMetrics(logger),
+      eventEmitter,
+      logger,
+    );
+
+    const generator = loop.run("me faça uma pergunta com 4 opções", context);
+    let result: AgentLoopResult | undefined;
+
+    while (true) {
+      const next = await generator.next();
+      if (next.done) {
+        result = next.value;
+        break;
+      }
+    }
+
+    expect(step).toHaveBeenCalledTimes(1);
+    expect(result?.iterations).toBe(1);
+    expect(emittedEvents).toContainEqual(
+      expect.objectContaining({
+        type: "token",
+        content: "Resposta registrada: rock.",
+      }),
+    );
+  });
 });

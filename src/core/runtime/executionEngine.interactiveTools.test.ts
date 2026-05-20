@@ -221,6 +221,23 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       expect(shouldComplete).toBe(false);
     });
 
+    it("should complete after an interactive tool when the engine marks it final", () => {
+      const stepResult: StepResult = {
+        stopReason: "end_turn",
+        hadToolCalls: false,
+        hadInteractiveToolCalls: true,
+        completeAfterInteractiveToolCalls: true,
+        hadThinking: false,
+        tokenCount: 100,
+        recoverable: true,
+      };
+
+      const shouldComplete =
+        stepResult.completeAfterInteractiveToolCalls === true;
+
+      expect(shouldComplete).toBe(true);
+    });
+
     it("should NOT complete when hadToolCalls is true", () => {
       const stepResult: StepResult = {
         stopReason: "end_turn",
@@ -300,6 +317,130 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       expect(result.hadInteractiveToolCalls).toBe(true);
       expect(toolExecute).toHaveBeenCalledTimes(1);
       expect(approvalRequester).not.toHaveBeenCalled();
+    });
+
+    it("should fast-complete direct question presentation requests", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const toolRegistry = new ToolRegistry();
+      const approvalRequester = vi.fn(async () => ({
+        approved: false,
+        level: "never" as const,
+      }));
+      const toolExecute = vi.fn(async () => ({
+        success: true,
+        data: {
+          "Qual gênero musical você prefere?": "rock",
+        },
+        metadata: {
+          duration: 1,
+          approved: true,
+          timestamp: Date.now(),
+        },
+      }));
+      const provider = createToolCallProvider("AskUserQuestion");
+      const permissionManager = new PermissionManager(approvalRequester);
+      const state = new RuntimeState({
+        mode: "ask",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+      const tool: Tool<Record<string, never>, Record<string, string>> = {
+        name: "AskUserQuestion",
+        description: "Ask a structured question.",
+        schema: z.object({}),
+        isInteractive: true,
+        requiresApproval: () => false,
+        allowedInMode: () => true,
+        execute: toolExecute,
+      };
+
+      toolRegistry.register(tool);
+      state.addMessage({
+        role: "user",
+        content: "me faça uma pergunta sobre musica com 4 opções",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "system prompt",
+      );
+
+      const result = await engine.step(state);
+
+      expect(result.completeAfterInteractiveToolCalls).toBe(true);
+      expect(result.syntheticResponse).toBe("Resposta registrada: rock.");
+    });
+
+    it("should keep provider follow-up for non-presentation interactive requests", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const toolRegistry = new ToolRegistry();
+      const approvalRequester = vi.fn(async () => ({
+        approved: false,
+        level: "never" as const,
+      }));
+      const toolExecute = vi.fn(async () => ({
+        success: true,
+        data: {
+          "Qual banco de dados você prefere?": "postgres",
+        },
+        metadata: {
+          duration: 1,
+          approved: true,
+          timestamp: Date.now(),
+        },
+      }));
+      const provider = createToolCallProvider("AskUserQuestion");
+      const permissionManager = new PermissionManager(approvalRequester);
+      const state = new RuntimeState({
+        mode: "agent",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+      const tool: Tool<Record<string, never>, Record<string, string>> = {
+        name: "AskUserQuestion",
+        description: "Ask a structured question.",
+        schema: z.object({}),
+        isInteractive: true,
+        requiresApproval: () => false,
+        allowedInMode: () => true,
+        execute: toolExecute,
+      };
+
+      toolRegistry.register(tool);
+      state.addMessage({
+        role: "user",
+        content: "preciso escolher um banco de dados para implementar a feature",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "system prompt",
+      );
+
+      const result = await engine.step(state);
+
+      expect(result.completeAfterInteractiveToolCalls).toBeUndefined();
+      expect(result.syntheticResponse).toBeUndefined();
     });
   });
 });

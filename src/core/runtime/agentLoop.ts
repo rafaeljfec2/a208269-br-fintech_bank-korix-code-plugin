@@ -36,8 +36,7 @@ export class AgentLoop {
     private readonly iterationGuard: IterationGuard,
     private readonly cancellationManager: CancellationManager,
     private readonly metrics: RuntimeMetrics,
-    // @ts-expect-error - Reserved for future use
-    private readonly __eventEmitter: RuntimeEventEmitter,
+    private readonly eventEmitter: RuntimeEventEmitter,
     private readonly logger: Logger,
   ) {}
 
@@ -154,6 +153,15 @@ export class AgentLoop {
           timestamp: Date.now(),
         });
 
+        if (stepResult.syntheticResponse && stepResult.syntheticResponse.trim().length > 0) {
+          const tokenEvent: RuntimeEvent = {
+            type: "token",
+            content: stepResult.syntheticResponse,
+            timestamp: Date.now(),
+          };
+          this.eventEmitter.emitEvent(tokenEvent);
+        }
+
         // Increment iteration
         state.incrementIteration();
         this.metrics.recordIteration();
@@ -176,9 +184,15 @@ export class AgentLoop {
         // Stop only when the provider ended without any tool work.
         // Interactive tools add a tool_result message with the user's answer,
         // so the loop must continue once more for the provider to respond.
+        const interactiveToolsNeedProviderFollowup =
+          stepResult.hadInteractiveToolCalls === true &&
+          stepResult.completeAfterInteractiveToolCalls !== true;
         const hadAnyToolCalls =
-          stepResult.hadToolCalls || stepResult.hadInteractiveToolCalls === true;
-        if (isEndTurn && !hadAnyToolCalls) {
+          stepResult.hadToolCalls || interactiveToolsNeedProviderFollowup;
+        if (
+          stepResult.completeAfterInteractiveToolCalls === true ||
+          (isEndTurn && !hadAnyToolCalls)
+        ) {
           completed = true;
         }
       }

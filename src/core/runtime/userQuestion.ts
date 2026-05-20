@@ -78,15 +78,6 @@ export async function askUserQuestion(
   const questionId = crypto.randomUUID();
   const mode = config.mode ?? "single";
 
-  // Emit user_question event
-  console.log("[askUserQuestion] About to emit user_question event", {
-    questionId,
-    title: config.title,
-    question: config.question,
-    mode,
-    optionsCount: config.options.length,
-  });
-
   emitter.emitEvent({
     type: "user_question",
     questionId,
@@ -98,8 +89,6 @@ export async function askUserQuestion(
     defaultAnswer: config.defaultAnswer,
     timestamp: Date.now(),
   });
-
-  console.log("[askUserQuestion] user_question event emitted successfully");
 
   // Wait for user_answer via promise (with guaranteed cleanup)
   return new Promise((resolve) => {
