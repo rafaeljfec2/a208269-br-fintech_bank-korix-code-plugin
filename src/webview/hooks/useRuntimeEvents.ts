@@ -10,6 +10,7 @@ import type {
   ToolExecution,
 } from "../store/slices/chatSlice";
 import { logger } from "../utils/logger";
+import { formatToolActivity } from "../utils/toolActivityFormatter";
 
 type AgentEventStatus = ThinkingTimelineItem["status"];
 
@@ -409,21 +410,30 @@ export function useRuntimeEvents() {
 
           case "tool_call": {
             const event = runtimeEvent;
+            const activity = formatToolActivity(event.name, event.input);
+            const toolMetadata = {
+              toolCallId: event.id,
+              toolName: event.name,
+              input: event.input,
+              displayAction: activity.action,
+              targetLabel: activity.targetLabel,
+              displayLabel: activity.label,
+            };
 
             // Add to timeline (existing behavior)
             store.addTimelineEvent({
               type: "tool",
-              description: `Tool: ${event.name}`,
+              description: activity.label,
               status: "pending",
-              metadata: { toolName: event.name, input: event.input },
+              metadata: toolMetadata,
             });
             addActiveEventItem({
               stage: "tool_call",
-              title: `Calling ${event.name}`,
+              title: activity.label,
               summary: "Tool execution requested by the agent loop.",
               status: "pending",
               timestamp: event.timestamp,
-              metadata: { toolName: event.name, input: event.input },
+              metadata: toolMetadata,
             });
             store.updateMetrics({
               toolCallCount:
@@ -436,7 +446,7 @@ export function useRuntimeEvents() {
               const toolPending: ToolExecution = {
                 id: event.id,
                 name: event.name,
-                description: `${event.name}`,
+                description: activity.label,
                 status: "pending",
                 duration: 0,
                 timestamp: event.timestamp,
@@ -450,10 +460,10 @@ export function useRuntimeEvents() {
             if (currentActivityContextIdRef.current) {
               store.addActivityItem(currentActivityContextIdRef.current, {
                 category: "tool",
-                context: `Tool: ${event.name}`,
-                description: `Executing ${event.name}`,
+                context: activity.label,
+                description: `Executing ${activity.label}`,
                 status: "pending",
-                metadata: { toolName: event.name, input: event.input },
+                metadata: toolMetadata,
               });
             }
             break;
@@ -476,7 +486,7 @@ export function useRuntimeEvents() {
               status: event.success ? "success" : "error",
               timestamp: event.timestamp,
               durationMs: event.duration,
-              metadata: { toolName: event.name },
+              metadata: { toolCallId: event.id, toolName: event.name },
             });
 
             // NEW: Update tool status and duration in active message tracking

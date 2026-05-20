@@ -32,6 +32,69 @@ describe('ThinkingContainer', () => {
     expect(screen.getByText(/answer task, low risk/)).toBeInTheDocument();
   });
 
+  it('should show the active tool activity in the collapsed header', () => {
+    render(
+      <ThinkingContainer
+        active={true}
+        items={[
+          ...items,
+          {
+            id: '2',
+            stage: 'tool_call',
+            title: 'Read package.json',
+            summary: 'Tool execution requested by the agent loop.',
+            status: 'pending',
+            timestamp: 2,
+            metadata: {
+              toolCallId: 'tool-1',
+              displayLabel: 'Read package.json',
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Read package.json')).toBeInTheDocument();
+    expect(screen.queryByText(/thinking/)).not.toBeInTheDocument();
+  });
+
+  it('should return to the thinking label after the active tool completes', () => {
+    render(
+      <ThinkingContainer
+        active={true}
+        items={[
+          ...items,
+          {
+            id: '2',
+            stage: 'tool_call',
+            title: 'Read package.json',
+            summary: 'Tool execution requested by the agent loop.',
+            status: 'pending',
+            timestamp: 2,
+            metadata: {
+              toolCallId: 'tool-1',
+              displayLabel: 'Read package.json',
+            },
+          },
+          {
+            id: '3',
+            stage: 'tool_result',
+            title: 'ReadFile completed',
+            summary: 'Tool finished in 5ms.',
+            status: 'success',
+            timestamp: 3,
+            metadata: {
+              toolCallId: 'tool-1',
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('thinking ...')).toBeInTheDocument();
+    expect(screen.queryByText('Read package.json')).not.toBeInTheDocument();
+  });
+
   it('should animate the thinking dots', () => {
     vi.useFakeTimers();
 

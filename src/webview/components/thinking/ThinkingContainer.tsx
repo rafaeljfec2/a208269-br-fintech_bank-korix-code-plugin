@@ -39,7 +39,10 @@ export default function ThinkingContainer({
   }
 
   const dots = '.'.repeat(dotCount);
-  const headerLabel = active ? `thinking ${dots}` : 'thought';
+  const activeToolLabel = active ? findActiveToolLabel(visibleItems) : undefined;
+  const headerLabel = active
+    ? activeToolLabel ?? `thinking ${dots}`
+    : 'thought';
 
   const headerClass = clsx(
     'group inline-flex min-h-[18px] max-w-full items-center gap-1.5 py-0.5 cursor-pointer overflow-visible',
@@ -174,6 +177,49 @@ function buildCompletedItems(
         },
       ]
     : [];
+}
+
+function findActiveToolLabel(
+  items: readonly ThinkingTimelineItem[],
+): string | undefined {
+  const completedToolCallIds = new Set<string>();
+
+  for (const item of items) {
+    if (item.stage !== "tool_result") {
+      continue;
+    }
+
+    const toolCallId = getMetadataString(item, "toolCallId");
+    if (toolCallId) {
+      completedToolCallIds.add(toolCallId);
+    }
+  }
+
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (!item || item.stage !== "tool_call") {
+      continue;
+    }
+
+    const toolCallId = getMetadataString(item, "toolCallId");
+    if (toolCallId && completedToolCallIds.has(toolCallId)) {
+      continue;
+    }
+
+    return getMetadataString(item, "displayLabel") ?? item.title;
+  }
+
+  return undefined;
+}
+
+function getMetadataString(
+  item: ThinkingTimelineItem,
+  key: string,
+): string | undefined {
+  const value = item.metadata?.[key];
+  return typeof value === "string" && value.trim().length > 0
+    ? value
+    : undefined;
 }
 
 function addNormalizedItem(

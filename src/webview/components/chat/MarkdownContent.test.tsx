@@ -128,6 +128,22 @@ console.log(users);
     expect(cells.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('should render markdown during streaming instead of raw markdown text', () => {
+    const content = `## Contexto Atual
+
+**Identidade**: Korix Code
+
+- ReadFile
+- SearchFiles`;
+
+    const { container } = render(<MarkdownContent content={content} isStreaming={true} />);
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Contexto Atual' })).toBeInTheDocument();
+    expect(container.querySelector('strong')?.textContent).toBe('Identidade');
+    expect(screen.queryByText('## Contexto Atual')).not.toBeInTheDocument();
+    expect(container.querySelector('.font-mono')).not.toBeInTheDocument();
+  });
+
   it('should handle empty content gracefully', () => {
     const { container } = render(<MarkdownContent content="" />);
     expect(container.firstChild).toBeInTheDocument();

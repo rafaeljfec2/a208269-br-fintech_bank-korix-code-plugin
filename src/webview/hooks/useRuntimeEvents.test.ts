@@ -355,16 +355,23 @@ describe("useRuntimeEvents", () => {
 
       expect(mockAddTimelineEvent).toHaveBeenCalledWith({
         type: "tool",
-        description: "Tool: ReadFile",
+        description: "Read test.ts",
         status: "pending",
-        metadata: { toolName: "ReadFile", input: { path: "test.ts" } },
+        metadata: {
+          displayAction: "Read",
+          displayLabel: "Read test.ts",
+          input: { path: "test.ts" },
+          targetLabel: "test.ts",
+          toolCallId: undefined,
+          toolName: "ReadFile",
+        },
       });
       expect(mockUpdateMetrics).toHaveBeenCalled();
       expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
         "test-chat-id",
         expect.objectContaining({
           stage: "tool_call",
-          title: "Calling ReadFile",
+          title: "Read test.ts",
           summary: "Tool execution requested by the agent loop.",
         }),
       );

@@ -19,25 +19,19 @@ interface MarkdownContentProps {
 
 function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps) {
   // Null/undefined guard
-  if (!content || typeof content !== 'string') {
+  if (typeof content !== 'string') {
     console.warn('[MarkdownContent] Invalid content:', typeof content);
     return <div className="text-red-500">Invalid markdown content</div>;
   }
 
-  // CRITICAL OPTIMIZATION: Render plain text during streaming, markdown when done
-  // This prevents ReactMarkdown from re-processing the entire content on every token
-  if (isStreaming) {
-    return (
-      <div className="whitespace-pre-wrap text-[var(--vscode-foreground)] text-sm leading-relaxed font-mono">
-        {content}
-        <span className="inline-block w-2 h-4 bg-[var(--vscode-foreground)] animate-pulse ml-1" />
-      </div>
-    );
-  }
-
-  // Post-process markdown for professional formatting with error handling
-  // Only run when NOT streaming (finalized content)
+  // Keep markdown rendering active while streaming so users never see raw
+  // markers like "##" or "**" flash before the final formatted message.
+  // The heavier post-processing pass still waits until streaming completes.
   const processedContent = React.useMemo(() => {
+    if (isStreaming) {
+      return content;
+    }
+
     try {
       return postProcessMarkdown(content, {
         addStrategicEmojis: true,
@@ -48,7 +42,8 @@ function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps)
       console.error('[MarkdownContent] Post-processor error:', error);
       return content; // Fallback to raw content
     }
-  }, [content]);
+  }, [content, isStreaming]);
+
   const markdownContent = clsx(
     'prose prose-sm max-w-none',
     // Headings
@@ -80,7 +75,7 @@ function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps)
   );
 
   return (
-    <div className={markdownContent}>
+    <div className={clsx(markdownContent, isStreaming && 'relative')}>
       <MarkdownErrorBoundary content={processedContent} className={markdownContent}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkDirective]}
@@ -137,6 +132,12 @@ function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps)
           {processedContent}
         </ReactMarkdown>
       </MarkdownErrorBoundary>
+      {isStreaming && (
+        <span
+          aria-hidden="true"
+          className="inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-[var(--vscode-foreground)] opacity-80"
+        />
+      )}
     </div>
   );
 }
