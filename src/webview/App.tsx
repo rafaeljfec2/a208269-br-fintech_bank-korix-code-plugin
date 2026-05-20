@@ -12,7 +12,6 @@ import BottomBar from './components/layout/BottomBar';
 import Sidebar from './components/layout/Sidebar';
 import ResizeHandle from './components/layout/ResizeHandle';
 import MainPanel from './components/layout/MainPanel';
-import ToolApprovalModal from './components/tools/ToolApprovalModal';
 
 export default function App() {
   const sidebarVisible = useStore((state) => state.sidebarVisible);
@@ -49,9 +48,6 @@ export default function App() {
 
       {/* Bottom Bar - Input + Controls + Status */}
       <BottomBar />
-
-      {/* Tool Approval Modal - Renders conditionally when approval is needed */}
-      <ToolApprovalModal />
     </div>
   );
 }

@@ -2,8 +2,6 @@
  * Permission system for tool execution with allowlist/denylist
  */
 
-import * as vscode from "vscode";
-
 export type PermissionLevel = "always" | "once" | "never" | "ask";
 
 export interface PermissionRule {
@@ -26,11 +24,15 @@ export interface ApprovalResponse {
   level?: PermissionLevel;
 }
 
+export type PermissionApprovalRequester = (
+  request: ApprovalRequest,
+) => Promise<ApprovalResponse>;
+
 export class PermissionManager {
   private rules: Map<string, PermissionRule> = new Map();
   private denylist: Set<string> = new Set();
 
-  constructor() {
+  constructor(private readonly approvalRequester?: PermissionApprovalRequester) {
     this.loadDefaultDenylist();
   }
 
@@ -106,50 +108,28 @@ export class PermissionManager {
       }
     }
 
-    // Ask user for approval
+    // Ask user for approval via the injected UI channel.
     return await this.promptUser(request);
   }
 
   private async promptUser(
     request: ApprovalRequest,
   ): Promise<ApprovalResponse> {
-    const riskEmoji = {
-      low: "✅",
-      medium: "⚠️",
-      high: "🔴",
-    };
-
-    const message = `${riskEmoji[request.riskLevel]} Korix wants to execute: ${request.tool}`;
-    const detail = request.description;
-
-    const choice = await vscode.window.showWarningMessage(
-      message,
-      {
-        modal: true,
-        detail,
-      },
-      "Approve Once",
-      "Always Allow",
-      "Reject",
-      "Never Allow",
-    );
-
-    switch (choice) {
-      case "Approve Once":
-        return { approved: true, level: "once" };
-
-      case "Always Allow":
-        this.addRule({ tool: request.tool, level: "always" });
-        return { approved: true, remember: true, level: "always" };
-
-      case "Never Allow":
-        this.addRule({ tool: request.tool, level: "never" });
-        return { approved: false, remember: true, level: "never" };
-
-      case "Reject":
-      default:
-        return { approved: false };
+    if (!this.approvalRequester) {
+      return { approved: false };
     }
+
+    const response = await this.approvalRequester(request);
+
+    if (response.level === "always") {
+      this.addRule({ tool: request.tool, level: "always" });
+    }
+
+    if (response.level === "never") {
+      this.addRule({ tool: request.tool, level: "never" });
+    }
+
+    return response;
   }
 
   async requestApproval(

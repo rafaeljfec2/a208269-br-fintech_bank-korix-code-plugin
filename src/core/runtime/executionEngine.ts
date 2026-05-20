@@ -11,7 +11,7 @@ import type {
   ProviderEvent,
   RequestContext,
 } from "../providers/types";
-import type { ToolRegistry } from "../../harness/toolRegistry";
+import type { ToolContext, ToolRegistry } from "../../harness/toolRegistry";
 import type { PermissionManager } from "../../harness/permissions";
 import type { Logger } from "../../telemetry/logger";
 import { RuntimeEventEmitter } from "./runtimeEvents";
@@ -274,8 +274,10 @@ export class ExecutionEngine {
       return;
     }
 
-    // Check permissions for all tools first
+    // Check permissions for tools that explicitly require approval.
     const approvedCalls: typeof this.pendingToolCalls = [];
+    const workspace = state.getWorkspace();
+    const toolContext = this.buildToolContext(workspace);
 
     for (const toolCall of this.pendingToolCalls) {
       this.cancellationManager.checkCancellation();
@@ -283,30 +285,36 @@ export class ExecutionEngine {
 
       const toolDef = this.toolRegistry.get(toolCall.name);
       const riskLevel = this.inferRiskLevel(toolCall.name);
-      const response = await this.permissionManager.checkPermission({
-        tool: toolCall.name,
-        input: toolCall.input,
-        description: toolDef?.description ?? `Execute ${toolCall.name}`,
-        riskLevel,
-      });
+      const requiresApproval =
+        toolDef?.requiresApproval?.(toolCall.input, toolContext) ??
+        riskLevel !== "low";
 
-      if (!response.approved) {
+      if (requiresApproval) {
+        const response = await this.permissionManager.checkPermission({
+          tool: toolCall.name,
+          input: toolCall.input,
+          description: toolDef?.description ?? `Execute ${toolCall.name}`,
+          riskLevel,
+        });
+
+        if (!response.approved) {
+          this.eventEmitter.emitEvent({
+            type: "tool_denied",
+            id: toolCall.id,
+            name: toolCall.name,
+            reason: "Permission denied",
+            timestamp: Date.now(),
+          });
+          continue;
+        }
+
         this.eventEmitter.emitEvent({
-          type: "tool_denied",
+          type: "tool_approved",
           id: toolCall.id,
           name: toolCall.name,
-          reason: "Permission denied",
           timestamp: Date.now(),
         });
-        continue;
       }
-
-      this.eventEmitter.emitEvent({
-        type: "tool_approved",
-        id: toolCall.id,
-        name: toolCall.name,
-        timestamp: Date.now(),
-      });
 
       approvedCalls.push(toolCall);
     }
@@ -315,7 +323,6 @@ export class ExecutionEngine {
     const tasks = this.prepareSchedulerTasks(approvedCalls);
 
     // Create executor function for scheduler
-    const workspace = state.getWorkspace();
     const executor = async (tool: string, input: unknown) => {
       return await this.toolRegistry.execute(tool, input, {
         execution: {
@@ -389,6 +396,21 @@ export class ExecutionEngine {
         metadata: { toolCallId: toolCall.id, toolName: toolCall.name },
       });
     }
+  }
+
+  private buildToolContext(
+    workspace: ReturnType<RuntimeState["getWorkspace"]>,
+  ): ToolContext {
+    return {
+      execution: {
+        mode: "agent",
+        workspaceRoot: workspace.root,
+        openFiles: Array.from(workspace.openFiles),
+        ...(workspace.currentFile ? { currentFile: workspace.currentFile } : {}),
+        ...(workspace.selection ? { selection: workspace.selection } : {}),
+      },
+      workspaceRoot: workspace.root,
+    };
   }
 
   private resetBuffers(): void {

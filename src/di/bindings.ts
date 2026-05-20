@@ -17,10 +17,15 @@ import { PatchValidator } from "../patch/validation";
 import { RollbackManager } from "../patch/rollback";
 import { PatchApplier } from "../patch/applier";
 import { globalToolRegistry } from "../harness/toolRegistry";
-import { PermissionManager } from "../harness/permissions";
+import {
+  PermissionManager,
+  type ApprovalRequest,
+  type ApprovalResponse,
+} from "../harness/permissions";
 import { ProviderRegistry } from "../providers/registry";
 import { ProviderConfigManager } from "../providers/config";
 import { RuntimeEventEmitter } from "../core/runtime/runtimeEvents";
+import { askUserQuestion } from "../core/runtime/userQuestion";
 import { RuntimeMetrics } from "../core/runtime/runtimeMetrics";
 import { RuntimeStateManager } from "../core/runtime/runtimeStateManager";
 import { CheckpointManager } from "../core/runtime/checkpoints";
@@ -49,10 +54,12 @@ export function configureContainer(
   container.bindValue(TOKENS.ToolRegistry, globalToolRegistry);
 
   // Permission Manager (singleton)
-  container.bindSingleton(
-    TOKENS.PermissionManager,
-    () => new PermissionManager(),
-  );
+  container.bindSingleton(TOKENS.PermissionManager, (c) => {
+    const eventEmitter = c.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
+    return new PermissionManager((request) =>
+      requestPermissionInWebview(eventEmitter, request),
+    );
+  });
 
   // Provider Registry (singleton)
   container.bindSingleton(
@@ -167,4 +174,73 @@ export function configureContainer(
   // which needs async config loading. These will be created on-demand
   // when actually used, not pre-registered in DI.
   // See extension.ts for manual instantiation when needed.
+}
+
+async function requestPermissionInWebview(
+  eventEmitter: RuntimeEventEmitter,
+  request: ApprovalRequest,
+): Promise<ApprovalResponse> {
+  const description = compactPermissionDescription(request.description);
+  const answers = await askUserQuestion(eventEmitter, {
+    title: "Permission",
+    question: `${riskLabel(request.riskLevel)} Allow Korix to execute ${request.tool}? ${description}`,
+    mode: "single",
+    options: [
+      {
+        value: "once",
+        label: "Approve once",
+        description: "Allow this execution only.",
+      },
+      {
+        value: "always",
+        label: "Always allow",
+        description: "Allow this tool automatically in future runs.",
+      },
+      {
+        value: "reject",
+        label: "Reject",
+        description: "Block this execution and continue safely.",
+      },
+      {
+        value: "never",
+        label: "Never allow",
+        description: "Block this tool automatically in future runs.",
+      },
+    ],
+    timeoutMs: 60000,
+    defaultAnswer: "reject",
+  });
+
+  switch (answers[0] ?? "reject") {
+    case "once":
+      return { approved: true, level: "once" };
+    case "always":
+      return { approved: true, remember: true, level: "always" };
+    case "never":
+      return { approved: false, remember: true, level: "never" };
+    case "reject":
+    default:
+      return { approved: false };
+  }
+}
+
+function compactPermissionDescription(description: string): string {
+  const compact = description.replace(/\s+/g, " ").trim();
+
+  if (compact.length === 0) {
+    return "Review the tool request before continuing.";
+  }
+
+  return compact.length > 220 ? `${compact.slice(0, 217)}...` : compact;
+}
+
+function riskLabel(riskLevel: ApprovalRequest["riskLevel"]): string {
+  switch (riskLevel) {
+    case "low":
+      return "Low risk.";
+    case "medium":
+      return "Medium risk.";
+    case "high":
+      return "High risk.";
+  }
 }
