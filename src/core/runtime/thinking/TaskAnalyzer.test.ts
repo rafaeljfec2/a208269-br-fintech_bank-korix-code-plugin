@@ -87,6 +87,7 @@ describe("TaskAnalyzer", () => {
     expect(profile.riskLevel).toBe("low");
     expect(profile.requiresWorkspaceEvidence).toBe(true);
     expect(profile.requiresToolUse).toBe(true);
+    expect(profile.constraints).toContain("explicit_workspace_access");
   });
 
   it("should not collect workspace evidence in ask mode", () => {

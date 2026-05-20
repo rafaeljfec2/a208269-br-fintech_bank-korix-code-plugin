@@ -306,6 +306,10 @@ export class TaskAnalyzer {
       constraints.push("read_only_mode");
     }
 
+    if (this.requestsWorkspaceAccess(message)) {
+      constraints.push("explicit_workspace_access");
+    }
+
     if (/\b(sem alterar|não altere|nao altere|no changes|read-only)\b/.test(message)) {
       constraints.push("no_file_changes");
     }

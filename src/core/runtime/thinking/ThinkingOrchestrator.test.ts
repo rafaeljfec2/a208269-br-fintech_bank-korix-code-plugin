@@ -170,4 +170,86 @@ describe("ThinkingOrchestrator", () => {
     expect(tokenIndex).toBeGreaterThanOrEqual(0);
     expect(validationIndex).toBeGreaterThan(tokenIndex);
   });
+
+  it("should require tools instead of passive evidence for explicit file reads", async () => {
+    const context: ThinkingRunInput["context"] = {
+      mode: "agent",
+      workspaceRoot: "/workspace",
+      openFiles: ["/workspace/src/app.ts"],
+    };
+
+    const eventEmitter = new RuntimeEventEmitter();
+    let runtimeMessage = "";
+    let evidenceCalls = 0;
+
+    const agentLoop: AgentLoopLike = {
+      async *run(
+        initialMessage: string,
+      ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
+        runtimeMessage = initialMessage;
+
+        yield {
+          type: "done",
+          stopReason: "end_turn",
+          timestamp: Date.now(),
+        };
+
+        const state = new RuntimeState(context, 25);
+        return {
+          success: true,
+          iterations: 1,
+          finalState: state.createSnapshot(),
+          metrics: {
+            totalTokens: 1,
+            totalToolCalls: 0,
+            iterations: 1,
+            duration: 1,
+            checkpoints: 0,
+            recoveries: 0,
+            toolBreakdown: {},
+            eventTimeline: [],
+          },
+        };
+      },
+    };
+
+    const orchestrator = new ThinkingOrchestrator({
+      agentLoop,
+      eventEmitter,
+      logger: new Logger({ level: "error" }),
+      evidenceProvider: async () => {
+        evidenceCalls += 1;
+        return {
+          summary: "1 workspace item, 20 estimated tokens.",
+          providerContext: "src/app.ts",
+          items: [
+            {
+              path: "/workspace/src/app.ts",
+              priority: 1,
+              tokenCount: 20,
+            },
+          ],
+          totalTokens: 20,
+        };
+      },
+    });
+
+    const generator = orchestrator.run({
+      initialMessage: "faça leitura e passe um resumo de tres arquivos do projeto",
+      context,
+    });
+
+    while (true) {
+      const next = await generator.next();
+      if (next.done) {
+        break;
+      }
+    }
+
+    expect(evidenceCalls).toBe(0);
+    expect(runtimeMessage).toContain("<korix_tool_requirement>");
+    expect(runtimeMessage).toContain("ListDirectory or SearchFiles");
+    expect(runtimeMessage).toContain("ReadFile or FileChunks");
+    expect(runtimeMessage).not.toContain("<korix_workspace_evidence>");
+  });
 });

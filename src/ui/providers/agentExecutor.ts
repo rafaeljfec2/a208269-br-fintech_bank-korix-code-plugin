@@ -70,10 +70,9 @@ export class AgentExecutor {
       // Create provider instance
       const provider = this.agentLoopFactory.createProvider(providerConfig);
 
-      // Get mode (use default if not initialized yet)
-      const mode = this.stateManager.isInitialized()
-        ? this.stateManager.getMode()
-        : "ask";
+      // Get the selected mode even before the runtime state is initialized.
+      // Mode changes can happen from the webview before the first message.
+      const mode = this.stateManager.getMode();
 
       // Prepare execution context before choosing the runtime path.
       const context = this.buildExecutionContext(mode);

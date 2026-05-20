@@ -102,6 +102,13 @@ describe("RuntimeStateManager", () => {
   });
 
   describe("mode management", () => {
+    it("should preserve selected mode before initialization", () => {
+      manager.setMode("agent");
+
+      expect(manager.isInitialized()).toBe(false);
+      expect(manager.getMode()).toBe("agent");
+    });
+
     it("should get and set mode", () => {
       manager.initialize(mockContext);
 

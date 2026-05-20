@@ -129,7 +129,11 @@ export class ThinkingOrchestrator {
     });
 
     try {
-      if (profile.requiresWorkspaceEvidence && this.options.evidenceProvider) {
+      if (
+        profile.requiresWorkspaceEvidence &&
+        this.options.evidenceProvider &&
+        !this.hasExplicitWorkspaceToolRequest(profile)
+      ) {
         this.options.eventEmitter.emitEvent({
           type: "thinking_step",
           item: this.narrator.step(
@@ -194,7 +198,12 @@ export class ThinkingOrchestrator {
         timestamp: Date.now(),
       });
 
-      const runtimeMessage = this.buildRuntimeMessage(input.initialMessage, evidence);
+      const runtimeMessage = this.buildRuntimeMessage(
+        input.initialMessage,
+        input.context,
+        profile,
+        evidence,
+      );
       const generator = this.options.agentLoop.run(
         runtimeMessage,
         input.context,
@@ -287,6 +296,12 @@ export class ThinkingOrchestrator {
     return profile.requiresWorkspaceEvidence;
   }
 
+  private hasExplicitWorkspaceToolRequest(
+    profile: ReturnType<TaskAnalyzer["analyze"]>,
+  ): boolean {
+    return profile.constraints.includes("explicit_workspace_access");
+  }
+
   private validateResponse(
     profile: ReturnType<TaskAnalyzer["analyze"]>,
     evidence: EvidencePack | undefined,
@@ -339,20 +354,45 @@ export class ThinkingOrchestrator {
     return validation;
   }
 
-  private buildRuntimeMessage(message: string, evidence?: EvidencePack): string {
-    if (!evidence || evidence.providerContext.trim().length === 0) {
-      return message;
+  private buildRuntimeMessage(
+    message: string,
+    context: ThinkingRunInput["context"],
+    profile: ReturnType<TaskAnalyzer["analyze"]>,
+    evidence?: EvidencePack,
+  ): string {
+    const sections = [message];
+
+    if (
+      context.mode !== "ask" &&
+      this.hasExplicitWorkspaceToolRequest(profile)
+    ) {
+      sections.push(
+        "",
+        "<korix_tool_requirement>",
+        [
+          "The user explicitly asked you to read, list, search, or inspect workspace files.",
+          "You must satisfy that request with available workspace tools before the final answer.",
+          "If paths are not provided, use ListDirectory or SearchFiles to choose project files, then use ReadFile or FileChunks for the requested files.",
+          "Do not answer from preloaded context alone, and do not ask the user to paste files unless tools are unavailable.",
+        ].join(" "),
+        "</korix_tool_requirement>",
+      );
     }
 
-    return [
-      message,
+    if (!evidence || evidence.providerContext.trim().length === 0) {
+      return sections.join("\n");
+    }
+
+    sections.push(
       "",
       "<korix_workspace_evidence>",
       evidence.providerContext,
       "</korix_workspace_evidence>",
       "",
       "Use the workspace evidence above for project-specific claims. If it is insufficient, say so explicitly.",
-    ].join("\n");
+    );
+
+    return sections.join("\n");
   }
 
   private withThinkingSnapshot(

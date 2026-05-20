@@ -166,9 +166,7 @@ export class MessageHandler {
    * Send initial state to webview on load
    */
   public async sendInitialState(): Promise<void> {
-    const mode = this.stateManager.isInitialized()
-      ? this.stateManager.getMode()
-      : "ask";
+    const mode = this.stateManager.getMode();
 
     const sessionId = this.stateManager.getSessionId() ?? crypto.randomUUID();
 
