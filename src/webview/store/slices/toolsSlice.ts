@@ -33,7 +33,9 @@ export interface ToolsSlice {
   readonly pendingApprovals: readonly PendingApproval[];
 
   // Actions
-  readonly addToolCall: (toolCall: Omit<ToolCall, "timestamp">) => void;
+  readonly addToolCall: (
+    toolCall: Omit<ToolCall, "timestamp"> & Partial<Pick<ToolCall, "timestamp">>,
+  ) => void;
   readonly updateToolCall: (id: string, updates: Partial<ToolCall>) => void;
   readonly addPendingApproval: (approval: PendingApproval) => void;
   readonly removePendingApproval: (toolCallId: string) => void;
@@ -50,7 +52,7 @@ export const createToolsSlice: StateCreator<ToolsSlice> = (set) => ({
         ...state.toolCalls,
         {
           ...toolCall,
-          timestamp: Date.now(),
+          timestamp: toolCall.timestamp ?? Date.now(),
         },
       ],
     })),

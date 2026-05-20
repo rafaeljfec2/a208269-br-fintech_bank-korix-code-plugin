@@ -11,30 +11,15 @@
  */
 
 import { spawn } from "child_process";
-import { z } from "zod";
 import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
+import { createPathMatcher } from "./searchFilesMatcher";
+import {
+  SearchFilesSchema,
+  type FileMatch,
+  type SearchFilesInput,
+} from "./searchFilesInput";
 
-const SearchFilesSchema = z.object({
-  pattern: z.string().describe("File name pattern (regex or glob)"),
-  searchType: z
-    .enum(["name", "content"])
-    .describe("Search by file name or content"),
-  includeHidden: z.boolean().optional().describe("Include hidden files"),
-  maxResults: z.number().optional().describe("Maximum results (default 100)"),
-  fileTypes: z
-    .array(z.string())
-    .optional()
-    .describe('File extensions to filter (e.g., ["ts", "js"])'),
-  excludePaths: z.array(z.string()).optional().describe("Paths to exclude"),
-});
-
-type SearchFilesInput = z.infer<typeof SearchFilesSchema>;
-
-interface FileMatch {
-  readonly path: string;
-  readonly match?: string; // matched line (if content search)
-  readonly lineNumber?: number;
-}
+let ripgrepAvailableCache: boolean | undefined;
 
 /**
  * Search files using ripgrep
@@ -109,11 +94,21 @@ export const SearchFilesTool: Tool<SearchFilesInput, FileMatch[]> = {
  * Check if ripgrep is available in PATH
  */
 async function checkRipgrepAvailable(): Promise<boolean> {
+  if (ripgrepAvailableCache !== undefined) {
+    return ripgrepAvailableCache;
+  }
+
   return new Promise((resolve) => {
     const rg = spawn("rg", ["--version"]);
 
-    rg.on("error", () => resolve(false));
-    rg.on("close", (code) => resolve(code === 0));
+    rg.on("error", () => {
+      ripgrepAvailableCache = false;
+      resolve(false);
+    });
+    rg.on("close", (code) => {
+      ripgrepAvailableCache = code === 0;
+      resolve(ripgrepAvailableCache);
+    });
   });
 }
 
@@ -172,14 +167,11 @@ async function searchFilesByName(
     }
 
     const rgFiles = spawn("rg", args, { cwd: workspaceRoot });
-    const rgFilter = spawn("rg", [input.pattern], { cwd: workspaceRoot });
-
-    // Pipe rg --files to rg <pattern>
-    rgFiles.stdout.pipe(rgFilter.stdin);
-
+    const matcher = createPathMatcher(input.pattern);
     let output = "";
+    let completedByLimit = false;
 
-    rgFilter.stdout.on("data", (data: Buffer) => {
+    rgFiles.stdout.on("data", (data: Buffer) => {
       output += data.toString();
 
       // Parse incrementally
@@ -187,25 +179,27 @@ async function searchFilesByName(
       output = lines.pop() ?? ""; // Keep incomplete line
 
       for (const line of lines) {
-        if (line.trim() && matches.length < maxResults) {
-          matches.push({ path: line.trim() });
+        const filePath = line.trim();
+        if (filePath && matcher(filePath) && matches.length < maxResults) {
+          matches.push({ path: filePath });
         }
       }
 
       // Stop if max results reached
       if (matches.length >= maxResults) {
+        completedByLimit = true;
         rgFiles.kill();
-        rgFilter.kill();
       }
     });
 
-    rgFilter.on("close", (code) => {
+    rgFiles.on("close", (code) => {
       // Process remaining output
-      if (output.trim() && matches.length < maxResults) {
-        matches.push({ path: output.trim() });
+      const filePath = output.trim();
+      if (filePath && matcher(filePath) && matches.length < maxResults) {
+        matches.push({ path: filePath });
       }
 
-      if (code === 0 || code === 1) {
+      if (completedByLimit || code === 0 || code === 1) {
         // 1 = no matches (not an error)
         resolve();
       } else {
@@ -213,7 +207,7 @@ async function searchFilesByName(
       }
     });
 
-    rgFilter.on("error", (error) => {
+    rgFiles.on("error", (error) => {
       reject(error);
     });
   });
@@ -258,6 +252,7 @@ async function searchFilesByContent(
     const rg = spawn("rg", args, { cwd: workspaceRoot });
 
     let output = "";
+    let completedByLimit = false;
 
     rg.stdout.on("data", (data: Buffer) => {
       output += data.toString();
@@ -304,6 +299,7 @@ async function searchFilesByContent(
 
         // Stop if max results reached
         if (matches.length >= maxResults) {
+          completedByLimit = true;
           rg.kill();
           break;
         }
@@ -311,7 +307,7 @@ async function searchFilesByContent(
     });
 
     rg.on("close", (code) => {
-      if (code === 0 || code === 1) {
+      if (completedByLimit || code === 0 || code === 1) {
         // 1 = no matches
         resolve();
       } else {

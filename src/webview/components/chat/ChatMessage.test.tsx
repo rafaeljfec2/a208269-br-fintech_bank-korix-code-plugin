@@ -20,19 +20,27 @@ describe('ChatMessage', () => {
     expect(screen.getByText('Test message content')).toBeInTheDocument();
   });
 
-  it('should apply user background for user messages', () => {
+  it('should render user messages as a right-aligned chat bubble', () => {
     const userMessage: Message = { ...baseMessage, role: 'user' };
     const { container } = render(<ChatMessage message={userMessage} />);
 
     const messageDiv = container.firstChild as HTMLElement;
-    expect(messageDiv.className).toContain('bg-[var(--vscode-input-background)]');
+    const bubble = messageDiv.firstChild as HTMLElement;
+
+    expect(messageDiv.className).toContain('justify-end');
+    expect(bubble.className).toContain('max-w-[82%]');
+    expect(bubble.className).toContain('rounded-2xl');
+    expect(bubble.className).toContain('bg-[var(--vscode-input-background)]');
   });
 
   it('should not apply user background for assistant messages', () => {
     const { container } = render(<ChatMessage message={baseMessage} />);
 
     const messageDiv = container.firstChild as HTMLElement;
-    expect(messageDiv.className).not.toContain('bg-[var(--vscode-input-background)]');
+    const surface = messageDiv.firstChild as HTMLElement;
+
+    expect(messageDiv.className).toContain('justify-start');
+    expect(surface.className).not.toContain('bg-[var(--vscode-input-background)]');
   });
 
   it('should render status card when metadata contains statusCard', () => {

@@ -33,6 +33,8 @@ describe("useRuntimeEvents", () => {
   const mockAddActiveThinkingItem = vi.fn();
   const mockAppendThinkingItemToLastAssistant = vi.fn();
   const mockClearActiveThinkingItems = vi.fn();
+  const mockSetActiveQuestion = vi.fn();
+  const mockClearActiveQuestion = vi.fn();
   // Activity Log mocks
   const mockStartContext = vi.fn();
   const mockEndContext = vi.fn();
@@ -64,6 +66,8 @@ describe("useRuntimeEvents", () => {
       addActiveThinkingItem: mockAddActiveThinkingItem,
       appendThinkingItemToLastAssistant: mockAppendThinkingItemToLastAssistant,
       clearActiveThinkingItems: mockClearActiveThinkingItems,
+      setActiveQuestion: mockSetActiveQuestion,
+      clearActiveQuestion: mockClearActiveQuestion,
       // Activity Log state
       startContext: mockStartContext,
       endContext: mockEndContext,
@@ -273,6 +277,58 @@ describe("useRuntimeEvents", () => {
           summary: "answer task, low risk",
         }),
       );
+    });
+  });
+
+  describe("runtime_event: user_question", () => {
+    it("should render a single active question panel without adding a duplicate chat message", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "user_question",
+                  questionId: "question-1",
+                  title: "Permission",
+                  question: "Allow Korix to execute FileChunks?",
+                  mode: "single",
+                  options: [
+                    {
+                      value: "once",
+                      label: "Approve once",
+                      description: "Allow this execution only.",
+                    },
+                  ],
+                  timeoutMs: 60000,
+                  defaultAnswer: "reject",
+                  timestamp: 123,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockSetActiveQuestion).toHaveBeenCalledWith({
+        questionId: "question-1",
+        title: "Permission",
+        question: "Allow Korix to execute FileChunks?",
+        mode: "single",
+        options: [
+          {
+            value: "once",
+            label: "Approve once",
+            description: "Allow this execution only.",
+          },
+        ],
+        timeoutMs: 60000,
+        defaultAnswer: "reject",
+      });
+      expect(mockAddMessage).not.toHaveBeenCalled();
     });
   });
 

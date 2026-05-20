@@ -42,8 +42,8 @@ export default function ThinkingContainer({
   const headerLabel = active ? `thinking ${dots}` : 'thought';
 
   const headerClass = clsx(
-    'group inline-flex max-w-full items-center gap-1.5 py-1 cursor-pointer',
-    'text-[11px] leading-none text-[var(--vscode-descriptionForeground)]',
+    'group inline-flex min-h-[18px] max-w-full items-center gap-1.5 py-0.5 cursor-pointer overflow-visible',
+    'text-[11px] leading-[1.4] text-[var(--vscode-descriptionForeground)]',
     'hover:text-[var(--vscode-foreground)] transition-colors'
   );
 
@@ -55,8 +55,8 @@ export default function ThinkingContainer({
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
       >
-        <span className="w-3 text-[10px]">{expanded ? '⌄' : '›'}</span>
-        <span className="truncate">{headerLabel}</span>
+        <span className="w-3 text-[10px] leading-[1.4]">{expanded ? '⌄' : '›'}</span>
+        <span className="truncate leading-[1.4]">{headerLabel}</span>
       </button>
 
       <AnimatePresence>

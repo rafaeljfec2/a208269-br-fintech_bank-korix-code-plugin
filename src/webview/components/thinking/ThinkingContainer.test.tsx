@@ -63,6 +63,16 @@ describe('ThinkingContainer', () => {
     expect(screen.queryByText(/thinking/)).not.toBeInTheDocument();
   });
 
+  it('should give the collapsed label enough line height for descenders', () => {
+    render(<ThinkingContainer items={items} />);
+
+    const button = screen.getByRole('button', { name: /thought/ });
+
+    expect(button).toHaveClass('min-h-[18px]');
+    expect(button).toHaveClass('leading-[1.4]');
+    expect(button).not.toHaveClass('leading-none');
+  });
+
   it('should hide noisy runtime internals from completed thinking', () => {
     render(
       <ThinkingContainer

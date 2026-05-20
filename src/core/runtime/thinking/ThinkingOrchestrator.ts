@@ -48,6 +48,8 @@ export class ThinkingOrchestrator {
     const toolNodes = new Map<string, ExecutionGraphNode>();
     let evidence: EvidencePack | undefined;
     let latestValidation: ResponseValidationResult | undefined;
+    let streamedResponse = "";
+    let responseValidated = false;
 
     const analysisNode = graph.addNode(
       "analysis",
@@ -56,7 +58,11 @@ export class ThinkingOrchestrator {
       { intent: profile.intent, riskLevel: profile.riskLevel },
     );
 
-    this.options.eventEmitter.beginResponseBuffering();
+    const shouldBufferResponse = this.shouldBufferResponse(profile);
+    if (shouldBufferResponse) {
+      this.options.eventEmitter.beginResponseBuffering();
+    }
+
     this.options.eventEmitter.emitEvent({
       type: "thinking_step",
       item: this.narrator.profile(profile),
@@ -64,6 +70,10 @@ export class ThinkingOrchestrator {
     });
 
     const subscription = this.options.eventEmitter.onEvent((event) => {
+      if (event.type === "token" && !shouldBufferResponse) {
+        streamedResponse += event.content;
+      }
+
       if (event.type === "tool_call") {
         const node = graph.addNode("tool_call", event.name, `Calling ${event.name}`, {
           input: event.input,
@@ -200,23 +210,45 @@ export class ThinkingOrchestrator {
         }
 
         if (next.value.type === "done") {
-          latestValidation = this.validateAndFlushResponse(
+          latestValidation = this.validateResponse(
             profile,
             evidence,
             observations,
             graph,
+            shouldBufferResponse
+              ? this.options.eventEmitter.getBufferedResponse()
+              : streamedResponse,
+            shouldBufferResponse,
           );
+          responseValidated = true;
         }
 
         yield next.value;
       }
 
-      if (!this.options.eventEmitter.isResponseBufferingEmpty()) {
-        latestValidation = this.validateAndFlushResponse(
+      if (
+        shouldBufferResponse &&
+        !responseValidated &&
+        !this.options.eventEmitter.isResponseBufferingEmpty()
+      ) {
+        latestValidation = this.validateResponse(
           profile,
           evidence,
           observations,
           graph,
+          this.options.eventEmitter.getBufferedResponse(),
+          true,
+        );
+      }
+
+      if (!shouldBufferResponse && !responseValidated) {
+        latestValidation = this.validateResponse(
+          profile,
+          evidence,
+          observations,
+          graph,
+          streamedResponse,
+          false,
         );
       }
 
@@ -249,13 +281,20 @@ export class ThinkingOrchestrator {
     }
   }
 
-  private validateAndFlushResponse(
+  private shouldBufferResponse(
+    profile: ReturnType<TaskAnalyzer["analyze"]>,
+  ): boolean {
+    return profile.requiresWorkspaceEvidence;
+  }
+
+  private validateResponse(
     profile: ReturnType<TaskAnalyzer["analyze"]>,
     evidence: EvidencePack | undefined,
     observations: readonly ObservationSummary[],
     graph: ExecutionGraph,
+    response: string,
+    flushResponse: boolean,
   ): ResponseValidationResult {
-    const response = this.options.eventEmitter.getBufferedResponse();
     const validation = this.hallucinationGuard.validate({
       profile,
       evidence,
@@ -289,11 +328,14 @@ export class ThinkingOrchestrator {
       timestamp: Date.now(),
     });
 
-    const finalResponse = this.hallucinationGuard.applyValidation(
-      response,
-      validation,
-    );
-    this.options.eventEmitter.flushBufferedResponse(finalResponse);
+    if (flushResponse) {
+      const finalResponse = this.hallucinationGuard.applyValidation(
+        response,
+        validation,
+      );
+      this.options.eventEmitter.flushBufferedResponse(finalResponse);
+    }
+
     return validation;
   }
 

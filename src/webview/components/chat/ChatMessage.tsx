@@ -8,7 +8,6 @@ import { clsx } from 'clsx';
 import MarkdownContent from './MarkdownContent';
 import StatusCard from './StatusCard';
 import StreamingIndicator from './StreamingIndicator';
-import QuestionCard from './QuestionCard';
 import ThinkingContainer from '../thinking/ThinkingContainer';
 import type {
   ThinkingTimelineItem,
@@ -34,20 +33,6 @@ interface MessageMetadata {
       readonly onClick: () => void;
     };
   };
-  readonly question?: {
-    readonly questionId: string;
-    readonly title: string;
-    readonly question: string;
-    readonly mode: 'single' | 'multiple';
-    readonly options: readonly {
-      readonly value: string;
-      readonly label: string;
-      readonly description: string;
-    }[];
-    readonly timeoutMs?: number;
-    readonly onSubmit: (answers: string[]) => void;
-    readonly onTimeout?: () => void;
-  };
 }
 
 export interface Message {
@@ -64,11 +49,20 @@ interface ChatMessageProps {
 }
 
 export default function ChatMessage({ message }: ChatMessageProps) {
-  // Chat fluido - SEM avatares, SEM labels ("You", "Korix")
-  // Diferenciação visual APENAS por background
+  const isUser = message.role === 'user';
   const messageContainer = clsx(
-    'px-3 py-3 my-2',
-    message.role === 'user' && 'bg-[var(--vscode-input-background)] rounded-lg' // Container cinza para usuário
+    'my-2 flex w-full',
+    isUser ? 'justify-end px-3' : 'justify-start px-3'
+  );
+  const messageSurface = clsx(
+    isUser
+      ? [
+          'max-w-[82%] rounded-2xl rounded-br-md px-3 py-2',
+          'bg-[var(--vscode-input-background)]',
+          'border border-[var(--vscode-panel-border)]',
+          'shadow-sm',
+        ]
+      : 'w-full'
   );
 
   return (
@@ -78,45 +72,39 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       transition={{ duration: 0.3 }}
       className={messageContainer}
     >
-      {/* Message Content */}
-      {message.content && (
-        <div className="text-sm leading-relaxed">
-          <MarkdownContent content={message.content} />
-          {message.isStreaming && <StreamingIndicator />}
-        </div>
-      )}
+      <div className={messageSurface}>
+        {/* Message Content */}
+        {message.content && (
+          <div className="text-sm leading-relaxed">
+            {isUser ? (
+              <div className="whitespace-pre-wrap break-words text-[13px] leading-relaxed text-[var(--vscode-foreground)]">
+                {message.content}
+              </div>
+            ) : (
+              <MarkdownContent content={message.content} />
+            )}
+            {message.isStreaming && <StreamingIndicator />}
+          </div>
+        )}
 
-      {/* Status Card */}
-      {message.metadata?.statusCard && (
-        <StatusCard
-          type={message.metadata.statusCard.type}
-          title={message.metadata.statusCard.title}
-          subtitle={message.metadata.statusCard.subtitle}
-          action={message.metadata.statusCard.action}
-        />
-      )}
+        {/* Status Card */}
+        {message.metadata?.statusCard && (
+          <StatusCard
+            type={message.metadata.statusCard.type}
+            title={message.metadata.statusCard.title}
+            subtitle={message.metadata.statusCard.subtitle}
+            action={message.metadata.statusCard.action}
+          />
+        )}
 
-      {/* Safe Thinking Timeline */}
-      {message.metadata?.thinking && message.metadata.thinking.items.length > 0 && (
-        <ThinkingContainer
-          items={message.metadata.thinking.items}
-          defaultExpanded={message.metadata.thinking.isExpanded}
-        />
-      )}
-
-      {/* Question Card */}
-      {message.metadata?.question && (
-        <QuestionCard
-          questionId={message.metadata.question.questionId}
-          title={message.metadata.question.title}
-          question={message.metadata.question.question}
-          mode={message.metadata.question.mode}
-          options={message.metadata.question.options}
-          timeoutMs={message.metadata.question.timeoutMs}
-          onSubmit={message.metadata.question.onSubmit}
-          onTimeout={message.metadata.question.onTimeout}
-        />
-      )}
+        {/* Safe Thinking Timeline */}
+        {message.metadata?.thinking && message.metadata.thinking.items.length > 0 && (
+          <ThinkingContainer
+            items={message.metadata.thinking.items}
+            defaultExpanded={message.metadata.thinking.isExpanded}
+          />
+        )}
+      </div>
     </motion.div>
   );
 }

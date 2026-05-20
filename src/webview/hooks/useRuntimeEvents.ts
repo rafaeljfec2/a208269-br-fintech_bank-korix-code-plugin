@@ -706,28 +706,8 @@ export function useRuntimeEvents() {
           case "user_question": {
             const event = runtimeEvent;
 
-            console.log("[useRuntimeEvents] user_question received!", {
-              questionId: event.questionId,
-              title: event.title,
-              question: event.question,
-              optionsCount: event.options.length,
-              mode: event.mode,
-            });
             logger.log("[useRuntimeEvents] user_question received:", event);
 
-            // Add visual indicator in chat that a question was asked
-            const chatId = useStore.getState().activeChatId ?? useStore.getState().createChat("Nova conversa");
-            store.addMessage(chatId, {
-              role: "system",
-              content: `💬 **${event.title}**: ${event.question}`,
-              metadata: {
-                statusCard: {
-                  type: "plan_created",
-                  title: "Aguardando sua resposta",
-                  subtitle: `${event.options.length} opções disponíveis no formulário abaixo`,
-                },
-              },
-            });
             addActiveEventItem({
               stage: "user_question",
               title: `Asked ${event.title}`,
@@ -737,7 +717,7 @@ export function useRuntimeEvents() {
               metadata: { questionId: event.questionId, mode: event.mode },
             });
 
-            // Set active question in footer
+            // Render a single in-chat question panel.
             store.setActiveQuestion({
               questionId: event.questionId,
               title: event.title,

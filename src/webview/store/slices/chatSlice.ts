@@ -44,20 +44,6 @@ export interface MessageMetadata {
       readonly onClick: () => void;
     };
   };
-  readonly question?: {
-    readonly questionId: string;
-    readonly title: string;
-    readonly question: string;
-    readonly mode: "single" | "multiple";
-    readonly options: readonly {
-      readonly value: string;
-      readonly label: string;
-      readonly description: string;
-    }[];
-    readonly timeoutMs?: number;
-    readonly onSubmit: (answers: string[]) => void;
-    readonly onTimeout?: () => void;
-  };
 }
 
 export interface Message {
@@ -137,10 +123,6 @@ export interface ChatSlice {
     item: ThinkingTimelineItem,
   ) => void;
   readonly clearActiveThinkingItems: (chatId: string) => void;
-  readonly removeQuestionFromMessage: (
-    chatId: string,
-    messageId: string,
-  ) => void;
   readonly setActiveQuestion: (question: ActiveQuestion) => void;
   readonly clearActiveQuestion: () => void;
   readonly toggleSidebar: () => void;
@@ -552,32 +534,6 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
           [chatId]: {
             ...chat,
             activeThinkingItems: undefined,
-          },
-        },
-      };
-    }),
-
-  removeQuestionFromMessage: (chatId, messageId) =>
-    set((state: ChatSlice) => {
-      const chat = state.conversations[chatId];
-      if (!chat) return state;
-
-      return {
-        conversations: {
-          ...state.conversations,
-          [chatId]: {
-            ...chat,
-            messages: chat.messages.map((msg) =>
-              msg.id === messageId
-                ? {
-                    ...msg,
-                    metadata: {
-                      ...msg.metadata,
-                      question: undefined,
-                    },
-                  }
-                : msg,
-            ),
           },
         },
       };

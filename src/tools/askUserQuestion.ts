@@ -9,21 +9,34 @@ import type { RuntimeEventEmitter } from "../core/runtime/runtimeEvents";
 import { getGlobalContainer } from "../di/container";
 import { TOKENS } from "../di/tokens";
 
+const MAX_HEADER_LENGTH = 12;
+const MAX_LABEL_LENGTH = 50;
+const MAX_DESCRIPTION_LENGTH = 200;
+
+const connectorWords = /\b(de|do|da|dos|das|of|the|a|an)\b/gi;
+
+const RequiredTextSchema = z
+  .string()
+  .transform(normalizeText)
+  .pipe(z.string().min(1));
+
 const QuestionOptionSchema = z.object({
-  label: z.string().min(1).max(50).describe("Option label (5-10 words max)"),
-  description: z
-    .string()
-    .min(1)
-    .max(200)
+  label: RequiredTextSchema.transform((value) =>
+    truncateText(value, MAX_LABEL_LENGTH),
+  ).describe("Option label (5-10 words max)"),
+  description: RequiredTextSchema.transform((value) =>
+    truncateText(value, MAX_DESCRIPTION_LENGTH),
+  )
     .describe("Why choose this? Trade-offs? Impact? (2 sentences max)"),
 });
 
 const QuestionSchema = z.object({
-  question: z
-    .string()
-    .min(5)
-    .describe("Clear, specific question ending with ?"),
-  header: z.string().min(1).max(12).describe("Short label (max 12 chars)"),
+  question: RequiredTextSchema.pipe(z.string().min(5)).describe(
+    "Clear, specific question ending with ?",
+  ),
+  header: RequiredTextSchema.transform(compactHeader).describe(
+    "Short label, normalized to fit the compact chat form",
+  ),
   multiSelect: z
     .boolean()
     .describe(
@@ -46,6 +59,26 @@ const AskUserQuestionInputSchema = z.object({
 
 type AskUserQuestionInput = z.infer<typeof AskUserQuestionInputSchema>;
 type UserAnswers = Record<string, string | string[]>;
+
+function normalizeText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function compactHeader(value: string): string {
+  const withoutConnectors = normalizeText(value.replace(connectorWords, " "));
+  const candidate = withoutConnectors.length >= 3 ? withoutConnectors : value;
+  return truncateText(candidate, MAX_HEADER_LENGTH);
+}
+
+function truncateText(value: string, maxLength: number): string {
+  const normalized = normalizeText(value);
+
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return normalized.slice(0, maxLength).trimEnd();
+}
 
 export const AskUserQuestionTool: Tool<AskUserQuestionInput, UserAnswers> = {
   name: "AskUserQuestion",

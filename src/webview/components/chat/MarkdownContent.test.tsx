@@ -92,6 +92,20 @@ const foo = 'bar';
     expect(screen.getByText('typescript')).toBeInTheDocument();
   });
 
+  it('should preserve fenced code text without rendering object placeholders', () => {
+    const content = `
+\`\`\`typescript
+const users = await db.select().from(usersTable);
+console.log(users);
+\`\`\`
+    `;
+    const { container } = render(<MarkdownContent content={content} />);
+
+    const codeElement = container.querySelector('pre code');
+    expect(codeElement?.textContent).toContain('db.select()');
+    expect(codeElement?.textContent).not.toContain('[object Object]');
+  });
+
   it('should render strikethrough text (GFM)', () => {
     const { container } = render(<MarkdownContent content="~~strikethrough~~" />);
     const del = container.querySelector('del');

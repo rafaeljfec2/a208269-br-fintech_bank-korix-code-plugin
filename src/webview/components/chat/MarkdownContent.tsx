@@ -6,7 +6,6 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
-import rehypeHighlight from 'rehype-highlight';
 import { clsx } from 'clsx';
 import CodeBlock from './CodeBlock';
 import { InfoBlock } from '../shared/InfoBlock';
@@ -85,7 +84,6 @@ function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps)
       <MarkdownErrorBoundary content={processedContent} className={markdownContent}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkDirective]}
-          rehypePlugins={[rehypeHighlight]}
           components={{
             // Custom renderer para code blocks
             code(props) {
@@ -96,7 +94,7 @@ function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps)
               };
               const match = /language-(\w+)/.exec(className || '');
               const language = match ? match[1] : '';
-              const code = String(children).replace(/\n$/, '');
+              const code = nodeToText(children).replace(/\n$/, '');
 
               return !inline && language ? (
                 <CodeBlock code={code} language={language} />
@@ -145,3 +143,23 @@ function MarkdownContent({ content, isStreaming = false }: MarkdownContentProps)
 
 // Otimização: Re-render apenas quando content mudar
 export default React.memo(MarkdownContent);
+
+function nodeToText(node: React.ReactNode): string {
+  if (node === null || node === undefined || typeof node === 'boolean') {
+    return '';
+  }
+
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node);
+  }
+
+  if (Array.isArray(node)) {
+    return node.map(nodeToText).join('');
+  }
+
+  if (React.isValidElement<{ readonly children?: React.ReactNode }>(node)) {
+    return nodeToText(node.props.children);
+  }
+
+  return '';
+}

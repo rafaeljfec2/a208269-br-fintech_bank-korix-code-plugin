@@ -40,7 +40,6 @@ export default function MainPanel() {
   const activeThinkingItems = useStore((state) =>
     state.activeChatId ? state.conversations[state.activeChatId]?.activeThinkingItems : []
   );
-
   // Refs para auto-scroll
   const containerRef = useRef<HTMLDivElement>(null);
   const streamingRef = useRef<HTMLDivElement>(null);
