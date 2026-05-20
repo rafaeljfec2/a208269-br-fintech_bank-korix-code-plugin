@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
-import type { AIProvider, RequestContext } from "../providers/types";
+import type { AIProvider, ProviderInput, RequestContext } from "../providers/types";
 import { PermissionManager } from "../../harness/permissions";
 import type { StepResult } from "./runtimeTypes";
 import type { Tool } from "../../harness/toolRegistry";
@@ -442,8 +442,104 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       expect(result.completeAfterInteractiveToolCalls).toBeUndefined();
       expect(result.syntheticResponse).toBeUndefined();
     });
+
+    it("should omit provider tools and cap tokens when tool policy is disabled", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const toolRegistry = new ToolRegistry();
+      const permissionManager = new PermissionManager(
+        vi.fn(async () => ({
+          approved: false,
+          level: "never" as const,
+        })),
+      );
+      const capturedInputs: ProviderInput[] = [];
+      const provider = createTextProvider(capturedInputs);
+      const state = new RuntimeState({
+        mode: "ask",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+
+      toolRegistry.register({
+        name: "ReadFile",
+        description: "Read a file.",
+        schema: z.object({ path: z.string() }),
+        execute: vi.fn(async () => ({ success: true, data: "ok" })),
+      });
+      state.addMessage({
+        role: "user",
+        content: "o que é esse json?",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "compact prompt",
+        {
+          toolPolicy: "disabled",
+          maxTokens: 1536,
+        },
+      );
+
+      const result = await engine.step(state);
+
+      expect(result.hadToolCalls).toBe(false);
+      expect(capturedInputs[0]?.tools).toBeUndefined();
+      expect(capturedInputs[0]?.maxTokens).toBe(1536);
+    });
   });
 });
+
+function createTextProvider(capturedInputs: ProviderInput[]): AIProvider {
+  return {
+    type: "test",
+    config: {
+      type: "test",
+      apiKey: "test",
+      model: "test",
+    },
+    async *send(input, context: RequestContext) {
+      capturedInputs.push(input);
+      const correlation = {
+        correlationId: context.correlationId,
+        sessionId: context.sessionId,
+        agentRunId: context.agentRunId,
+        iterationId: context.iterationId,
+      };
+
+      yield {
+        type: "token",
+        value: "Direct answer",
+        timestamp: Date.now(),
+        correlation,
+      };
+
+      yield {
+        type: "finish",
+        reason: "end_turn",
+        timestamp: Date.now(),
+        correlation,
+      };
+
+      return {
+        model: "test",
+        totalDuration: 1,
+      };
+    },
+    async dispose() {
+      return undefined;
+    },
+  };
+}
 
 function createToolCallProvider(toolName: string): AIProvider {
   return {

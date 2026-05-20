@@ -37,6 +37,11 @@ interface ExecutedToolCall {
   readonly error?: string;
 }
 
+export interface ExecutionEngineOptions {
+  readonly toolPolicy?: "auto" | "disabled";
+  readonly maxTokens?: number;
+}
+
 export class ExecutionEngine {
   private currentTextBuffer = "";
   private currentThinkingBuffer = "";
@@ -55,6 +60,7 @@ export class ExecutionEngine {
     private readonly cancellationManager: CancellationManager,
     private readonly logger: Logger,
     private readonly systemPrompt: string,
+    private readonly options: ExecutionEngineOptions = {},
   ) {}
 
   async step(state: RuntimeState): Promise<StepResult> {
@@ -70,7 +76,10 @@ export class ExecutionEngine {
     try {
       // Prepare messages and tools
       const conversation = state.getConversation();
-      const tools = this.toolRegistry.toProviderDefinitions();
+      const tools =
+        this.options.toolPolicy === "disabled"
+          ? []
+          : this.toolRegistry.toProviderDefinitions(state.getContext().mode);
 
       // DEBUG: Log tools being sent
       this.logger.info("[ExecutionEngine] Sending tools to provider", {
@@ -91,8 +100,8 @@ export class ExecutionEngine {
       const stream = this.provider.send(
         {
           messages: [...conversation.messages], // Copy readonly array
-          tools,
-          maxTokens: 4096,
+          ...(tools.length > 0 ? { tools } : {}),
+          maxTokens: this.resolveMaxTokens(),
           system: this.systemPrompt,
         },
         context,
@@ -551,6 +560,10 @@ export class ExecutionEngine {
 
     // Default: medium risk
     return "medium";
+  }
+
+  private resolveMaxTokens(): number {
+    return this.options.maxTokens ?? this.provider.config.maxTokens ?? 4096;
   }
 
   /**

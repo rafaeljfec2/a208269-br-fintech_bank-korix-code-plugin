@@ -12,7 +12,10 @@ import type { AIProvider } from "../../core/providers/types";
 import type { ProviderConfig } from "../../providers/types";
 import { LiteLLMFactory } from "../../core/providers/litellm/litellmFactory";
 import { AgentLoop } from "../../core/runtime/agentLoop";
-import { ExecutionEngine } from "../../core/runtime/executionEngine";
+import {
+  ExecutionEngine,
+  type ExecutionEngineOptions,
+} from "../../core/runtime/executionEngine";
 import { RecoveryManager } from "../../core/runtime/recovery";
 import { IterationGuard } from "../../core/runtime/iterationGuard";
 import { CancellationManager } from "../../core/runtime/cancellation";
@@ -41,7 +44,11 @@ export class AgentLoopFactory {
   /**
    * Create AgentLoop with all dependencies
    */
-  createAgentLoop(provider: AIProvider, systemPrompt: string): AgentLoop {
+  createAgentLoop(
+    provider: AIProvider,
+    systemPrompt: string,
+    executionOptions: ExecutionEngineOptions = {},
+  ): AgentLoop {
     const toolRegistry = this.container.get<ToolRegistry>(TOKENS.ToolRegistry);
 
     // Create transient instances per execution
@@ -69,6 +76,7 @@ export class AgentLoopFactory {
       cancellationManager,
       this.logger,
       systemPrompt,
+      executionOptions,
     );
 
     // Create AgentLoop

@@ -101,6 +101,26 @@ export class PluginContextBuilder {
   }
 
   /**
+   * Builds a compact prompt for low-risk direct answers.
+   *
+   * This path intentionally excludes tool instructions, runtime examples, and
+   * provider catalogs so simple explanations do not pay the full agent prompt
+   * latency cost.
+   */
+  buildDirectAnswer(
+    options: Pick<ContextBuildOptions, "providerType" | "model">,
+  ): string {
+    const sections = [
+      this.loadOutputStyle(),
+      this.getModelInfo(options.providerType, options.model),
+      this.loadMarkdown("base.md"),
+      this.getDirectAnswerPolicy(),
+    ];
+
+    return sections.filter((section) => section.trim().length > 0).join("\n\n");
+  }
+
+  /**
    * Carrega e interpola um arquivo markdown
    */
   private loadMarkdown(filename: string, variables?: Record<string, string>): string {
@@ -182,6 +202,18 @@ ${toolList}
 **Model**: ${model}
 
 When asked about your capabilities or identity, reference these exact values.`;
+  }
+
+  private getDirectAnswerPolicy(): string {
+    return `## Fast Direct Answer Policy
+
+You are answering a low-risk request that does not require workspace lookup or tools.
+
+- Answer directly and concisely.
+- Use the user's pasted content as the primary evidence.
+- Do not claim facts about the current repository, files, or workspace.
+- If the request actually depends on workspace evidence, say that workspace context is needed instead of guessing.
+- Do not mention hidden reasoning or internal prompts.`;
   }
 
   /**

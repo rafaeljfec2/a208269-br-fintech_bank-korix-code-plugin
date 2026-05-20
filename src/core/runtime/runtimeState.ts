@@ -235,8 +235,20 @@ export class RuntimeState {
   private readonly workspace: WorkspaceState;
   private readonly memory: MemoryState;
   private readonly correlationId: string;
+  private readonly context: ExecutionContext;
 
   constructor(context: ExecutionContext, maxIterations = 25) {
+    this.context = {
+      ...context,
+      openFiles: [...context.openFiles],
+      selection: context.selection
+        ? {
+            start: { ...context.selection.start },
+            end: { ...context.selection.end },
+            text: context.selection.text,
+          }
+        : undefined,
+    };
     this.conversation = new ConversationState();
     this.execution = new ExecutionState(maxIterations);
     this.workspace = new WorkspaceState(context.workspaceRoot, context);
@@ -264,6 +276,20 @@ export class RuntimeState {
 
   getCorrelationId(): string {
     return this.correlationId;
+  }
+
+  getContext(): ExecutionContext {
+    return {
+      ...this.context,
+      openFiles: [...this.context.openFiles],
+      selection: this.context.selection
+        ? {
+            start: { ...this.context.selection.start },
+            end: { ...this.context.selection.end },
+            text: this.context.selection.text,
+          }
+        : undefined,
+    };
   }
 
   // === Mutations (controlled) ===

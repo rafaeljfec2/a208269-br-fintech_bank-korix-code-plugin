@@ -72,6 +72,7 @@ export class TaskAnalyzer {
     const mentionedSymbols = this.extractMentionedSymbols(message);
     const intent = this.detectIntent(normalized);
     const riskLevel = this.detectRisk(normalized, intent);
+    const requiresInteractiveChoice = this.requiresInteractiveChoice(normalized);
     const requiresWorkspaceEvidence = this.requiresWorkspaceEvidence(
       normalized,
       context,
@@ -84,7 +85,8 @@ export class TaskAnalyzer {
       intent,
       riskLevel,
       requiresWorkspaceEvidence,
-      requiresToolUse: requiresWorkspaceEvidence || riskLevel !== "low",
+      requiresToolUse:
+        requiresInteractiveChoice || requiresWorkspaceEvidence || riskLevel !== "low",
       mentionedSymbols,
       constraints,
       summary: this.buildSummary(intent, riskLevel, requiresWorkspaceEvidence),
@@ -133,6 +135,10 @@ export class TaskAnalyzer {
     mentionedSymbols: readonly string[],
     intent: ThinkingIntent,
   ): boolean {
+    if (this.isPastedStructuredContentQuestion(message)) {
+      return false;
+    }
+
     if (context.currentFile || context.openFiles.length > 0) {
       if (/\b(este|esse|essa|arquivo|file|repo|workspace|projeto|código|codigo|code)\b/.test(message)) {
         return true;
@@ -161,7 +167,8 @@ export class TaskAnalyzer {
       }
     }
 
-    const identifierMatches = message.matchAll(/\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?\b/g);
+    const identifierSource = this.stripQuotedPayloadLiterals(message);
+    const identifierMatches = identifierSource.matchAll(/\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?\b/g);
     for (const match of identifierMatches) {
       const value = match[0];
       if (this.isLikelyWorkspaceSymbol(value)) {
@@ -173,16 +180,30 @@ export class TaskAnalyzer {
   }
 
   private isLikelyWorkspaceSymbol(value: string): boolean {
+    if (value.includes(".")) {
+      return this.isLikelyDottedWorkspaceSymbol(value);
+    }
+
+    return this.isLikelyStandaloneWorkspaceSymbol(value);
+  }
+
+  private isLikelyDottedWorkspaceSymbol(value: string): boolean {
+    const parts = value.split(".").filter((part) => part.length > 0);
+
+    if (parts.length < 2) {
+      return false;
+    }
+
+    return parts.some((part) => this.isLikelyStandaloneWorkspaceSymbol(part));
+  }
+
+  private isLikelyStandaloneWorkspaceSymbol(value: string): boolean {
     if (value.length <= 2) {
       return false;
     }
 
     if (this.commonTechnologyTerms.has(value.toLowerCase())) {
       return false;
-    }
-
-    if (value.includes(".")) {
-      return true;
     }
 
     if (/^[A-Z][A-Z0-9_]+$/.test(value) && value.includes("_")) {
@@ -194,6 +215,52 @@ export class TaskAnalyzer {
     }
 
     return this.workspaceSymbolSuffixes.some((suffix) => value.endsWith(suffix));
+  }
+
+  private isPastedStructuredContentQuestion(message: string): boolean {
+    if (this.hasExplicitWorkspaceReference(message)) {
+      return false;
+    }
+
+    const hasJsonLikePayload =
+      /```(?:json)?[\s\S]*?```/.test(message) ||
+      /[{[][\s\S]{40,}?:[\s\S]*?[}\]]/.test(message);
+
+    if (!hasJsonLikePayload) {
+      return false;
+    }
+
+    return /\b(que|qual|what|isso|isto|esse|essa|este|esta|json|payload|documento|objeto|object|estrutura|significa|explique|explain)\b/.test(
+      message,
+    );
+  }
+
+  private hasExplicitWorkspaceReference(message: string): boolean {
+    return /\b(arquivo atual|neste arquivo|nesse arquivo|nesse repo|neste repo|repo|workspace|projeto|codebase|src\/|\.ts|\.tsx|\.js|\.jsx)\b/.test(
+      message,
+    );
+  }
+
+  private stripQuotedPayloadLiterals(message: string): string {
+    return message.replace(/"[^"]*"/g, " ").replace(/'[^']*'/g, " ");
+  }
+
+  private requiresInteractiveChoice(message: string): boolean {
+    const asksForChoices = /\b(opcao|opcoes|option|options|alternativa|alternativas|choices|escolha|choose)\b/.test(
+      this.normalizeForIntent(message),
+    );
+
+    if (!asksForChoices) {
+      return false;
+    }
+
+    return /\b(pergunta|question|pergunte|apresente|mostre|monte|gere|crie|ask|show|create|generate)\b/.test(
+      this.normalizeForIntent(message),
+    );
+  }
+
+  private normalizeForIntent(message: string): string {
+    return message.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
   private extractConstraints(

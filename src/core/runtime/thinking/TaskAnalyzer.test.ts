@@ -43,6 +43,40 @@ describe("TaskAnalyzer", () => {
     expect(profile.mentionedSymbols).toEqual([]);
   });
 
+  it("should treat pasted JSON questions as direct evidence instead of workspace lookup", () => {
+    const profile = new TaskAnalyzer().analyze(
+      `que documento é esse {
+        "entry": [{
+          "changes": [{
+            "value": {
+              "statuses": [{
+                "message_id": "wamid.test_123456789",
+                "status": "delivered"
+              }]
+            }
+          }]
+        }]
+      }`,
+      context,
+    );
+
+    expect(profile.intent).toBe("answer");
+    expect(profile.riskLevel).toBe("low");
+    expect(profile.requiresWorkspaceEvidence).toBe(false);
+    expect(profile.requiresToolUse).toBe(false);
+    expect(profile.mentionedSymbols).toEqual([]);
+  });
+
+  it("should still detect dotted workspace symbols when a real symbol is present", () => {
+    const profile = new TaskAnalyzer().analyze(
+      "Explique `AuthService.findUser` neste projeto",
+      context,
+    );
+
+    expect(profile.requiresWorkspaceEvidence).toBe(true);
+    expect(profile.mentionedSymbols).toContain("AuthService.findUser");
+  });
+
   it("should classify implementation as modification risk", () => {
     const profile = new TaskAnalyzer().analyze(
       "Implemente retry no login",

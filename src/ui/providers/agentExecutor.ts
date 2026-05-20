@@ -12,7 +12,12 @@ import { PluginContextBuilder } from "../../prompts/pluginContext";
 import type { ToolRegistry } from "../../harness/toolRegistry";
 import type { RuntimeEventEmitter } from "../../core/runtime/runtimeEvents";
 import type { ContextEngine } from "../../context/contextEngine";
-import { ThinkingOrchestrator } from "../../core/runtime/thinking";
+import {
+  TaskAnalyzer,
+  ThinkingOrchestrator,
+  type ThinkingRunProfile,
+} from "../../core/runtime/thinking";
+import type { ExecutionEngineOptions } from "../../core/runtime/executionEngine";
 import type {
   EvidencePack,
   EvidenceRequest,
@@ -70,27 +75,42 @@ export class AgentExecutor {
         ? this.stateManager.getMode()
         : "ask";
 
+      // Prepare execution context before choosing the runtime path.
+      const context = this.buildExecutionContext(mode);
+      const taskProfile = new TaskAnalyzer().analyze(content, context);
+      const useFastDirectPath = this.shouldUseFastDirectPath(
+        taskProfile,
+        content,
+      );
+
       // Build unified system prompt
       const contextBuilder = new PluginContextBuilder(
         this.toolRegistry,
         this.logger,
       );
 
-      const systemPrompt = contextBuilder.build({
-        mode,
-        providerType: providerType,
-        model: providerConfig.model,
-        maxIterations: 25,
-      });
+      const systemPrompt = useFastDirectPath
+        ? contextBuilder.buildDirectAnswer({
+            providerType,
+            model: providerConfig.model,
+          })
+        : contextBuilder.build({
+            mode,
+            providerType,
+            model: providerConfig.model,
+            maxIterations: 25,
+          });
 
       // Create AgentLoop with system prompt
+      const executionOptions = this.buildExecutionOptions(
+        useFastDirectPath,
+        providerConfig.maxTokens,
+      );
       const agentLoop = this.agentLoopFactory.createAgentLoop(
         provider,
         systemPrompt,
+        executionOptions,
       );
-
-      // Prepare execution context
-      const context = this.buildExecutionContext(mode);
 
       // Initialize RuntimeStateManager if needed
       if (!this.stateManager.isInitialized()) {
@@ -147,6 +167,52 @@ export class AgentExecutor {
         `Failed to start agent: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+  }
+
+  private shouldUseFastDirectPath(
+    profile: ThinkingRunProfile,
+    content: string,
+  ): boolean {
+    if (
+      profile.riskLevel !== "low" ||
+      profile.requiresWorkspaceEvidence ||
+      profile.requiresToolUse
+    ) {
+      return false;
+    }
+
+    if (profile.intent !== "answer" && profile.intent !== "explain") {
+      return false;
+    }
+
+    return !this.looksLikeInteractiveChoiceRequest(content);
+  }
+
+  private buildExecutionOptions(
+    useFastDirectPath: boolean,
+    configuredMaxTokens: number | undefined,
+  ): ExecutionEngineOptions {
+    if (!useFastDirectPath) {
+      return {
+        maxTokens: configuredMaxTokens,
+      };
+    }
+
+    return {
+      toolPolicy: "disabled",
+      maxTokens: Math.min(configuredMaxTokens ?? 1536, 1536),
+    };
+  }
+
+  private looksLikeInteractiveChoiceRequest(content: string): boolean {
+    const normalized = content
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    return /\b(opcao|opcoes|option|options|alternativa|alternativas|choices|escolha|choose|pergunta|question)\b/.test(
+      normalized,
+    );
   }
 
   private buildExecutionContext(mode: "ask" | "plan" | "agent"): ExecutionContext {
