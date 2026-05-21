@@ -22,7 +22,8 @@
     "productivity"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onChatParticipant:korix-code.korix"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {
@@ -88,6 +89,29 @@
         }
       ]
     },
+    "chatParticipants": [
+      {
+        "id": "korix-code.korix",
+        "name": "korix",
+        "fullName": "Korix Code",
+        "description": "AI-native coding assistant with Ask, Plan, and Agent modes.",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "ask",
+            "description": "Answer in read-only Ask mode."
+          },
+          {
+            "name": "plan",
+            "description": "Create or refine an implementation plan."
+          },
+          {
+            "name": "agent",
+            "description": "Run Korix in Agent mode with workspace tools."
+          }
+        ]
+      }
+    ],
     "configuration": {
       "title": "Korix Code",
       "properties": {

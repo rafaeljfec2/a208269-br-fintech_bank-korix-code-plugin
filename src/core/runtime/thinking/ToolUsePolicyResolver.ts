@@ -8,6 +8,8 @@ const WORKSPACE_READ_TOOLS = [
   "FileChunks",
 ] as const;
 
+const WORKSPACE_OPEN_TOOLS = [...WORKSPACE_READ_TOOLS, "OpenFile"] as const;
+
 const WORKSPACE_SEARCH_TOOLS = [
   "SearchFiles",
   "Grep",
@@ -36,7 +38,7 @@ const WORKSPACE_INSPECT_TOOLS = [
 
 export class ToolUsePolicyResolver {
   resolve(
-    _message: string,
+    message: string,
     profile: ThinkingRunProfile,
     context: ExecutionContext,
   ): ToolUsePolicy {
@@ -45,6 +47,16 @@ export class ToolUsePolicyResolver {
     }
 
     const workspaceAccess = profile.workspaceAccess;
+
+    if (profile.intent === "modify") {
+      return {
+        mode: context.mode === "agent" ? "auto" : "required",
+        allowedTools: context.mode === "agent" ? [] : WORKSPACE_INSPECT_TOOLS,
+        evidenceRequired: true,
+        allowPassiveEvidence: true,
+        reason: "modify",
+      };
+    }
 
     if (workspaceAccess.explicit) {
       if (workspaceAccess.action === "search") {
@@ -69,20 +81,12 @@ export class ToolUsePolicyResolver {
 
       return {
         mode: "required",
-        allowedTools: WORKSPACE_READ_TOOLS,
+        allowedTools: this.requestsEditorOpen(message)
+          ? WORKSPACE_OPEN_TOOLS
+          : WORKSPACE_READ_TOOLS,
         evidenceRequired: true,
         allowPassiveEvidence: false,
         reason: "workspace_read",
-      };
-    }
-
-    if (profile.intent === "modify") {
-      return {
-        mode: context.mode === "agent" ? "auto" : "required",
-        allowedTools: context.mode === "agent" ? [] : WORKSPACE_INSPECT_TOOLS,
-        evidenceRequired: true,
-        allowPassiveEvidence: true,
-        reason: "modify",
       };
     }
 
@@ -127,5 +131,14 @@ export class ToolUsePolicyResolver {
       allowPassiveEvidence: false,
       reason: "general",
     };
+  }
+
+  private requestsEditorOpen(message: string): boolean {
+    const normalized = message
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
+    return /\b(abra|abre|abrir|open|reveal|show)\b/.test(normalized);
   }
 }

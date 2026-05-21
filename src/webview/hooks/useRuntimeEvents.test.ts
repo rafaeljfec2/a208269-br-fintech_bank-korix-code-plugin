@@ -32,6 +32,7 @@ describe("useRuntimeEvents", () => {
   const mockClearActiveMessageTools = vi.fn();
   const mockAddActiveThinkingItem = vi.fn();
   const mockAppendThinkingItemToLastAssistant = vi.fn();
+  const mockReplaceLastAssistantFallbackContent = vi.fn();
   const mockClearActiveThinkingItems = vi.fn();
   const mockSetActiveQuestion = vi.fn();
   const mockClearActiveQuestion = vi.fn();
@@ -65,6 +66,8 @@ describe("useRuntimeEvents", () => {
       clearActiveMessageTools: mockClearActiveMessageTools,
       addActiveThinkingItem: mockAddActiveThinkingItem,
       appendThinkingItemToLastAssistant: mockAppendThinkingItemToLastAssistant,
+      replaceLastAssistantFallbackContent:
+        mockReplaceLastAssistantFallbackContent,
       clearActiveThinkingItems: mockClearActiveThinkingItems,
       setActiveQuestion: mockSetActiveQuestion,
       clearActiveQuestion: mockClearActiveQuestion,
@@ -762,6 +765,10 @@ describe("useRuntimeEvents", () => {
           title: "Execution completed",
           summary: "2 iteration(s), 3 tool call(s), 128 token(s).",
         }),
+      );
+      expect(mockReplaceLastAssistantFallbackContent).toHaveBeenCalledWith(
+        "test-chat-id",
+        "Concluído: 2 iterações, 3 ferramentas, 128 tokens em 0.5s.",
       );
     });
 

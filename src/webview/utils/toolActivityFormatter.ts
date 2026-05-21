@@ -58,6 +58,8 @@ export function formatToolActivity(
       return buildDisplay("Check", displayPath ?? "diagnostics");
     case "WorkspaceGraph":
       return buildDisplay("Analyze", "workspace graph");
+    case "OpenFile":
+      return buildDisplay("Open", displayPath ?? "file");
     case "AskUserQuestion":
       return buildDisplay("Ask", getQuestionLabel(record));
     case "CollectWorkspaceEvidence":

@@ -4,6 +4,10 @@
 
 import type { StateCreator } from "zustand";
 import { logger } from "../../utils/logger";
+import {
+  finalizeChatStreaming,
+  replaceFallbackAssistantContent,
+} from "../chatCompletionHelpers";
 
 export interface ToolExecution {
   readonly id: string;
@@ -26,6 +30,7 @@ export interface ThinkingTimelineItem {
 }
 
 export interface MessageMetadata {
+  readonly runtimeFallback?: boolean;
   readonly thinking?: {
     readonly items: readonly ThinkingTimelineItem[];
     readonly isExpanded: boolean;
@@ -121,6 +126,10 @@ export interface ChatSlice {
   readonly appendThinkingItemToLastAssistant: (
     chatId: string,
     item: ThinkingTimelineItem,
+  ) => void;
+  readonly replaceLastAssistantFallbackContent: (
+    chatId: string,
+    content: string,
   ) => void;
   readonly clearActiveThinkingItems: (chatId: string) => void;
   readonly setActiveQuestion: (question: ActiveQuestion) => void;
@@ -272,51 +281,9 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
         isThinking: chat.isThinking,
       });
 
-      // ALWAYS clear isStreaming, even if streamingContent is empty
-      // to prevent "Digitando..." from getting stuck
-      const updatedChat = {
-        ...chat,
-        streamingContent: "",
-        isStreaming: false,
-        isThinking: false,
-      };
+      const updatedChat = finalizeChatStreaming(chat);
 
-      // Only add a new message if there was actual streaming content
-      if (chat.streamingContent && chat.streamingContent.trim().length > 0) {
-        const totalDuration = (chat.activeMessageTools ?? []).reduce(
-          (sum, tool) => sum + tool.duration,
-          0,
-        );
-
-        updatedChat.messages = [
-          ...chat.messages,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant" as const,
-            content: chat.streamingContent,
-            timestamp: Date.now(),
-            metadata: {
-              ...(chat.activeThinkingItems &&
-              chat.activeThinkingItems.length > 0
-                ? {
-                    thinking: {
-                      items: chat.activeThinkingItems,
-                      isExpanded: false,
-                    },
-                  }
-                : {}),
-              ...(chat.activeMessageTools && chat.activeMessageTools.length > 0
-                ? {
-                    execution: {
-                      tools: chat.activeMessageTools,
-                      isExpanded: false,
-                      totalDuration,
-                    },
-                  }
-                : {}),
-            },
-          },
-        ];
+      if (updatedChat.messages.length > chat.messages.length) {
         logger.log("[ChatSlice] Added assistant message", {
           contentLength: chat.streamingContent.length,
         });
@@ -328,6 +295,24 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
         isStreaming: updatedChat.isStreaming,
         messageCount: updatedChat.messages.length,
       });
+
+      return {
+        conversations: {
+          ...state.conversations,
+          [chatId]: updatedChat,
+        },
+      };
+    }),
+
+  replaceLastAssistantFallbackContent: (chatId, content) =>
+    set((state: ChatSlice) => {
+      const chat = state.conversations[chatId];
+      if (!chat || chat.messages.length === 0) return state;
+
+      const updatedChat = replaceFallbackAssistantContent(chat, content);
+      if (!updatedChat) {
+        return state;
+      }
 
       return {
         conversations: {

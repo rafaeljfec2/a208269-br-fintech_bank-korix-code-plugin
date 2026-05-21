@@ -3,6 +3,7 @@
  */
 
 import * as vscode from "vscode";
+import * as path from "path";
 import { z } from "zod";
 import type { Tool, ToolContext, ToolResult } from "../harness/toolRegistry";
 
@@ -251,6 +252,74 @@ export class GetCurrentFileTool implements Tool<
           timestamp: Date.now(),
         },
       });
+    }
+  }
+}
+
+// OpenFile Tool
+const OpenFileSchema = z.object({
+  path: z.string().describe("Absolute or relative path to the file to open"),
+  preview: z
+    .boolean()
+    .optional()
+    .describe("Whether to open the file as a preview tab"),
+});
+
+type OpenFileInput = z.infer<typeof OpenFileSchema>;
+
+interface OpenedFileInfo {
+  readonly path: string;
+  readonly languageId: string;
+}
+
+export class OpenFileTool implements Tool<OpenFileInput, OpenedFileInfo> {
+  name = "OpenFile";
+  description =
+    "Open an existing workspace file in the VS Code editor. Use this when the user asks to open, reveal, or show a file in VS Code.";
+  schema = OpenFileSchema;
+
+  allowedInMode(mode: "ask" | "plan" | "agent"): boolean {
+    return mode === "agent";
+  }
+
+  async execute(
+    input: OpenFileInput,
+    context: ToolContext,
+  ): Promise<ToolResult<OpenedFileInfo>> {
+    try {
+      const absolutePath = path.isAbsolute(input.path)
+        ? input.path
+        : path.join(context.workspaceRoot, input.path);
+      const uri = vscode.Uri.file(absolutePath);
+      const document = await vscode.workspace.openTextDocument(uri);
+
+      await vscode.window.showTextDocument(document, {
+        preview: input.preview ?? false,
+      });
+
+      return {
+        success: true,
+        data: {
+          path: absolutePath,
+          languageId: document.languageId,
+        },
+        metadata: {
+          duration: 0,
+          approved: true,
+          timestamp: Date.now(),
+        },
+      };
+    } catch (error) {
+      const err = error as Error;
+      return {
+        success: false,
+        error: `Failed to open file: ${err.message}`,
+        metadata: {
+          duration: 0,
+          approved: true,
+          timestamp: Date.now(),
+        },
+      };
     }
   }
 }

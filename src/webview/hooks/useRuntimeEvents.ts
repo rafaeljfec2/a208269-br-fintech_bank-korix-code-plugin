@@ -910,6 +910,23 @@ export function useRuntimeEvents() {
                   const duration = event.metrics.duration
                     ? event.metrics.duration / 1000
                     : 0;
+                  const completedChatId =
+                    lastCompletedChatIdRef.current ??
+                    useStore.getState().activeChatId;
+                  const toolCount = event.metrics.totalToolCalls ?? 0;
+                  const tokenCount = event.metrics.totalTokens ?? 0;
+                  const iterationLabel =
+                    event.iterations === 1 ? "iteração" : "iterações";
+                  const toolLabel =
+                    toolCount === 1 ? "ferramenta" : "ferramentas";
+                  const summary = `Concluído: ${event.iterations} ${iterationLabel}, ${toolCount} ${toolLabel}, ${tokenCount} tokens em ${duration.toFixed(1)}s.`;
+
+                  if (completedChatId) {
+                    store.replaceLastAssistantFallbackContent(
+                      completedChatId,
+                      summary,
+                    );
+                  }
 
                   const stats = {
                     iterations: event.iterations,

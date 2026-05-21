@@ -27,12 +27,13 @@ You have access to tools according to the active mode.
 ### 🖥️ Terminal (1 tool)
 - `RunCommand` - Execute shell commands (requires approval)
 
-### 🩺 Diagnostics (5 tools)
+### 🩺 Diagnostics & Workspace (6 tools)
 - `Problems` - Get workspace errors/warnings
 - `GetDiagnostics` - Get diagnostics for specific file
 - `WorkspaceGraph` - Analyze project structure
 - `GetOpenFiles` - List currently open editor tabs
 - `GetCurrentFile` - Get active file path and selection
+- `OpenFile` - Open an existing workspace file in the VS Code editor
 
 ## Tool Restrictions by Mode
 
@@ -46,6 +47,7 @@ You have access to tools according to the active mode.
 - Grep, FindReferences, FindSymbols
 - GitStatus, GitDiff, ChangedFiles
 - Problems, GetDiagnostics, WorkspaceGraph, GetOpenFiles, GetCurrentFile
+- OpenFile
 - WriteFile (no file creation/modification)
 - EditFile (no patches)
 - RunCommand (no command execution)
@@ -62,6 +64,7 @@ You have access to tools according to the active mode.
 - WriteFile (no file creation/modification)
 - EditFile (no patches)
 - RunCommand (no command execution)
+- OpenFile (no editor-opening side effects)
 - AskUserQuestion
 
 ### AGENT Mode (full execution)
@@ -70,6 +73,7 @@ You have access to tools according to the active mode.
 - WriteFile (requires user approval for destructive ops)
 - EditFile (can apply patches)
 - RunCommand (requires user approval)
+- OpenFile (open files directly in the VS Code editor when requested)
 
 ## VSCode Commands (for reference)
 

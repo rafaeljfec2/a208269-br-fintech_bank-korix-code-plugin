@@ -381,7 +381,13 @@ export class ToolRegistry {
    * Check if tool is a write tool (should not be cached)
    */
   private isWriteTool(name: string): boolean {
-    const writeTools = ["WriteFile", "EditFile", "RunCommand", "DeleteFile"];
+    const writeTools = [
+      "WriteFile",
+      "EditFile",
+      "RunCommand",
+      "DeleteFile",
+      "OpenFile",
+    ];
     return writeTools.includes(name);
   }
 

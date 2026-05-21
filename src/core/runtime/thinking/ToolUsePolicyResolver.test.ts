@@ -96,6 +96,16 @@ describe("ToolUsePolicyResolver", () => {
     expect(policy.allowPassiveEvidence).toBe(true);
   });
 
+  it("should keep all agent tools available for create-read-open requests", () => {
+    const policy = resolve(
+      "crie um arquivo simples em .ts que leia um arquivo .txt da raiz do projeto depois abra ele no vscode",
+    );
+
+    expect(policy.mode).toBe("auto");
+    expect(policy.reason).toBe("modify");
+    expect(policy.allowedTools).toEqual([]);
+  });
+
   it("should use inspection tools for validation requests", () => {
     const policy = resolve("valide esse projeto");
 

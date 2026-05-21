@@ -9,6 +9,7 @@ import { useStore } from '../../store';
 import { useVSCode } from '../../hooks/useVSCode';
 import Dropdown from '../shared/Dropdown';
 import ActiveQuestionPanel from '../chat/ActiveQuestionPanel';
+import ExecutionFeedback from '../chat/ExecutionFeedback';
 
 type OpenDropdown = 'model' | 'mode' | 'workspace' | 'approval' | null;
 type ApprovalMode = 'strict' | 'writes' | 'auto';
@@ -128,6 +129,8 @@ export default function BottomBar() {
     <div className="flex-shrink-0 border-t border-[var(--vscode-panel-border)] bg-[var(--vscode-editor-background)] px-3 py-2">
       {/* Single footer question/permission panel */}
       {activeQuestion && <ActiveQuestionPanel />}
+
+      <ExecutionFeedback />
 
       {/* Input Area - Primeiro */}
       <div className="mb-2">

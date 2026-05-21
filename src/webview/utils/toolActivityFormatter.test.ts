@@ -45,4 +45,12 @@ describe("formatToolActivity", () => {
       }).label,
     ).toBe("Collect workspace evidence");
   });
+
+  it("should format open file activity", () => {
+    expect(
+      formatToolActivity("OpenFile", {
+        path: "/workspace/src/openFile.ts",
+      }).label,
+    ).toBe("Open openFile.ts");
+  });
 });

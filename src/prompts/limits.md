@@ -41,3 +41,4 @@
 - ❌ `WriteFile`: Never cached (always executes)
 - ✅ `Grep`: Results cached for 5min
 - ❌ `RunCommand`: Never cached (always executes)
+- ❌ `OpenFile`: Never cached (always opens the requested editor tab)

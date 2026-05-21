@@ -4,9 +4,11 @@ import { globalRegistry } from "./providers/registry";
 import { ProviderConfigManager } from "./providers/config";
 import type { AIProvider } from "./providers/types";
 import { KorixWebviewProvider } from "./ui/providers/webviewProvider";
+import { registerKorixChatParticipant } from "./ui/chatParticipant";
 import type { Logger } from "./telemetry/logger";
 import type { ContextEngine } from "./context/contextEngine";
 import type { TerminalSessionManager } from "./terminal/session";
+import type { RuntimeStateManager } from "./core/runtime/runtimeStateManager";
 import { registerAllTools } from "./tools";
 import {
   createContainer,
@@ -62,6 +64,17 @@ export function activate(context: vscode.ExtensionContext) {
       KorixWebviewProvider.viewType,
       webviewProvider,
     ),
+    registerKorixChatParticipant({
+      extensionUri: context.extensionUri,
+      container,
+      onModeSelected: (mode) => {
+        currentMode = mode;
+        container.get<RuntimeStateManager>(TOKENS.RuntimeStateManager).setMode(
+          mode,
+        );
+        updateStatusBar();
+      },
+    }),
   );
 
   statusBarItem = vscode.window.createStatusBarItem(
@@ -86,10 +99,12 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand("korix.openSidebar", () => {
-      vscode.window.showInformationMessage(
-        `Korix Code Sidebar (Coming Soon) - Current Mode: ${currentMode}`,
-      );
-      logger.info("Sidebar opened");
+      openKorixSidebar(logger).catch((error) => {
+        logger.error("Failed to open sidebar", error);
+        vscode.window.showErrorMessage(
+          `Failed to open Korix Code: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
     }),
 
     vscode.commands.registerCommand("korix.cancelExecution", () => {
@@ -163,6 +178,9 @@ export async function deactivate() {
 function handleModeSwitch(mode: Mode) {
   const logger = getGlobalContainer().get<Logger>(TOKENS.Logger);
   currentMode = mode;
+  getGlobalContainer()
+    .get<RuntimeStateManager>(TOKENS.RuntimeStateManager)
+    .setMode(mode);
   updateStatusBar();
 
   const modeDescriptions: Record<Mode, string> = {
@@ -182,6 +200,23 @@ function handleModeSwitch(mode: Mode) {
   );
 
   logger.info("Mode switched", { mode, description: modeDescriptions[mode] });
+}
+
+async function openKorixSidebar(logger: Logger): Promise<void> {
+  try {
+    await vscode.commands.executeCommand(
+      `${KorixWebviewProvider.viewType}.focus`,
+    );
+  } catch (error) {
+    logger.warn("Failed to focus Korix webview directly", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await vscode.commands.executeCommand(
+      "workbench.view.extension.korix-sidebar",
+    );
+  }
+
+  logger.info("Sidebar opened", { mode: currentMode });
 }
 
 async function initializeProvider() {
