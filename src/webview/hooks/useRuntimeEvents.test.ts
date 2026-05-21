@@ -599,6 +599,47 @@ describe("useRuntimeEvents", () => {
         metadata: { toolName: "ReadFile" },
       });
     });
+
+    it("should summarize batch workspace evidence collection results", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "tool_result",
+                  id: "workspace-evidence-1",
+                  name: "CollectWorkspaceEvidence",
+                  success: true,
+                  duration: 12,
+                  result: {
+                    files: [{ path: "src/a.ts" }],
+                    omittedFiles: [{ path: "src/b.ts", reason: "max_files" }],
+                  },
+                  timestamp: 100,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "tool_result",
+          title: "CollectWorkspaceEvidence completed",
+          summary: "Collected 1 file(s), omitted 1 file(s).",
+          metadata: expect.objectContaining({
+            fileCount: 1,
+            omittedCount: 1,
+          }),
+        }),
+      );
+    });
   });
 
   describe("runtime_event: tool_approved", () => {

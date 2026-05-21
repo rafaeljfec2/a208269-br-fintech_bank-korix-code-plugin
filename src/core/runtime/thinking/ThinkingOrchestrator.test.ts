@@ -8,7 +8,10 @@ import {
   ThinkingOrchestrator,
   type AgentLoopLike,
 } from "./ThinkingOrchestrator";
-import type { ThinkingRunInput } from "./types";
+import type {
+  ThinkingRunInput,
+  WorkspaceEvidenceCollectionRequest,
+} from "./types";
 
 describe("ThinkingOrchestrator", () => {
   it("should validate and flush workspace responses after supervised execution", async () => {
@@ -362,5 +365,140 @@ describe("ThinkingOrchestrator", () => {
           "Não consegui executar as ferramentas necessárias para atender a solicitação.",
       }),
     );
+  });
+
+  it("should collect required workspace evidence before running the agent loop", async () => {
+    const context: ThinkingRunInput["context"] = {
+      mode: "agent",
+      workspaceRoot: "/workspace",
+      openFiles: [],
+    };
+
+    const eventEmitter = new RuntimeEventEmitter();
+    const emittedEvents: RuntimeEvent[] = [];
+    eventEmitter.onEvent((event) => emittedEvents.push(event));
+    let runtimeMessage = "";
+    let runtimeOptions: AgentLoopRunOptions | undefined;
+    let agentLoopCalls = 0;
+    let collectionRequest: WorkspaceEvidenceCollectionRequest | undefined;
+
+    const agentLoop: AgentLoopLike = {
+      async *run(
+        initialMessage: string,
+        _context,
+        _previousMessages,
+        options,
+      ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
+        agentLoopCalls += 1;
+        runtimeMessage = initialMessage;
+        runtimeOptions = options;
+
+        eventEmitter.emitEvent({
+          type: "token",
+          content: "Resumo baseado nos arquivos coletados.",
+          timestamp: Date.now(),
+        });
+
+        yield {
+          type: "done",
+          stopReason: "end_turn",
+          timestamp: Date.now(),
+        };
+
+        const state = new RuntimeState(context, 25);
+        return {
+          success: true,
+          iterations: 1,
+          finalState: state.createSnapshot(),
+          metrics: {
+            totalTokens: 1,
+            totalToolCalls: 0,
+            iterations: 1,
+            duration: 1,
+            checkpoints: 0,
+            recoveries: 0,
+            toolBreakdown: {},
+            eventTimeline: [],
+          },
+        };
+      },
+    };
+
+    const orchestrator = new ThinkingOrchestrator({
+      agentLoop,
+      eventEmitter,
+      logger: new Logger({ level: "error" }),
+      workspaceEvidenceCollector: async (request) => {
+        collectionRequest = request;
+        return {
+          success: true,
+          summary: "3 workspace file(s) collected in batch.",
+          evidence: {
+            summary: "3 batch evidence file(s), 30 estimated tokens.",
+            providerContext: "### src/a.ts\ncontent-a",
+            items: [
+              {
+                path: "src/a.ts",
+                priority: 1,
+                tokenCount: 30,
+              },
+            ],
+            totalTokens: 30,
+          },
+          files: [
+            {
+              path: "src/a.ts",
+              content: "content-a",
+              sourceTool: "FileChunks",
+              truncated: false,
+            },
+          ],
+          omittedFiles: [],
+          duration: 12,
+        };
+      },
+    });
+
+    const generator = orchestrator.run({
+      initialMessage:
+        "faça leitura e passe um resumo de tres arquivos do projeto",
+      context,
+    });
+
+    while (true) {
+      const next = await generator.next();
+      if (next.done) {
+        break;
+      }
+    }
+
+    expect(agentLoopCalls).toBe(1);
+    expect(collectionRequest?.plan).toMatchObject({
+      kind: "read",
+      maxFiles: 3,
+    });
+    expect(runtimeMessage).toContain("<korix_workspace_evidence>");
+    expect(runtimeMessage).toContain("### src/a.ts");
+    expect(runtimeOptions?.toolUsePolicy?.mode).toBe("auto");
+    expect(emittedEvents).toContainEqual(
+      expect.objectContaining({
+        type: "tool_call",
+        name: "CollectWorkspaceEvidence",
+      }),
+    );
+    expect(emittedEvents).toContainEqual(
+      expect.objectContaining({
+        type: "tool_result",
+        name: "CollectWorkspaceEvidence",
+        success: true,
+      }),
+    );
+    expect(
+      emittedEvents.some(
+        (event) =>
+          event.type === "response_validation" &&
+          event.validation.status === "passed",
+      ),
+    ).toBe(true);
   });
 });

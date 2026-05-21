@@ -36,6 +36,14 @@ export interface ToolUsePolicy {
   readonly reason: ToolUseReason;
 }
 
+export interface WorkspaceEvidencePlan {
+  readonly kind: "list" | "read" | "search" | "inspect";
+  readonly toolNames: readonly string[];
+  readonly targetHints: readonly string[];
+  readonly maxFiles: number;
+  readonly maxChunksPerFile: number;
+}
+
 export type ThinkingStage =
   | "analyzing_request"
   | "checking_context"
@@ -150,4 +158,33 @@ export interface EvidenceRequest {
   readonly message: string;
   readonly profile: ThinkingRunProfile;
   readonly context: ExecutionContext;
+}
+
+export interface WorkspaceEvidenceCollectionRequest {
+  readonly message: string;
+  readonly profile: ThinkingRunProfile;
+  readonly context: ExecutionContext;
+  readonly plan: WorkspaceEvidencePlan;
+}
+
+export interface WorkspaceEvidenceFile {
+  readonly path: string;
+  readonly content: string;
+  readonly sourceTool: string;
+  readonly truncated: boolean;
+}
+
+export interface OmittedWorkspaceEvidenceFile {
+  readonly path: string;
+  readonly reason: "outside_workspace" | "max_files" | "read_failed";
+}
+
+export interface WorkspaceEvidenceCollection {
+  readonly success: boolean;
+  readonly summary: string;
+  readonly evidence: EvidencePack;
+  readonly files: readonly WorkspaceEvidenceFile[];
+  readonly omittedFiles: readonly OmittedWorkspaceEvidenceFile[];
+  readonly duration: number;
+  readonly error?: string;
 }

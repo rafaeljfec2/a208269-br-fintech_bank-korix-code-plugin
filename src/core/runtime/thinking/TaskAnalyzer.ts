@@ -336,6 +336,9 @@ export class TaskAnalyzer {
     const hasWorkspaceTarget =
       /\b(arquivo|arquivos|file|files|workspace|repo|repositorio|projeto|codebase|diretorio|diretorios|pasta|pastas)\b/.test(
         normalized,
+      ) ||
+      /\b[\w./-]+\.(?:ts|tsx|js|jsx|json|md|yml|yaml|css|scss|html)\b/.test(
+        normalized,
       );
     const hasSearchAction =
       /\b(busque|buscar|procure|procurar|pesquise|pesquisar|search|find|grep)\b/.test(

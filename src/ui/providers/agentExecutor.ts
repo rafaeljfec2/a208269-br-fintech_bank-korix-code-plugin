@@ -17,6 +17,7 @@ import {
   ThinkingOrchestrator,
   InteractionContextCompiler,
   ToolUsePolicyResolver,
+  WorkspaceEvidenceCollector,
   type ThinkingRunProfile,
   type ToolUsePolicy,
 } from "../../core/runtime/thinking";
@@ -143,6 +144,8 @@ export class AgentExecutor {
         eventEmitter: this.eventEmitter,
         logger: this.logger,
         evidenceProvider: (request) => this.buildEvidencePack(request),
+        workspaceEvidenceCollector: (request) =>
+          new WorkspaceEvidenceCollector(this.toolRegistry).collect(request),
       });
 
       // Run thinking orchestrator with history and process events

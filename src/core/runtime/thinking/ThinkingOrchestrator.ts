@@ -13,6 +13,7 @@ import { ReflectionEngine } from "./ReflectionEngine";
 import { RuntimeNarrator } from "./RuntimeNarrator";
 import { TaskAnalyzer } from "./TaskAnalyzer";
 import { ToolUsePolicyResolver } from "./ToolUsePolicyResolver";
+import { WorkspaceEvidencePlanner } from "./WorkspaceEvidencePlanner";
 import type {
   EvidencePack,
   EvidenceRequest,
@@ -22,6 +23,8 @@ import type {
   ResponseValidationResult,
   ThinkingRunInput,
   ToolUsePolicy,
+  WorkspaceEvidenceCollection,
+  WorkspaceEvidenceCollectionRequest,
 } from "./types";
 
 export interface AgentLoopLike {
@@ -40,6 +43,9 @@ export interface ThinkingOrchestratorOptions {
   readonly evidenceProvider?: (
     request: EvidenceRequest,
   ) => Promise<EvidencePack>;
+  readonly workspaceEvidenceCollector?: (
+    request: WorkspaceEvidenceCollectionRequest,
+  ) => Promise<WorkspaceEvidenceCollection>;
 }
 
 export class ThinkingOrchestrator {
@@ -49,6 +55,7 @@ export class ThinkingOrchestrator {
   private readonly hallucinationGuard = new HallucinationGuard();
   private readonly narrator = new RuntimeNarrator();
   private readonly toolUsePolicyResolver = new ToolUsePolicyResolver();
+  private readonly workspaceEvidencePlanner = new WorkspaceEvidencePlanner();
 
   constructor(private readonly options: ThinkingOrchestratorOptions) {}
 
@@ -70,6 +77,7 @@ export class ThinkingOrchestrator {
     let responseValidated = false;
     let responseBufferStartedAt: number | undefined;
     let responseBufferDurationMs = 0;
+    let agentLoopToolUsePolicy = toolUsePolicy;
 
     const analysisNode = graph.addNode(
       "analysis",
@@ -162,9 +170,57 @@ export class ThinkingOrchestrator {
     });
 
     try {
+      const workspaceEvidencePlan = this.workspaceEvidencePlanner.createPlan(
+        input.initialMessage,
+        profile,
+        toolUsePolicy,
+        input.context,
+      );
+
+      if (workspaceEvidencePlan && this.options.workspaceEvidenceCollector) {
+        const collection = await this.collectWorkspaceEvidence({
+          message: input.initialMessage,
+          profile,
+          context: input.context,
+          plan: workspaceEvidencePlan,
+        });
+
+        if (collection.success) {
+          evidence = collection.evidence;
+          agentLoopToolUsePolicy = {
+            ...toolUsePolicy,
+            mode: "auto",
+          };
+
+          const contextNode = graph.addNode(
+            "context",
+            "Batch workspace evidence",
+            collection.evidence.summary,
+            {
+              fileCount: collection.files.length,
+              omittedCount: collection.omittedFiles.length,
+              totalTokens: collection.evidence.totalTokens,
+            },
+          );
+          graph.addEdge(analysisNode.id, contextNode.id, "depends_on");
+
+          this.options.eventEmitter.emitEvent({
+            type: "context_evidence",
+            evidence: collection.evidence,
+            timestamp: Date.now(),
+          });
+          this.options.eventEmitter.emitEvent({
+            type: "thinking_step",
+            item: this.narrator.evidence(collection.evidence),
+            timestamp: Date.now(),
+          });
+        }
+      }
+
       if (
         profile.requiresWorkspaceEvidence &&
         this.options.evidenceProvider &&
+        evidence === undefined &&
         toolUsePolicy.allowPassiveEvidence
       ) {
         this.options.eventEmitter.emitEvent({
@@ -242,7 +298,7 @@ export class ThinkingOrchestrator {
         runtimeMessage,
         input.context,
         input.previousMessages,
-        { toolUsePolicy },
+        { toolUsePolicy: agentLoopToolUsePolicy },
       );
 
       let finalResult: AgentLoopResult | undefined;
@@ -353,6 +409,93 @@ export class ThinkingOrchestrator {
     profile: ReturnType<TaskAnalyzer["analyze"]>,
   ): boolean {
     return profile.requiresWorkspaceEvidence;
+  }
+
+  private async collectWorkspaceEvidence(
+    request: WorkspaceEvidenceCollectionRequest,
+  ): Promise<WorkspaceEvidenceCollection> {
+    const id = `workspace-evidence-${Date.now()}`;
+
+    this.options.eventEmitter.emitEvent({
+      type: "thinking_step",
+      item: this.narrator.step(
+        "collecting_evidence",
+        "Collecting workspace evidence",
+        "Reading requested workspace files in a deterministic batch.",
+        "pending",
+        {
+          kind: request.plan.kind,
+          maxFiles: request.plan.maxFiles,
+          targetHints: request.plan.targetHints,
+        },
+      ),
+      timestamp: Date.now(),
+    });
+    this.options.eventEmitter.emitEvent({
+      type: "tool_call",
+      id,
+      name: "CollectWorkspaceEvidence",
+      input: request.plan,
+      timestamp: Date.now(),
+    });
+
+    try {
+      const collection =
+        await this.options.workspaceEvidenceCollector?.(request);
+      const result = collection ?? {
+        success: false,
+        summary: "Workspace evidence collector is unavailable.",
+        evidence: {
+          summary: "Workspace evidence collector is unavailable.",
+          providerContext: "",
+          items: [],
+          totalTokens: 0,
+        },
+        files: [],
+        omittedFiles: [],
+        duration: 0,
+        error: "Workspace evidence collector is unavailable.",
+      };
+
+      this.options.eventEmitter.emitEvent({
+        type: "tool_result",
+        id,
+        name: "CollectWorkspaceEvidence",
+        success: result.success,
+        result,
+        duration: result.duration,
+        timestamp: Date.now(),
+      });
+
+      return result;
+    } catch (error) {
+      const failed: WorkspaceEvidenceCollection = {
+        success: false,
+        summary: "Workspace evidence collection failed.",
+        evidence: {
+          summary: "Workspace evidence collection failed.",
+          providerContext: "",
+          items: [],
+          totalTokens: 0,
+        },
+        files: [],
+        omittedFiles: [],
+        duration: 0,
+        error: error instanceof Error ? error.message : String(error),
+      };
+
+      this.options.eventEmitter.emitEvent({
+        type: "tool_result",
+        id,
+        name: "CollectWorkspaceEvidence",
+        success: false,
+        result: failed,
+        duration: 0,
+        timestamp: Date.now(),
+      });
+
+      return failed;
+    }
   }
 
   private validateResponse(

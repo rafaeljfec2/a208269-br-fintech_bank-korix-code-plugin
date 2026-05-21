@@ -24,6 +24,11 @@ interface AgentEventListInput {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+interface BatchEvidenceDisplay {
+  readonly summary: string;
+  readonly metadata: Readonly<Record<string, unknown>>;
+}
+
 export function useRuntimeEvents() {
   // Track current activity context - usar ref para persistir entre renders
   const currentActivityContextIdRef = useRef<string | null>(null);
@@ -699,22 +704,36 @@ export function useRuntimeEvents() {
 
               case "tool_result": {
                 const event = runtimeEvent;
+                const batchEvidence =
+                  event.name === "CollectWorkspaceEvidence"
+                    ? getBatchEvidenceDisplay(event.result)
+                    : undefined;
+                const metadata = {
+                  toolCallId: event.id,
+                  toolName: event.name,
+                  ...(batchEvidence?.metadata ?? {}),
+                };
 
                 // Add to timeline (existing behavior)
                 store.addTimelineEvent({
                   type: "tool",
                   description: `Tool ${event.name} completed`,
                   status: event.success ? "success" : "error",
-                  metadata: { toolName: event.name },
+                  metadata: {
+                    toolName: event.name,
+                    ...(batchEvidence?.metadata ?? {}),
+                  },
                 });
                 addActiveEventItem({
                   stage: "tool_result",
                   title: `${event.name} ${event.success ? "completed" : "failed"}`,
-                  summary: `Tool finished in ${event.duration ?? 0}ms.`,
+                  summary:
+                    batchEvidence?.summary ??
+                    `Tool finished in ${event.duration ?? 0}ms.`,
                   status: event.success ? "success" : "error",
                   timestamp: event.timestamp,
                   durationMs: event.duration,
-                  metadata: { toolCallId: event.id, toolName: event.name },
+                  metadata,
                 });
 
                 // NEW: Update tool status and duration in active message tracking
@@ -1493,4 +1512,29 @@ export function useRuntimeEvents() {
       }
     };
   }, []); // Array vazio - listener registrado apenas uma vez
+}
+
+function getBatchEvidenceDisplay(
+  result: unknown,
+): BatchEvidenceDisplay | undefined {
+  if (!isRecord(result)) {
+    return undefined;
+  }
+
+  const files = Array.isArray(result.files) ? result.files : [];
+  const omittedFiles = Array.isArray(result.omittedFiles)
+    ? result.omittedFiles
+    : [];
+
+  return {
+    summary: `Collected ${files.length} file(s), omitted ${omittedFiles.length} file(s).`,
+    metadata: {
+      fileCount: files.length,
+      omittedCount: omittedFiles.length,
+    },
+  };
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

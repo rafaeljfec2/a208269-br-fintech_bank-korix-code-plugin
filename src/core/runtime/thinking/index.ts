@@ -8,3 +8,5 @@ export * from "./RuntimeNarrator";
 export * from "./ThinkingOrchestrator";
 export * from "./ToolUsePolicyResolver";
 export * from "./InteractionContextCompiler";
+export * from "./WorkspaceEvidencePlanner";
+export * from "./WorkspaceEvidenceCollector";

@@ -37,4 +37,12 @@ describe("formatToolActivity", () => {
       }).label,
     ).toBe('Search "ThinkingContainer"');
   });
+
+  it("should format batch workspace evidence collection", () => {
+    expect(
+      formatToolActivity("CollectWorkspaceEvidence", {
+        maxFiles: 3,
+      }).label,
+    ).toBe("Collect workspace evidence");
+  });
 });

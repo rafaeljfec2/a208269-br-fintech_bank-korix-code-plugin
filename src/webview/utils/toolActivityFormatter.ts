@@ -60,6 +60,8 @@ export function formatToolActivity(
       return buildDisplay("Analyze", "workspace graph");
     case "AskUserQuestion":
       return buildDisplay("Ask", getQuestionLabel(record));
+    case "CollectWorkspaceEvidence":
+      return buildDisplay("Collect", "workspace evidence");
     default:
       if (/shell|terminal/i.test(toolName)) {
         return buildDisplay(
