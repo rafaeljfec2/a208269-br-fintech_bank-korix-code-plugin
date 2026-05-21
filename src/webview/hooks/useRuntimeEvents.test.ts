@@ -263,6 +263,176 @@ describe("useRuntimeEvents", () => {
     });
   });
 
+  describe("runtime_event: provider latency", () => {
+    it("should add an active event when provider request starts", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "provider_request_start",
+                  iteration: 1,
+                  correlationId: "request-1",
+                  toolCount: 2,
+                  toolChoice: "required",
+                  timestamp: 100,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "provider_request_start",
+          title: "Waiting model",
+          summary: "Provider request sent with 2 tool(s).",
+        }),
+      );
+    });
+
+    it("should add an active event when provider first output arrives", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "provider_first_output",
+                  iteration: 1,
+                  correlationId: "request-1",
+                  outputKind: "tool_call",
+                  latency: 1200,
+                  timestamp: 1300,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "provider_first_output",
+          title: "Model first output",
+          summary: "First tool_call after 1200ms.",
+          durationMs: 1200,
+        }),
+      );
+    });
+
+    it("should add an active event when provider request ends", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "provider_request_end",
+                  iteration: 1,
+                  correlationId: "request-1",
+                  duration: 23100,
+                  stopReason: "end_turn",
+                  tokenCount: 34,
+                  hadToolCalls: false,
+                  timestamp: 23200,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "provider_request_end",
+          title: "Model response completed",
+          summary: "Provider finished in 23100ms with 34 token(s).",
+          durationMs: 23100,
+        }),
+      );
+    });
+  });
+
+  describe("runtime_event: response buffering", () => {
+    it("should add an active event when response buffering starts", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "response_buffer_start",
+                  reason: "workspace_evidence_validation",
+                  timestamp: 400,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "response_buffer_start",
+          title: "Buffering response",
+          summary: "Response is being held for workspace evidence validation.",
+        }),
+      );
+    });
+
+    it("should add an active event when response buffering flushes", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "response_buffer_flush",
+                  reason: "validated",
+                  duration: 900,
+                  responseLength: 128,
+                  timestamp: 1300,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "response_buffer_flush",
+          title: "Buffered response released",
+          summary: "Response buffer validated after 900ms.",
+          durationMs: 900,
+        }),
+      );
+    });
+  });
+
   describe("runtime_event: thinking_step", () => {
     it("should add safe thinking item", () => {
       renderHook(() => useRuntimeEvents());
@@ -431,6 +601,41 @@ describe("useRuntimeEvents", () => {
     });
   });
 
+  describe("runtime_event: tool_approved", () => {
+    it("should show approval wait duration", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "tool_approved",
+                  id: "tool-call-1",
+                  name: "ReadFile",
+                  duration: 2500,
+                  timestamp: 3000,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAddActiveThinkingItem).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "tool_approved",
+          title: "Tool approved: ReadFile",
+          summary: "User approved tool execution after 2500ms.",
+          durationMs: 2500,
+        }),
+      );
+    });
+  });
+
   describe("runtime_event: done", () => {
     it("should handle done event", () => {
       renderHook(() => useRuntimeEvents());
@@ -515,6 +720,66 @@ describe("useRuntimeEvents", () => {
           stage: "execution_complete",
           title: "Execution completed",
           summary: "2 iteration(s), 3 tool call(s), 128 token(s).",
+        }),
+      );
+    });
+
+    it("should append latency summary when execution metrics include latency", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "done",
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "runtime_event",
+              payload: {
+                event: {
+                  type: "execution_complete",
+                  success: true,
+                  iterations: 2,
+                  metrics: {
+                    totalToolCalls: 3,
+                    totalTokens: 128,
+                    duration: 456,
+                    latency: {
+                      providerDurationMs: 340,
+                      providerFirstOutputLatencyMs: 90,
+                      toolDurationMs: 20,
+                      approvalWaitMs: 40,
+                      responseBufferDurationMs: 50,
+                      iterationOverheadMs: 6,
+                    },
+                  },
+                  timestamp: 789,
+                },
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockAppendThinkingItemToLastAssistant).toHaveBeenCalledWith(
+        "test-chat-id",
+        expect.objectContaining({
+          stage: "latency_summary",
+          title: "Latency summary",
+          summary:
+            "Model 340ms, first output 90ms, tools 20ms, approvals 40ms, buffering 50ms, overhead 6ms.",
         }),
       );
     });

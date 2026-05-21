@@ -92,11 +92,28 @@ describe("ThinkingOrchestrator", () => {
     const validationIndex = emittedEvents.findIndex(
       (event) => event.type === "response_validation",
     );
+    const bufferStartIndex = emittedEvents.findIndex(
+      (event) => event.type === "response_buffer_start",
+    );
+    const bufferFlushIndex = emittedEvents.findIndex(
+      (event) => event.type === "response_buffer_flush",
+    );
     const tokenIndex = emittedEvents.findIndex(
       (event) => event.type === "token",
     );
 
     expect(yieldedEvents.some((event) => event.type === "done")).toBe(true);
+    expect(bufferStartIndex).toBeGreaterThanOrEqual(0);
+    expect(bufferFlushIndex).toBeGreaterThan(validationIndex);
+    expect(emittedEvents[bufferStartIndex]).toMatchObject({
+      type: "response_buffer_start",
+      reason: "workspace_evidence_validation",
+    });
+    expect(emittedEvents[bufferFlushIndex]).toMatchObject({
+      type: "response_buffer_flush",
+      reason: "validated",
+      responseLength: expect.any(Number),
+    });
     expect(validationIndex).toBeGreaterThanOrEqual(0);
     expect(tokenIndex).toBeGreaterThan(validationIndex);
     expect(result?.finalState.memory.thinking?.validationResult?.status).toBe(

@@ -16,6 +16,7 @@ import type { Tool } from "../../harness/toolRegistry";
 import { ToolRegistry } from "../../harness/toolRegistry";
 import { ExecutionEngine } from "./executionEngine";
 import { RuntimeEventEmitter } from "./runtimeEvents";
+import type { RuntimeEvent } from "./runtimeEvents";
 import { CheckpointManager } from "./checkpoints";
 import { RuntimeMetrics } from "./runtimeMetrics";
 import { IterationGuard } from "./iterationGuard";
@@ -262,6 +263,213 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
   });
 
   describe("Permission Flow", () => {
+    it("should emit provider latency events around a provider request", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const events: RuntimeEvent[] = [];
+      const toolRegistry = new ToolRegistry();
+      const permissionManager = new PermissionManager(
+        vi.fn(async () => ({
+          approved: false,
+          level: "never" as const,
+        })),
+      );
+      const capturedInputs: ProviderInput[] = [];
+      const provider = createTextProvider(capturedInputs);
+      const state = new RuntimeState({
+        mode: "agent",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+
+      eventEmitter.onEvent((event) => {
+        events.push(event);
+      });
+      state.addMessage({
+        role: "user",
+        content: "responda direto",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "system prompt",
+      );
+
+      const result = await engine.step(state);
+      const providerStart = events.find(
+        (event) => event.type === "provider_request_start",
+      );
+      const providerFirstOutput = events.find(
+        (event) => event.type === "provider_first_output",
+      );
+      const providerEnd = events.find(
+        (event) => event.type === "provider_request_end",
+      );
+
+      expect(result.tokenCount).toBe(1);
+      expect(providerStart).toMatchObject({
+        type: "provider_request_start",
+        iteration: 0,
+        toolCount: 0,
+      });
+      expect(providerFirstOutput).toMatchObject({
+        type: "provider_first_output",
+        iteration: 0,
+        outputKind: "token",
+      });
+      expect(providerEnd).toMatchObject({
+        type: "provider_request_end",
+        iteration: 0,
+        stopReason: "end_turn",
+        tokenCount: 1,
+        hadToolCalls: false,
+      });
+      expect(
+        providerEnd?.type === "provider_request_end"
+          ? providerEnd.duration
+          : undefined,
+      ).toEqual(expect.any(Number));
+    });
+
+    it("should report first provider output as tool call when the model calls a tool before tokens", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const events: RuntimeEvent[] = [];
+      const toolRegistry = new ToolRegistry();
+      const permissionManager = new PermissionManager(
+        vi.fn(async () => ({
+          approved: false,
+          level: "never" as const,
+        })),
+      );
+      const provider = createToolCallProvider("ReadFile");
+      const state = new RuntimeState({
+        mode: "agent",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+
+      eventEmitter.onEvent((event) => {
+        events.push(event);
+      });
+      toolRegistry.register({
+        name: "ReadFile",
+        description: "Read a file.",
+        schema: z.object({}),
+        requiresApproval: () => false,
+        execute: vi.fn(async () => ({ success: true, data: "ok" })),
+      });
+      state.addMessage({
+        role: "user",
+        content: "leia um arquivo",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "system prompt",
+      );
+
+      await engine.step(state);
+
+      expect(
+        events.filter((event) => event.type === "provider_first_output"),
+      ).toHaveLength(1);
+      expect(
+        events.find((event) => event.type === "provider_first_output"),
+      ).toMatchObject({
+        type: "provider_first_output",
+        outputKind: "tool_call",
+      });
+      expect(
+        events.find((event) => event.type === "provider_request_end"),
+      ).toMatchObject({
+        type: "provider_request_end",
+        hadToolCalls: true,
+      });
+    });
+
+    it("should emit approval wait duration for approved tools", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const events: RuntimeEvent[] = [];
+      const toolRegistry = new ToolRegistry();
+      const approvalRequester = vi.fn(async () => ({
+        approved: true,
+        level: "once" as const,
+      }));
+      const provider = createToolCallProvider("ReadFile");
+      const permissionManager = new PermissionManager(approvalRequester);
+      const state = new RuntimeState({
+        mode: "agent",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+
+      eventEmitter.onEvent((event) => {
+        events.push(event);
+      });
+      toolRegistry.register({
+        name: "ReadFile",
+        description: "Read a file.",
+        schema: z.object({}),
+        requiresApproval: () => true,
+        execute: vi.fn(async () => ({ success: true, data: "ok" })),
+      });
+      state.addMessage({
+        role: "user",
+        content: "leia um arquivo",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "system prompt",
+      );
+
+      await engine.step(state);
+
+      expect(approvalRequester).toHaveBeenCalledTimes(1);
+      expect(
+        events.find((event) => event.type === "tool_approval_required"),
+      ).toMatchObject({
+        type: "tool_approval_required",
+        name: "ReadFile",
+      });
+      expect(
+        events.find((event) => event.type === "tool_approved"),
+      ).toMatchObject({
+        type: "tool_approved",
+        name: "ReadFile",
+        duration: expect.any(Number),
+      });
+    });
+
     it("should not request approval for interactive tools that opt out", async () => {
       const logger = new Logger({ level: "error" });
       const eventEmitter = new RuntimeEventEmitter();

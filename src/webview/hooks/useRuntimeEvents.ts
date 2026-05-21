@@ -254,6 +254,215 @@ export function useRuntimeEvents() {
                 break;
               }
 
+              case "provider_request_start": {
+                const event = runtimeEvent;
+                const toolChoice = event.toolChoice
+                  ? `, choice ${event.toolChoice}`
+                  : "";
+
+                store.addTimelineEvent({
+                  type: "thinking",
+                  description: "Waiting model",
+                  status: "pending",
+                  metadata: {
+                    iteration: event.iteration,
+                    correlationId: event.correlationId,
+                    toolCount: event.toolCount,
+                    toolChoice: event.toolChoice,
+                  },
+                });
+                addActiveEventItem({
+                  stage: "provider_request_start",
+                  title: "Waiting model",
+                  summary: `Provider request sent with ${event.toolCount} tool(s).`,
+                  status: "pending",
+                  timestamp: event.timestamp,
+                  metadata: {
+                    iteration: event.iteration,
+                    correlationId: event.correlationId,
+                    toolCount: event.toolCount,
+                    toolChoice: event.toolChoice,
+                  },
+                });
+
+                if (currentActivityContextIdRef.current) {
+                  store.addActivityItem(currentActivityContextIdRef.current, {
+                    category: "execution",
+                    context: "Provider",
+                    description: `Waiting model (${event.toolCount} tool(s)${toolChoice})`,
+                    status: "pending",
+                    metadata: {
+                      correlationId: event.correlationId,
+                      toolCount: event.toolCount,
+                      toolChoice: event.toolChoice,
+                    },
+                  });
+                }
+                break;
+              }
+
+              case "provider_first_output": {
+                const event = runtimeEvent;
+
+                addActiveEventItem({
+                  stage: "provider_first_output",
+                  title: "Model first output",
+                  summary: `First ${event.outputKind} after ${event.latency}ms.`,
+                  status: "success",
+                  timestamp: event.timestamp,
+                  durationMs: event.latency,
+                  metadata: {
+                    iteration: event.iteration,
+                    correlationId: event.correlationId,
+                    outputKind: event.outputKind,
+                  },
+                });
+
+                if (currentActivityContextIdRef.current) {
+                  store.addActivityItem(currentActivityContextIdRef.current, {
+                    category: "execution",
+                    context: "Provider",
+                    description: `First ${event.outputKind}`,
+                    status: "success",
+                    duration: event.latency,
+                    metadata: {
+                      correlationId: event.correlationId,
+                      outputKind: event.outputKind,
+                    },
+                  });
+                }
+                break;
+              }
+
+              case "provider_request_end": {
+                const event = runtimeEvent;
+
+                store.addTimelineEvent({
+                  type: "thinking",
+                  description: `Model response completed in ${event.duration}ms`,
+                  status: "success",
+                  metadata: {
+                    iteration: event.iteration,
+                    correlationId: event.correlationId,
+                    stopReason: event.stopReason,
+                    tokenCount: event.tokenCount,
+                    hadToolCalls: event.hadToolCalls,
+                  },
+                });
+                addActiveEventItem({
+                  stage: "provider_request_end",
+                  title: "Model response completed",
+                  summary: `Provider finished in ${event.duration}ms with ${event.tokenCount} token(s).`,
+                  status: "success",
+                  timestamp: event.timestamp,
+                  durationMs: event.duration,
+                  metadata: {
+                    iteration: event.iteration,
+                    correlationId: event.correlationId,
+                    stopReason: event.stopReason,
+                    hadToolCalls: event.hadToolCalls,
+                  },
+                });
+
+                if (currentActivityContextIdRef.current) {
+                  store.addActivityItem(currentActivityContextIdRef.current, {
+                    category: "execution",
+                    context: "Provider",
+                    description: "Model response completed",
+                    status: "success",
+                    duration: event.duration,
+                    metadata: {
+                      correlationId: event.correlationId,
+                      stopReason: event.stopReason,
+                      tokenCount: event.tokenCount,
+                      hadToolCalls: event.hadToolCalls,
+                    },
+                  });
+                }
+                break;
+              }
+
+              case "response_buffer_start": {
+                const event = runtimeEvent;
+
+                store.addTimelineEvent({
+                  type: "thinking",
+                  description: "Buffering response for validation",
+                  status: "pending",
+                  metadata: { reason: event.reason },
+                });
+                addActiveEventItem({
+                  stage: "response_buffer_start",
+                  title: "Buffering response",
+                  summary:
+                    "Response is being held for workspace evidence validation.",
+                  status: "pending",
+                  timestamp: event.timestamp,
+                  metadata: { reason: event.reason },
+                });
+
+                if (currentActivityContextIdRef.current) {
+                  store.addActivityItem(currentActivityContextIdRef.current, {
+                    category: "thinking",
+                    context: "Response validation",
+                    description: "Buffering response",
+                    status: "pending",
+                    metadata: { reason: event.reason },
+                  });
+                }
+                break;
+              }
+
+              case "response_buffer_flush": {
+                const event = runtimeEvent;
+                const title =
+                  event.reason === "blocked"
+                    ? "Buffered response blocked"
+                    : "Buffered response released";
+                const summary =
+                  event.reason === "blocked"
+                    ? `Response buffer blocked after ${event.duration}ms.`
+                    : `Response buffer ${event.reason} after ${event.duration}ms.`;
+
+                store.addTimelineEvent({
+                  type: "thinking",
+                  description: title,
+                  status: event.reason === "blocked" ? "error" : "success",
+                  metadata: {
+                    reason: event.reason,
+                    responseLength: event.responseLength,
+                    duration: event.duration,
+                  },
+                });
+                addActiveEventItem({
+                  stage: "response_buffer_flush",
+                  title,
+                  summary,
+                  status: event.reason === "blocked" ? "error" : "success",
+                  timestamp: event.timestamp,
+                  durationMs: event.duration,
+                  metadata: {
+                    reason: event.reason,
+                    responseLength: event.responseLength,
+                  },
+                });
+
+                if (currentActivityContextIdRef.current) {
+                  store.addActivityItem(currentActivityContextIdRef.current, {
+                    category: "thinking",
+                    context: "Response validation",
+                    description: title,
+                    status: event.reason === "blocked" ? "error" : "success",
+                    duration: event.duration,
+                    metadata: {
+                      reason: event.reason,
+                      responseLength: event.responseLength,
+                    },
+                  });
+                }
+                break;
+              }
+
               case "thinking_step": {
                 const event = runtimeEvent;
                 const chatId =
@@ -646,6 +855,29 @@ export function useRuntimeEvents() {
                     },
                   },
                 );
+                if (event.metrics.latency) {
+                  appendCompletedEventItem(
+                    lastCompletedChatIdRef.current ??
+                      useStore.getState().activeChatId,
+                    {
+                      stage: "latency_summary",
+                      title: "Latency summary",
+                      summary:
+                        [
+                          `Model ${event.metrics.latency.providerDurationMs}ms`,
+                          `first output ${event.metrics.latency.providerFirstOutputLatencyMs}ms`,
+                          `tools ${event.metrics.latency.toolDurationMs}ms`,
+                          `approvals ${event.metrics.latency.approvalWaitMs}ms`,
+                          `buffering ${event.metrics.latency.responseBufferDurationMs}ms`,
+                          `overhead ${event.metrics.latency.iterationOverheadMs}ms`,
+                        ].join(", ") + ".",
+                      status: "success",
+                      timestamp: event.timestamp,
+                      durationMs: event.metrics.duration,
+                      metadata: event.metrics.latency,
+                    },
+                  );
+                }
 
                 // NOVO: Atualizar métricas de tokens
                 store.updateMetrics({
@@ -1066,19 +1298,24 @@ export function useRuntimeEvents() {
 
               case "tool_approved": {
                 const event = runtimeEvent;
+                const approvalSummary =
+                  event.duration !== undefined
+                    ? `User approved tool execution after ${event.duration}ms.`
+                    : "User approved tool execution.";
 
                 store.addTimelineEvent({
                   type: "tool",
                   description: `Tool approved: ${event.name}`,
                   status: "success",
-                  metadata: { toolName: event.name },
+                  metadata: { toolName: event.name, duration: event.duration },
                 });
                 addActiveEventItem({
                   stage: "tool_approved",
                   title: `Tool approved: ${event.name}`,
-                  summary: "User approved tool execution.",
+                  summary: approvalSummary,
                   status: "success",
                   timestamp: event.timestamp,
+                  durationMs: event.duration,
                   metadata: { toolName: event.name },
                 });
                 break;
@@ -1086,19 +1323,28 @@ export function useRuntimeEvents() {
 
               case "tool_denied": {
                 const event = runtimeEvent;
+                const denialSummary =
+                  event.duration !== undefined
+                    ? `${event.reason} after ${event.duration}ms.`
+                    : event.reason;
 
                 store.addTimelineEvent({
                   type: "tool",
                   description: `Tool denied: ${event.name} - ${event.reason}`,
                   status: "error",
-                  metadata: { toolName: event.name, reason: event.reason },
+                  metadata: {
+                    toolName: event.name,
+                    reason: event.reason,
+                    duration: event.duration,
+                  },
                 });
                 addActiveEventItem({
                   stage: "tool_denied",
                   title: `Tool denied: ${event.name}`,
-                  summary: event.reason,
+                  summary: denialSummary,
                   status: "error",
                   timestamp: event.timestamp,
+                  durationMs: event.duration,
                   metadata: { toolName: event.name },
                 });
 

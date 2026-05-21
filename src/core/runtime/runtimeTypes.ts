@@ -71,6 +71,16 @@ export interface RuntimeMetricsSnapshot {
   readonly recoveries: number;
   readonly toolBreakdown: Readonly<Record<string, number>>;
   readonly eventTimeline: readonly RuntimeEventRecord[];
+  readonly latency?: RuntimeLatencyMetricsSnapshot;
+}
+
+export interface RuntimeLatencyMetricsSnapshot {
+  readonly providerDurationMs: number;
+  readonly providerFirstOutputLatencyMs: number;
+  readonly toolDurationMs: number;
+  readonly approvalWaitMs: number;
+  readonly responseBufferDurationMs: number;
+  readonly iterationOverheadMs: number;
 }
 
 /**

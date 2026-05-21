@@ -2,6 +2,7 @@ import type { Logger } from "../../../telemetry/logger";
 import type {
   AgentLoopResult,
   AgentLoopRunOptions,
+  RuntimeMetricsSnapshot,
   RuntimeStateSnapshot,
 } from "../runtimeTypes";
 import type { RuntimeEvent, RuntimeEventEmitter } from "../runtimeEvents";
@@ -67,6 +68,8 @@ export class ThinkingOrchestrator {
     let latestValidation: ResponseValidationResult | undefined;
     let streamedResponse = "";
     let responseValidated = false;
+    let responseBufferStartedAt: number | undefined;
+    let responseBufferDurationMs = 0;
 
     const analysisNode = graph.addNode(
       "analysis",
@@ -77,7 +80,13 @@ export class ThinkingOrchestrator {
 
     const shouldBufferResponse = this.shouldBufferResponse(profile);
     if (shouldBufferResponse) {
+      responseBufferStartedAt = Date.now();
       this.options.eventEmitter.beginResponseBuffering();
+      this.options.eventEmitter.emitEvent({
+        type: "response_buffer_start",
+        reason: "workspace_evidence_validation",
+        timestamp: responseBufferStartedAt,
+      });
     }
 
     this.options.eventEmitter.emitEvent({
@@ -255,11 +264,23 @@ export class ThinkingOrchestrator {
               ? this.options.eventEmitter.getBufferedResponse()
               : streamedResponse,
             shouldBufferResponse,
+            responseBufferStartedAt,
           );
+          if (shouldBufferResponse && responseBufferStartedAt !== undefined) {
+            responseBufferDurationMs = Date.now() - responseBufferStartedAt;
+          }
           responseValidated = true;
         }
 
-        yield next.value;
+        yield next.value.type === "execution_complete"
+          ? {
+              ...next.value,
+              metrics: this.withResponseBufferLatency(
+                next.value.metrics,
+                responseBufferDurationMs,
+              ),
+            }
+          : next.value;
       }
 
       if (
@@ -275,7 +296,11 @@ export class ThinkingOrchestrator {
           toolUsePolicy,
           this.options.eventEmitter.getBufferedResponse(),
           true,
+          responseBufferStartedAt,
         );
+        if (responseBufferStartedAt !== undefined) {
+          responseBufferDurationMs = Date.now() - responseBufferStartedAt;
+        }
       }
 
       if (!shouldBufferResponse && !responseValidated) {
@@ -287,6 +312,7 @@ export class ThinkingOrchestrator {
           toolUsePolicy,
           streamedResponse,
           false,
+          undefined,
         );
       }
 
@@ -312,6 +338,10 @@ export class ThinkingOrchestrator {
           latestValidation,
           graphSnapshot,
         ),
+        metrics: this.withResponseBufferLatency(
+          finalResult.metrics,
+          responseBufferDurationMs,
+        ),
       };
     } finally {
       subscription.dispose();
@@ -333,6 +363,7 @@ export class ThinkingOrchestrator {
     toolUsePolicy: ToolUsePolicy,
     response: string,
     flushResponse: boolean,
+    responseBufferStartedAt: number | undefined,
   ): ResponseValidationResult {
     const baseValidation = this.hallucinationGuard.validate({
       profile,
@@ -379,6 +410,22 @@ export class ThinkingOrchestrator {
         validation.status === "blocked"
           ? this.buildBlockedToolUseResponse(toolUsePolicy)
           : this.hallucinationGuard.applyValidation(response, validation);
+      const bufferDuration =
+        responseBufferStartedAt !== undefined
+          ? Date.now() - responseBufferStartedAt
+          : 0;
+      this.options.eventEmitter.emitEvent({
+        type: "response_buffer_flush",
+        reason:
+          validation.status === "blocked"
+            ? "blocked"
+            : finalResponse.length > 0
+              ? "validated"
+              : "empty",
+        duration: bufferDuration,
+        responseLength: finalResponse.length,
+        timestamp: Date.now(),
+      });
       this.options.eventEmitter.flushBufferedResponse(finalResponse);
     }
 
@@ -402,6 +449,40 @@ export class ThinkingOrchestrator {
       "",
       "Use the workspace evidence above for project-specific claims. If it is insufficient, say so explicitly.",
     ].join("\n");
+  }
+
+  private withResponseBufferLatency(
+    metrics: RuntimeMetricsSnapshot,
+    responseBufferDurationMs: number,
+  ): RuntimeMetricsSnapshot {
+    if (responseBufferDurationMs <= 0) {
+      return metrics;
+    }
+
+    const currentLatency = metrics.latency ?? {
+      providerDurationMs: 0,
+      providerFirstOutputLatencyMs: 0,
+      toolDurationMs: 0,
+      approvalWaitMs: 0,
+      responseBufferDurationMs: 0,
+      iterationOverheadMs: metrics.duration,
+    };
+    const responseBufferTotal =
+      currentLatency.responseBufferDurationMs + responseBufferDurationMs;
+    const measuredLatency =
+      currentLatency.providerDurationMs +
+      currentLatency.toolDurationMs +
+      currentLatency.approvalWaitMs +
+      responseBufferTotal;
+
+    return {
+      ...metrics,
+      latency: {
+        ...currentLatency,
+        responseBufferDurationMs: responseBufferTotal,
+        iterationOverheadMs: Math.max(0, metrics.duration - measuredLatency),
+      },
+    };
   }
 
   private applyToolUsePolicyValidation(

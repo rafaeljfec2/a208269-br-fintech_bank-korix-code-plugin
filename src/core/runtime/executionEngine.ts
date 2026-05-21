@@ -109,6 +109,19 @@ export class ExecutionEngine {
         agentRunId: crypto.randomUUID(),
         iterationId: state.getExecution().currentIteration,
       };
+      const providerStartedAt = Date.now();
+      let firstProviderOutputEmitted = false;
+
+      this.eventEmitter.emitEvent({
+        type: "provider_request_start",
+        iteration: state.getExecution().currentIteration,
+        correlationId: context.correlationId,
+        toolCount: tools.length,
+        ...(toolChoice
+          ? { toolChoice: this.formatToolChoiceForEvent(toolChoice) }
+          : {}),
+        timestamp: providerStartedAt,
+      });
 
       // Stream from provider
       const stream = this.provider.send(
@@ -126,8 +139,39 @@ export class ExecutionEngine {
       for await (const event of stream) {
         this.cancellationManager.checkCancellation();
 
+        if (!firstProviderOutputEmitted) {
+          const outputKind = this.resolveFirstProviderOutputKind(event);
+          if (outputKind) {
+            firstProviderOutputEmitted = true;
+            this.eventEmitter.emitEvent({
+              type: "provider_first_output",
+              iteration: state.getExecution().currentIteration,
+              correlationId: context.correlationId,
+              outputKind,
+              latency: Date.now() - providerStartedAt,
+              timestamp: Date.now(),
+            });
+            this.metrics.recordProviderFirstOutputLatency(
+              Date.now() - providerStartedAt,
+            );
+          }
+        }
+
         this.processEvent(event, state, result);
       }
+
+      const providerDuration = Date.now() - providerStartedAt;
+      this.metrics.recordProviderDuration(providerDuration);
+      this.eventEmitter.emitEvent({
+        type: "provider_request_end",
+        iteration: state.getExecution().currentIteration,
+        correlationId: context.correlationId,
+        duration: providerDuration,
+        stopReason: result.stopReason,
+        tokenCount: result.tokenCount,
+        hadToolCalls: this.pendingToolCalls.length > 0,
+        timestamp: Date.now(),
+      });
 
       // Add assistant message if text or tool calls were generated
       if (this.currentTextBuffer || this.pendingToolCalls.length > 0) {
@@ -348,12 +392,23 @@ export class ExecutionEngine {
         riskLevel !== "low";
 
       if (requiresApproval) {
+        const approvalStartedAt = Date.now();
+        this.eventEmitter.emitEvent({
+          type: "tool_approval_required",
+          id: toolCall.id,
+          name: toolCall.name,
+          input: toolCall.input,
+          timestamp: approvalStartedAt,
+        });
+
         const response = await this.permissionManager.checkPermission({
           tool: toolCall.name,
           input: toolCall.input,
           description: toolDef?.description ?? `Execute ${toolCall.name}`,
           riskLevel,
         });
+        const approvalDuration = Date.now() - approvalStartedAt;
+        this.metrics.recordApprovalWait(approvalDuration);
 
         if (!response.approved) {
           this.eventEmitter.emitEvent({
@@ -361,6 +416,7 @@ export class ExecutionEngine {
             id: toolCall.id,
             name: toolCall.name,
             reason: "Permission denied",
+            duration: approvalDuration,
             timestamp: Date.now(),
           });
           continue;
@@ -370,6 +426,7 @@ export class ExecutionEngine {
           type: "tool_approved",
           id: toolCall.id,
           name: toolCall.name,
+          duration: approvalDuration,
           timestamp: Date.now(),
         });
       }
@@ -416,6 +473,7 @@ export class ExecutionEngine {
       });
 
       const duration = result.metadata?.duration ?? 0;
+      this.metrics.recordToolDuration(duration);
       const observationSummary = this.observationEngine.summarizeToolResult(
         toolCall.name,
         result.success ? result.data : { error: result.error },
@@ -599,6 +657,27 @@ export class ExecutionEngine {
     return this.options.maxTokens ?? this.provider.config.maxTokens ?? 4096;
   }
 
+  private resolveFirstProviderOutputKind(
+    event: ProviderEvent,
+  ): "token" | "thinking" | "tool_call" | undefined {
+    if (event.type === "token") {
+      return "token";
+    }
+
+    if (event.type === "thinking") {
+      return "thinking";
+    }
+
+    if (
+      event.type === "tool_call_complete" ||
+      event.type === "tool_call_delta"
+    ) {
+      return "tool_call";
+    }
+
+    return undefined;
+  }
+
   private resolveToolChoice(
     policy: ToolUsePolicy | undefined,
     toolCount: number,
@@ -624,6 +703,23 @@ export class ExecutionEngine {
     }
 
     return "none";
+  }
+
+  private formatToolChoiceForEvent(
+    toolChoice:
+      | "none"
+      | "auto"
+      | "required"
+      | {
+          readonly type: "tool";
+          readonly name: string;
+        },
+  ): string {
+    if (typeof toolChoice === "string") {
+      return toolChoice;
+    }
+
+    return toolChoice.name;
   }
 
   /**

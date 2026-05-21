@@ -57,6 +57,35 @@ export interface ThinkingEvent {
   readonly timestamp: number;
 }
 
+export interface ProviderRequestStartEvent {
+  readonly type: "provider_request_start";
+  readonly iteration: number;
+  readonly correlationId: string;
+  readonly toolCount: number;
+  readonly toolChoice?: string;
+  readonly timestamp: number;
+}
+
+export interface ProviderRequestEndEvent {
+  readonly type: "provider_request_end";
+  readonly iteration: number;
+  readonly correlationId: string;
+  readonly duration: number;
+  readonly stopReason?: string;
+  readonly tokenCount: number;
+  readonly hadToolCalls: boolean;
+  readonly timestamp: number;
+}
+
+export interface ProviderFirstOutputEvent {
+  readonly type: "provider_first_output";
+  readonly iteration: number;
+  readonly correlationId: string;
+  readonly outputKind: "token" | "thinking" | "tool_call";
+  readonly latency: number;
+  readonly timestamp: number;
+}
+
 /**
  * Safe thinking/orchestration events
  */
@@ -87,6 +116,20 @@ export interface ReflectionSummaryEvent {
 export interface ResponseValidationEvent {
   readonly type: "response_validation";
   readonly validation: ResponseValidationResult;
+  readonly timestamp: number;
+}
+
+export interface ResponseBufferStartEvent {
+  readonly type: "response_buffer_start";
+  readonly reason: "workspace_evidence_validation";
+  readonly timestamp: number;
+}
+
+export interface ResponseBufferFlushEvent {
+  readonly type: "response_buffer_flush";
+  readonly reason: "validated" | "blocked" | "empty";
+  readonly duration: number;
+  readonly responseLength: number;
   readonly timestamp: number;
 }
 
@@ -139,6 +182,7 @@ export interface ToolApprovedEvent {
   readonly type: "tool_approved";
   readonly id: string;
   readonly name: string;
+  readonly duration: number;
   readonly timestamp: number;
 }
 
@@ -147,6 +191,7 @@ export interface ToolDeniedEvent {
   readonly id: string;
   readonly name: string;
   readonly reason: string;
+  readonly duration: number;
   readonly timestamp: number;
 }
 
@@ -295,12 +340,17 @@ export type RuntimeEvent =
   // Provider
   | TokenEvent
   | ThinkingEvent
+  | ProviderRequestStartEvent
+  | ProviderRequestEndEvent
+  | ProviderFirstOutputEvent
   // Safe thinking orchestration
   | ThinkingStepEvent
   | ContextEvidenceEvent
   | ObservationSummaryEvent
   | ReflectionSummaryEvent
   | ResponseValidationEvent
+  | ResponseBufferStartEvent
+  | ResponseBufferFlushEvent
   | ExecutionGraphUpdateEvent
   | DoneEvent
   // Tools
