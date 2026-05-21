@@ -10,6 +10,7 @@ import type { WebviewToExtensionMessage } from "../../shared/protocol";
 
 export class KorixWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "korix.chatView";
+  public static readonly secondaryViewType = "korix.chatSecondaryView";
 
   // @ts-expect-error - Reserved for future use
   private __view?: vscode.WebviewView;

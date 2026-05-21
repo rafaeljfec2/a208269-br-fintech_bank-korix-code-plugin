@@ -23,7 +23,9 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onChatParticipant:korix-code.korix"
+    "onChatParticipant:korix-code.korix",
+    "onView:korix.chatView",
+    "onView:korix.chatSecondaryView"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {
@@ -76,7 +78,16 @@
         {
           "id": "korix-sidebar",
           "title": "Korix Code",
-          "icon": "resources/sidebar-icon.svg"
+          "icon": "resources/sidebar-icon.svg",
+          "when": "korix.doesNotSupportSecondarySidebar"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "korix-secondary-sidebar",
+          "title": "Korix Code",
+          "icon": "resources/sidebar-icon.svg",
+          "when": "!korix.doesNotSupportSecondarySidebar"
         }
       ]
     },
@@ -85,7 +96,16 @@
         {
           "id": "korix.chatView",
           "name": "KORIX CODE",
-          "type": "webview"
+          "type": "webview",
+          "when": "korix.doesNotSupportSecondarySidebar"
+        }
+      ],
+      "korix-secondary-sidebar": [
+        {
+          "id": "korix.chatSecondaryView",
+          "name": "KORIX CODE",
+          "type": "webview",
+          "when": "!korix.doesNotSupportSecondarySidebar"
         }
       ]
     },

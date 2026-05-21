@@ -5,6 +5,10 @@ import { ProviderConfigManager } from "./providers/config";
 import type { AIProvider } from "./providers/types";
 import { KorixWebviewProvider } from "./ui/providers/webviewProvider";
 import { registerKorixChatParticipant } from "./ui/chatParticipant";
+import {
+  getKorixViewTarget,
+  supportsSecondarySidebar,
+} from "./ui/viewTarget";
 import type { Logger } from "./telemetry/logger";
 import type { ContextEngine } from "./context/contextEngine";
 import type { TerminalSessionManager } from "./terminal/session";
@@ -56,6 +60,13 @@ export function activate(context: vscode.ExtensionContext) {
   // Register all tools
   registerAllTools();
 
+  const hasSecondarySidebar = supportsSecondarySidebar(vscode.version);
+  void vscode.commands.executeCommand(
+    "setContext",
+    "korix.doesNotSupportSecondarySidebar",
+    !hasSecondarySidebar,
+  );
+
   // Register UI providers
   webviewProvider = new KorixWebviewProvider(context.extensionUri, container);
 
@@ -63,15 +74,25 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewViewProvider(
       KorixWebviewProvider.viewType,
       webviewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } },
     ),
+    ...(hasSecondarySidebar
+      ? [
+          vscode.window.registerWebviewViewProvider(
+            KorixWebviewProvider.secondaryViewType,
+            webviewProvider,
+            { webviewOptions: { retainContextWhenHidden: true } },
+          ),
+        ]
+      : []),
     registerKorixChatParticipant({
       extensionUri: context.extensionUri,
       container,
       onModeSelected: (mode) => {
         currentMode = mode;
-        container.get<RuntimeStateManager>(TOKENS.RuntimeStateManager).setMode(
-          mode,
-        );
+        container
+          .get<RuntimeStateManager>(TOKENS.RuntimeStateManager)
+          .setMode(mode);
         updateStatusBar();
       },
     }),
@@ -203,16 +224,25 @@ function handleModeSwitch(mode: Mode) {
 }
 
 async function openKorixSidebar(logger: Logger): Promise<void> {
+  const target = getKorixViewTarget(vscode.version);
+
   try {
     await vscode.commands.executeCommand(
-      `${KorixWebviewProvider.viewType}.focus`,
+      `workbench.view.extension.${target.containerId}`,
     );
+    await vscode.commands.executeCommand(`${target.viewId}.focus`);
   } catch (error) {
-    logger.warn("Failed to focus Korix webview directly", {
+    logger.warn("Failed to focus preferred Korix view", {
       error: error instanceof Error ? error.message : String(error),
+      containerId: target.containerId,
+      viewId: target.viewId,
     });
+
     await vscode.commands.executeCommand(
       "workbench.view.extension.korix-sidebar",
+    );
+    await vscode.commands.executeCommand(
+      `${KorixWebviewProvider.viewType}.focus`,
     );
   }
 
