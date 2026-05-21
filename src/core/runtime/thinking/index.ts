@@ -7,3 +7,4 @@ export * from "./ReflectionEngine";
 export * from "./RuntimeNarrator";
 export * from "./ThinkingOrchestrator";
 export * from "./ToolUsePolicyResolver";
+export * from "./InteractionContextCompiler";

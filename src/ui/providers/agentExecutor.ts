@@ -15,6 +15,7 @@ import type { ContextEngine } from "../../context/contextEngine";
 import {
   TaskAnalyzer,
   ThinkingOrchestrator,
+  InteractionContextCompiler,
   ToolUsePolicyResolver,
   type ThinkingRunProfile,
   type ToolUsePolicy,
@@ -24,146 +25,12 @@ import type {
   EvidencePack,
   EvidenceRequest,
 } from "../../core/runtime/thinking";
-import type { ExecutionContext, Mode } from "../../core/types";
-
-type ChatHistoryMessage = {
-  readonly role: "user" | "assistant" | "system";
-  readonly content: string;
-};
-
-interface ModeSensitiveHistorySanitization {
-  readonly messages: readonly ChatHistoryMessage[];
-  readonly removedStaleAssistantClaim: boolean;
-}
-
-export function sanitizeModeSensitiveHistory(
-  previousMessages: readonly ChatHistoryMessage[],
-  mode: Mode,
-): readonly ChatHistoryMessage[] {
-  return sanitizeModeSensitiveHistoryWithMetadata(previousMessages, mode)
-    .messages;
-}
-
-function sanitizeModeSensitiveHistoryWithMetadata(
-  previousMessages: readonly ChatHistoryMessage[],
-  mode: Mode,
-): ModeSensitiveHistorySanitization {
-  if (mode === "ask") {
-    return {
-      messages: previousMessages,
-      removedStaleAssistantClaim: false,
-    };
-  }
-
-  let removedStaleAssistantClaim = false;
-  const messages = previousMessages.filter((message) => {
-    if (message.role !== "assistant") {
-      return true;
-    }
-
-    const stale = isStaleAskModeClaim(message.content);
-    removedStaleAssistantClaim = removedStaleAssistantClaim || stale;
-    return !stale;
-  });
-
-  return {
-    messages,
-    removedStaleAssistantClaim,
-  };
-}
-
-export function resolveModeSensitiveUserMessage(
-  content: string,
-  previousMessages: readonly ChatHistoryMessage[],
-  mode: Mode,
-): string {
-  if (mode === "ask" || !isRetryAfterModeSwitchRequest(content)) {
-    return content;
-  }
-
-  const sanitization = sanitizeModeSensitiveHistoryWithMetadata(
-    previousMessages,
-    mode,
-  );
-  if (!sanitization.removedStaleAssistantClaim) {
-    return content;
-  }
-
-  const previousRequest = findLastActionableUserMessage(previousMessages);
-  if (!previousRequest) {
-    return content;
-  }
-
-  return [
-    "Pedido anterior retomado apos troca de modo:",
-    previousRequest,
-    "",
-    "Mensagem atual do usuario:",
-    content,
-  ].join("\n");
-}
-
-function isStaleAskModeClaim(content: string): boolean {
-  const normalized = content
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-  return (
-    /\bmodo\s+ask\b/.test(normalized) ||
-    /\bask\s+mode\b/.test(normalized) ||
-    /\bmodo\s+atual\b/.test(normalized) ||
-    /modo\s+de\s+resposta\s+direta/.test(normalized) ||
-    /sem\s+acesso\s+a(?:os?|s)?\s+ferramentas/.test(normalized) ||
-    /sem\s+acesso\s+a(?:os?|s)?\s+arquivos/.test(normalized) ||
-    /sem\s+acesso\s+ao\s+workspace/.test(normalized) ||
-    /nao\s+tenho\s+acesso\s+ao\s+workspace/.test(normalized) ||
-    /nao\s+consigo\s+(listar|ler|abrir|buscar|acessar)/.test(normalized) ||
-    /continuo\s+sem\s+acesso/.test(normalized) ||
-    /cole?\s+o\s+conteudo/.test(normalized) ||
-    /colar\s+o\s+conteudo/.test(normalized) ||
-    /troque\s+para\s+(o\s+)?modo\s+agent/.test(normalized)
-  );
-}
-
-function isRetryAfterModeSwitchRequest(content: string): boolean {
-  const normalized = normalizeForModeSensitiveMatch(content);
-
-  return (
-    /\b(tente|tentar|try)\b.*\b(novamente|again|agora|now)\b/.test(
-      normalized,
-    ) ||
-    /\b(retry|tente\s+novamente|tentar\s+novamente|try\s+again)\b/.test(
-      normalized,
-    )
-  );
-}
-
-function findLastActionableUserMessage(
-  previousMessages: readonly ChatHistoryMessage[],
-): string | undefined {
-  for (let index = previousMessages.length - 1; index >= 0; index--) {
-    const message = previousMessages[index];
-    if (
-      message?.role === "user" &&
-      message.content.trim().length > 0 &&
-      !isRetryAfterModeSwitchRequest(message.content)
-    ) {
-      return message.content;
-    }
-  }
-
-  return undefined;
-}
-
-function normalizeForModeSensitiveMatch(content: string): string {
-  return content
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
+import type { ExecutionContext } from "../../core/types";
 
 export class AgentExecutor {
+  private readonly interactionContextCompiler =
+    new InteractionContextCompiler();
+
   constructor(
     private readonly logger: Logger,
     private readonly stateManager: RuntimeStateManager,
@@ -214,16 +81,12 @@ export class AgentExecutor {
       // Capture the interaction mode once at send time. A mode change during
       // execution applies to the next user message, not this run.
       const mode = interactionMode;
-      const historySanitization = sanitizeModeSensitiveHistoryWithMetadata(
+      const compiledInteraction = this.interactionContextCompiler.compile({
+        message: content,
         previousMessages,
         mode,
-      );
-      const sanitizedPreviousMessages = historySanitization.messages;
-      const effectiveContent = resolveModeSensitiveUserMessage(
-        content,
-        previousMessages,
-        mode,
-      );
+      });
+      const effectiveContent = compiledInteraction.effectiveMessage;
 
       // Prepare execution context before choosing the runtime path.
       const context = this.buildExecutionContext(mode);
@@ -286,7 +149,7 @@ export class AgentExecutor {
       const generator = orchestrator.run({
         initialMessage: effectiveContent,
         context,
-        previousMessages: sanitizedPreviousMessages,
+        previousMessages: compiledInteraction.previousMessages,
       });
 
       try {

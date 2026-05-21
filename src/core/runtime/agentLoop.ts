@@ -301,7 +301,7 @@ export class AgentLoop {
     policy: ToolUsePolicy | undefined,
     requiredToolSatisfiedForRun: boolean,
   ): ToolUsePolicy | undefined {
-    if (!policy || policy.mode !== "required" || !requiredToolSatisfiedForRun) {
+    if (policy?.mode !== "required" || !requiredToolSatisfiedForRun) {
       return policy;
     }
 
