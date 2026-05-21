@@ -82,6 +82,7 @@ export default function BottomBar() {
       type: 'send_message',
       payload: {
         content: messageContent,
+        mode,
         messages: previousMessages,
       },
     });

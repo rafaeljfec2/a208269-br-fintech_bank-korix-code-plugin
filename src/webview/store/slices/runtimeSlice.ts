@@ -39,7 +39,11 @@ export interface RuntimeSlice {
 }
 
 export const createRuntimeSlice = (
-  set: (partial: Partial<RuntimeSlice> | ((state: RuntimeSlice) => Partial<RuntimeSlice>)) => void
+  set: (
+    partial:
+      | Partial<RuntimeSlice>
+      | ((state: RuntimeSlice) => Partial<RuntimeSlice>),
+  ) => void,
 ): RuntimeSlice => ({
   isExecuting: false,
   currentIteration: 0,

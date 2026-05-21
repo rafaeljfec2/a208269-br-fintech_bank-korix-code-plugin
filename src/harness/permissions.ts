@@ -32,7 +32,9 @@ export class PermissionManager {
   private rules: Map<string, PermissionRule> = new Map();
   private denylist: Set<string> = new Set();
 
-  constructor(private readonly approvalRequester?: PermissionApprovalRequester) {
+  constructor(
+    private readonly approvalRequester?: PermissionApprovalRequester,
+  ) {
     this.loadDefaultDenylist();
   }
 

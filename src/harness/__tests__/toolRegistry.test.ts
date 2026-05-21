@@ -120,14 +120,18 @@ describe("ToolRegistry", () => {
     it("should block direct tool execution in ask mode", async () => {
       registry.register(createMockTool("ReadFile"));
 
-      const result = await registry.execute("ReadFile", { value: "x" }, {
-        execution: {
-          mode: "ask",
+      const result = await registry.execute(
+        "ReadFile",
+        { value: "x" },
+        {
+          execution: {
+            mode: "ask",
+            workspaceRoot: "/repo",
+            openFiles: [],
+          },
           workspaceRoot: "/repo",
-          openFiles: [],
         },
-        workspaceRoot: "/repo",
-      });
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Tool "ReadFile" not allowed in ask mode');

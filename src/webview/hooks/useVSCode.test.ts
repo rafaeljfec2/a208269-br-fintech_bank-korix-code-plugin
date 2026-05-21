@@ -44,13 +44,13 @@ describe("useVSCode", () => {
 
     result.current.sendMessage({
       type: "send_message",
-      payload: { content: "test message" },
+      payload: { content: "test message", mode: "agent" },
     });
 
     expect(mockPostMessage).toHaveBeenCalledTimes(1);
     expect(mockPostMessage).toHaveBeenCalledWith({
       type: "send_message",
-      payload: { content: "test message" },
+      payload: { content: "test message", mode: "agent" },
     });
   });
 

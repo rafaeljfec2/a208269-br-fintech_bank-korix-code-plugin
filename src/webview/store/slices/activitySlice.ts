@@ -83,7 +83,7 @@ export const createActivitySlice: StateCreator<
           ctx.isExpanded = false; // Auto-colapsar ao finalizar
         }
         draft.currentContextId = null;
-      })
+      }),
     ),
 
   addActivityItem: (contextId, item) =>
@@ -97,7 +97,7 @@ export const createActivitySlice: StateCreator<
             timestamp: Date.now(),
           });
         }
-      })
+      }),
     ),
 
   toggleContext: (contextId) =>
@@ -107,7 +107,7 @@ export const createActivitySlice: StateCreator<
         if (ctx) {
           ctx.isExpanded = !ctx.isExpanded;
         }
-      })
+      }),
     ),
 
   clearActivity: () => set({ contexts: [], currentContextId: null }),

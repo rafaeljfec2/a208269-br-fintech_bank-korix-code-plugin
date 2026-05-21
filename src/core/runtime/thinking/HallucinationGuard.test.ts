@@ -8,6 +8,11 @@ describe("HallucinationGuard", () => {
     riskLevel: "low",
     requiresWorkspaceEvidence: true,
     requiresToolUse: true,
+    workspaceAccess: {
+      requested: true,
+      action: "inspect",
+      explicit: false,
+    },
     mentionedSymbols: [],
     constraints: [],
     summary: "workspace answer",

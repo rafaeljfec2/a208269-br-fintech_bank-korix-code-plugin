@@ -368,6 +368,10 @@ export class RuntimeEventEmitter extends EventEmitter {
     return this.responseBuffer.length === 0;
   }
 
+  clearBufferedResponse(): void {
+    this.responseBuffer.length = 0;
+  }
+
   flushBufferedResponse(replacementText?: string): void {
     const text = replacementText ?? this.getBufferedResponse();
     const timestamp = Date.now();

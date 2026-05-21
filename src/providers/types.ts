@@ -33,6 +33,14 @@ export interface ToolDefinition {
 export interface ProviderInput {
   messages: Message[];
   tools?: ToolDefinition[];
+  toolChoice?:
+    | "none"
+    | "auto"
+    | "required"
+    | {
+        readonly type: "tool";
+        readonly name: string;
+      };
   system?: string;
   maxTokens?: number;
   temperature?: number;

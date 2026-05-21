@@ -1,7 +1,9 @@
 import type { ObservationSummary, ThinkingTimelineItem } from "./types";
 
 export class ReflectionEngine {
-  reflectOnObservation(summary: ObservationSummary): ThinkingTimelineItem | null {
+  reflectOnObservation(
+    summary: ObservationSummary,
+  ): ThinkingTimelineItem | null {
     if (summary.success) {
       return null;
     }
@@ -10,7 +12,9 @@ export class ReflectionEngine {
       id: `reflection-${summary.id}`,
       stage: "reflecting",
       title: "Adjusting strategy",
-      summary: summary.retryHint ?? "Tool failed; next action should change strategy before retrying.",
+      summary:
+        summary.retryHint ??
+        "Tool failed; next action should change strategy before retrying.",
       status: "warning",
       timestamp: Date.now(),
       metadata: {
@@ -20,4 +24,3 @@ export class ReflectionEngine {
     };
   }
 }
-

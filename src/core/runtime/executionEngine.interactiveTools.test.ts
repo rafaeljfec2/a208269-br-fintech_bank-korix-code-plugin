@@ -5,7 +5,11 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
-import type { AIProvider, ProviderInput, RequestContext } from "../providers/types";
+import type {
+  AIProvider,
+  ProviderInput,
+  RequestContext,
+} from "../providers/types";
 import { PermissionManager } from "../../harness/permissions";
 import type { StepResult } from "./runtimeTypes";
 import type { Tool } from "../../harness/toolRegistry";
@@ -341,7 +345,7 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       const provider = createToolCallProvider("AskUserQuestion");
       const permissionManager = new PermissionManager(approvalRequester);
       const state = new RuntimeState({
-        mode: "ask",
+        mode: "agent",
         workspaceRoot: "/workspace",
         openFiles: [],
       });
@@ -420,7 +424,8 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       toolRegistry.register(tool);
       state.addMessage({
         role: "user",
-        content: "preciso escolher um banco de dados para implementar a feature",
+        content:
+          "preciso escolher um banco de dados para implementar a feature",
         timestamp: Date.now(),
       });
 
@@ -495,6 +500,72 @@ describe("ExecutionEngine - Interactive Tools Pattern", () => {
       expect(result.hadToolCalls).toBe(false);
       expect(capturedInputs[0]?.tools).toBeUndefined();
       expect(capturedInputs[0]?.maxTokens).toBe(1536);
+    });
+
+    it("should filter provider tools and send required tool choice from runtime policy", async () => {
+      const logger = new Logger({ level: "error" });
+      const eventEmitter = new RuntimeEventEmitter();
+      const toolRegistry = new ToolRegistry();
+      const permissionManager = new PermissionManager(
+        vi.fn(async () => ({
+          approved: false,
+          level: "never" as const,
+        })),
+      );
+      const capturedInputs: ProviderInput[] = [];
+      const provider = createTextProvider(capturedInputs);
+      const state = new RuntimeState({
+        mode: "agent",
+        workspaceRoot: "/workspace",
+        openFiles: [],
+      });
+
+      toolRegistry.register({
+        name: "ReadFile",
+        description: "Read a file.",
+        schema: z.object({ path: z.string() }),
+        execute: vi.fn(async () => ({ success: true, data: "ok" })),
+      });
+      toolRegistry.register({
+        name: "WriteFile",
+        description: "Write a file.",
+        schema: z.object({ path: z.string(), content: z.string() }),
+        execute: vi.fn(async () => ({ success: true, data: "ok" })),
+      });
+      state.addMessage({
+        role: "user",
+        content: "leia um arquivo",
+        timestamp: Date.now(),
+      });
+
+      const engine = new ExecutionEngine(
+        provider,
+        toolRegistry,
+        permissionManager,
+        eventEmitter,
+        new CheckpointManager(logger),
+        new RuntimeMetrics(logger),
+        new IterationGuard(logger, eventEmitter),
+        new CancellationManager(logger, eventEmitter),
+        logger,
+        "system prompt",
+      );
+
+      const result = await engine.step(state, {
+        toolUsePolicy: {
+          mode: "required",
+          allowedTools: ["ReadFile"],
+          evidenceRequired: true,
+          allowPassiveEvidence: false,
+          reason: "workspace_read",
+        },
+      });
+
+      expect(capturedInputs[0]?.tools?.map((tool) => tool.name)).toEqual([
+        "ReadFile",
+      ]);
+      expect(capturedInputs[0]?.toolChoice).toBe("required");
+      expect(result.requiredToolSatisfied).toBe(false);
     });
   });
 });

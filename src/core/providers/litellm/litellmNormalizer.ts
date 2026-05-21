@@ -201,7 +201,11 @@ export class LiteLLMNormalizer {
     }
 
     // Tool input JSON delta - acumular chunks
-    if (delta.type === "input_json_delta" && delta.partial_json && this.currentToolCall) {
+    if (
+      delta.type === "input_json_delta" &&
+      delta.partial_json &&
+      this.currentToolCall
+    ) {
       this.currentToolCall.jsonChunks.push(delta.partial_json);
     }
 

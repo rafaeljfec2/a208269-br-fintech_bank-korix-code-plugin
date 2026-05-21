@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import BottomBar from './BottomBar';
 import { useStore } from '../../store';
@@ -78,5 +78,23 @@ describe('BottomBar', () => {
 
     expect(screen.queryByRole('button', { name: /Submit answers/ })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Pergunte ao Korix...')).toBeInTheDocument();
+  });
+
+  it('should include the selected mode when sending a chat message', () => {
+    render(<BottomBar />);
+
+    fireEvent.change(screen.getByPlaceholderText('Pergunte ao Korix...'), {
+      target: { value: 'olhe tres arquivos do projeto' },
+    });
+    fireEvent.click(screen.getByTitle('Send (Enter)'));
+
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'send_message',
+      payload: {
+        content: 'olhe tres arquivos do projeto',
+        mode: 'agent',
+        messages: [],
+      },
+    });
   });
 });

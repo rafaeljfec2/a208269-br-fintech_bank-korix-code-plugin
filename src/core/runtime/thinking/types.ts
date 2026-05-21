@@ -10,6 +10,32 @@ export type ThinkingIntent =
 
 export type ThinkingRiskLevel = "low" | "medium" | "high";
 
+export type WorkspaceAccessAction = "read" | "search" | "inspect" | "none";
+
+export interface WorkspaceAccessSignal {
+  readonly requested: boolean;
+  readonly action: WorkspaceAccessAction;
+  readonly explicit: boolean;
+}
+
+export type ToolUseMode = "none" | "auto" | "required";
+
+export type ToolUseReason =
+  | "general"
+  | "workspace_read"
+  | "workspace_search"
+  | "workspace_inspect"
+  | "modify"
+  | "validate";
+
+export interface ToolUsePolicy {
+  readonly mode: ToolUseMode;
+  readonly allowedTools: readonly string[];
+  readonly evidenceRequired: boolean;
+  readonly allowPassiveEvidence: boolean;
+  readonly reason: ToolUseReason;
+}
+
 export type ThinkingStage =
   | "analyzing_request"
   | "checking_context"
@@ -27,6 +53,7 @@ export interface ThinkingRunProfile {
   readonly riskLevel: ThinkingRiskLevel;
   readonly requiresWorkspaceEvidence: boolean;
   readonly requiresToolUse: boolean;
+  readonly workspaceAccess: WorkspaceAccessSignal;
   readonly mentionedSymbols: readonly string[];
   readonly constraints: readonly string[];
   readonly summary: string;
@@ -124,4 +151,3 @@ export interface EvidenceRequest {
   readonly profile: ThinkingRunProfile;
   readonly context: ExecutionContext;
 }
-

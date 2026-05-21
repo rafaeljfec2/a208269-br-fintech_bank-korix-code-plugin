@@ -15,14 +15,153 @@ import type { ContextEngine } from "../../context/contextEngine";
 import {
   TaskAnalyzer,
   ThinkingOrchestrator,
+  ToolUsePolicyResolver,
   type ThinkingRunProfile,
+  type ToolUsePolicy,
 } from "../../core/runtime/thinking";
 import type { ExecutionEngineOptions } from "../../core/runtime/executionEngine";
 import type {
   EvidencePack,
   EvidenceRequest,
 } from "../../core/runtime/thinking";
-import type { ExecutionContext } from "../../core/types";
+import type { ExecutionContext, Mode } from "../../core/types";
+
+type ChatHistoryMessage = {
+  readonly role: "user" | "assistant" | "system";
+  readonly content: string;
+};
+
+interface ModeSensitiveHistorySanitization {
+  readonly messages: readonly ChatHistoryMessage[];
+  readonly removedStaleAssistantClaim: boolean;
+}
+
+export function sanitizeModeSensitiveHistory(
+  previousMessages: readonly ChatHistoryMessage[],
+  mode: Mode,
+): readonly ChatHistoryMessage[] {
+  return sanitizeModeSensitiveHistoryWithMetadata(previousMessages, mode)
+    .messages;
+}
+
+function sanitizeModeSensitiveHistoryWithMetadata(
+  previousMessages: readonly ChatHistoryMessage[],
+  mode: Mode,
+): ModeSensitiveHistorySanitization {
+  if (mode === "ask") {
+    return {
+      messages: previousMessages,
+      removedStaleAssistantClaim: false,
+    };
+  }
+
+  let removedStaleAssistantClaim = false;
+  const messages = previousMessages.filter((message) => {
+    if (message.role !== "assistant") {
+      return true;
+    }
+
+    const stale = isStaleAskModeClaim(message.content);
+    removedStaleAssistantClaim = removedStaleAssistantClaim || stale;
+    return !stale;
+  });
+
+  return {
+    messages,
+    removedStaleAssistantClaim,
+  };
+}
+
+export function resolveModeSensitiveUserMessage(
+  content: string,
+  previousMessages: readonly ChatHistoryMessage[],
+  mode: Mode,
+): string {
+  if (mode === "ask" || !isRetryAfterModeSwitchRequest(content)) {
+    return content;
+  }
+
+  const sanitization = sanitizeModeSensitiveHistoryWithMetadata(
+    previousMessages,
+    mode,
+  );
+  if (!sanitization.removedStaleAssistantClaim) {
+    return content;
+  }
+
+  const previousRequest = findLastActionableUserMessage(previousMessages);
+  if (!previousRequest) {
+    return content;
+  }
+
+  return [
+    "Pedido anterior retomado apos troca de modo:",
+    previousRequest,
+    "",
+    "Mensagem atual do usuario:",
+    content,
+  ].join("\n");
+}
+
+function isStaleAskModeClaim(content: string): boolean {
+  const normalized = content
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return (
+    /\bmodo\s+ask\b/.test(normalized) ||
+    /\bask\s+mode\b/.test(normalized) ||
+    /\bmodo\s+atual\b/.test(normalized) ||
+    /modo\s+de\s+resposta\s+direta/.test(normalized) ||
+    /sem\s+acesso\s+a(?:os?|s)?\s+ferramentas/.test(normalized) ||
+    /sem\s+acesso\s+a(?:os?|s)?\s+arquivos/.test(normalized) ||
+    /sem\s+acesso\s+ao\s+workspace/.test(normalized) ||
+    /nao\s+tenho\s+acesso\s+ao\s+workspace/.test(normalized) ||
+    /nao\s+consigo\s+(listar|ler|abrir|buscar|acessar)/.test(normalized) ||
+    /continuo\s+sem\s+acesso/.test(normalized) ||
+    /cole?\s+o\s+conteudo/.test(normalized) ||
+    /colar\s+o\s+conteudo/.test(normalized) ||
+    /troque\s+para\s+(o\s+)?modo\s+agent/.test(normalized)
+  );
+}
+
+function isRetryAfterModeSwitchRequest(content: string): boolean {
+  const normalized = normalizeForModeSensitiveMatch(content);
+
+  return (
+    /\b(tente|tentar|try)\b.*\b(novamente|again|agora|now)\b/.test(
+      normalized,
+    ) ||
+    /\b(retry|tente\s+novamente|tentar\s+novamente|try\s+again)\b/.test(
+      normalized,
+    )
+  );
+}
+
+function findLastActionableUserMessage(
+  previousMessages: readonly ChatHistoryMessage[],
+): string | undefined {
+  for (let index = previousMessages.length - 1; index >= 0; index--) {
+    const message = previousMessages[index];
+    if (
+      message?.role === "user" &&
+      message.content.trim().length > 0 &&
+      !isRetryAfterModeSwitchRequest(message.content)
+    ) {
+      return message.content;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeForModeSensitiveMatch(content: string): string {
+  return content
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
 
 export class AgentExecutor {
   constructor(
@@ -44,11 +183,13 @@ export class AgentExecutor {
       role: "user" | "assistant" | "system";
       content: string;
     }[],
+    interactionMode: "ask" | "plan" | "agent",
   ): Promise<void> {
     this.logger.info("User message received", {
       length: content.length,
       historyLength: previousMessages.length,
       lastHistoryRole: previousMessages[previousMessages.length - 1]?.role,
+      mode: interactionMode,
     });
 
     try {
@@ -70,17 +211,33 @@ export class AgentExecutor {
       // Create provider instance
       const provider = this.agentLoopFactory.createProvider(providerConfig);
 
-      // Get the selected mode even before the runtime state is initialized.
-      // Mode changes can happen from the webview before the first message.
-      const mode = this.stateManager.getMode();
+      // Capture the interaction mode once at send time. A mode change during
+      // execution applies to the next user message, not this run.
+      const mode = interactionMode;
+      const historySanitization = sanitizeModeSensitiveHistoryWithMetadata(
+        previousMessages,
+        mode,
+      );
+      const sanitizedPreviousMessages = historySanitization.messages;
+      const effectiveContent = resolveModeSensitiveUserMessage(
+        content,
+        previousMessages,
+        mode,
+      );
 
       // Prepare execution context before choosing the runtime path.
       const context = this.buildExecutionContext(mode);
-      const taskProfile = new TaskAnalyzer().analyze(content, context);
+      const taskProfile = new TaskAnalyzer().analyze(effectiveContent, context);
+      const toolUsePolicy = new ToolUsePolicyResolver().resolve(
+        effectiveContent,
+        taskProfile,
+        context,
+      );
       const useFastDirectPath = this.shouldUseFastDirectPath(
         taskProfile,
-        content,
+        effectiveContent,
         mode,
+        toolUsePolicy,
       );
 
       // Build unified system prompt
@@ -113,10 +270,7 @@ export class AgentExecutor {
         executionOptions,
       );
 
-      // Initialize RuntimeStateManager if needed
-      if (!this.stateManager.isInitialized()) {
-        this.stateManager.initialize(context);
-      }
+      this.stateManager.prepareInteraction(context);
 
       // Mark as executing
       this.stateManager.startExecution();
@@ -130,9 +284,9 @@ export class AgentExecutor {
 
       // Run thinking orchestrator with history and process events
       const generator = orchestrator.run({
-        initialMessage: content,
+        initialMessage: effectiveContent,
         context,
-        previousMessages,
+        previousMessages: sanitizedPreviousMessages,
       });
 
       try {
@@ -174,7 +328,12 @@ export class AgentExecutor {
     profile: ThinkingRunProfile,
     content: string,
     mode: "ask" | "plan" | "agent",
+    toolUsePolicy: ToolUsePolicy,
   ): boolean {
+    if (toolUsePolicy.mode !== "none") {
+      return false;
+    }
+
     if (
       mode === "ask" &&
       profile.riskLevel === "low" &&
@@ -225,15 +384,20 @@ export class AgentExecutor {
     );
   }
 
-  private buildExecutionContext(mode: "ask" | "plan" | "agent"): ExecutionContext {
+  private buildExecutionContext(
+    mode: "ask" | "plan" | "agent",
+  ): ExecutionContext {
     const activeEditor = vscode.window.activeTextEditor;
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
+    const workspaceRoot =
+      vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
     const openFiles = Array.from(vscode.workspace.textDocuments)
       .filter((document) => document.uri.scheme === "file")
       .map((document) => document.uri.fsPath);
 
     const selection = activeEditor?.selection;
-    const selectedText = selection ? activeEditor.document.getText(selection) : "";
+    const selectedText = selection
+      ? activeEditor.document.getText(selection)
+      : "";
 
     return {
       mode,

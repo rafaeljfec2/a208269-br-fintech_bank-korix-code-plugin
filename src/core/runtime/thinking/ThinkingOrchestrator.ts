@@ -1,5 +1,9 @@
 import type { Logger } from "../../../telemetry/logger";
-import type { AgentLoopResult, RuntimeStateSnapshot } from "../runtimeTypes";
+import type {
+  AgentLoopResult,
+  AgentLoopRunOptions,
+  RuntimeStateSnapshot,
+} from "../runtimeTypes";
 import type { RuntimeEvent, RuntimeEventEmitter } from "../runtimeEvents";
 import { ExecutionGraph } from "./ExecutionGraph";
 import { HallucinationGuard } from "./HallucinationGuard";
@@ -7,6 +11,7 @@ import { ObservationEngine } from "./ObservationEngine";
 import { ReflectionEngine } from "./ReflectionEngine";
 import { RuntimeNarrator } from "./RuntimeNarrator";
 import { TaskAnalyzer } from "./TaskAnalyzer";
+import { ToolUsePolicyResolver } from "./ToolUsePolicyResolver";
 import type {
   EvidencePack,
   EvidenceRequest,
@@ -15,6 +20,7 @@ import type {
   ObservationSummary,
   ResponseValidationResult,
   ThinkingRunInput,
+  ToolUsePolicy,
 } from "./types";
 
 export interface AgentLoopLike {
@@ -22,6 +28,7 @@ export interface AgentLoopLike {
     initialMessage: string,
     context: ThinkingRunInput["context"],
     previousMessages?: ThinkingRunInput["previousMessages"],
+    options?: AgentLoopRunOptions,
   ): AsyncGenerator<RuntimeEvent, AgentLoopResult>;
 }
 
@@ -29,7 +36,9 @@ export interface ThinkingOrchestratorOptions {
   readonly agentLoop: AgentLoopLike;
   readonly eventEmitter: RuntimeEventEmitter;
   readonly logger: Logger;
-  readonly evidenceProvider?: (request: EvidenceRequest) => Promise<EvidencePack>;
+  readonly evidenceProvider?: (
+    request: EvidenceRequest,
+  ) => Promise<EvidencePack>;
 }
 
 export class ThinkingOrchestrator {
@@ -38,11 +47,19 @@ export class ThinkingOrchestrator {
   private readonly reflectionEngine = new ReflectionEngine();
   private readonly hallucinationGuard = new HallucinationGuard();
   private readonly narrator = new RuntimeNarrator();
+  private readonly toolUsePolicyResolver = new ToolUsePolicyResolver();
 
   constructor(private readonly options: ThinkingOrchestratorOptions) {}
 
-  async *run(input: ThinkingRunInput): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
+  async *run(
+    input: ThinkingRunInput,
+  ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
     const profile = this.analyzer.analyze(input.initialMessage, input.context);
+    const toolUsePolicy = this.toolUsePolicyResolver.resolve(
+      input.initialMessage,
+      profile,
+      input.context,
+    );
     const graph = new ExecutionGraph();
     const observations: ObservationSummary[] = [];
     const toolNodes = new Map<string, ExecutionGraphNode>();
@@ -75,9 +92,14 @@ export class ThinkingOrchestrator {
       }
 
       if (event.type === "tool_call") {
-        const node = graph.addNode("tool_call", event.name, `Calling ${event.name}`, {
-          input: event.input,
-        });
+        const node = graph.addNode(
+          "tool_call",
+          event.name,
+          `Calling ${event.name}`,
+          {
+            input: event.input,
+          },
+        );
         toolNodes.set(event.id, node);
         graph.addEdge(analysisNode.id, node.id, "caused");
       }
@@ -90,13 +112,15 @@ export class ThinkingOrchestrator {
         );
         observations.push(summary);
 
-        const node = graph.addNode(
-          "observation",
-          event.name,
-          summary.summary,
-          { success: event.success, rawSize: summary.rawSize },
+        const node = graph.addNode("observation", event.name, summary.summary, {
+          success: event.success,
+          rawSize: summary.rawSize,
+        });
+        graph.addEdge(
+          toolNodes.get(event.id)?.id ?? analysisNode.id,
+          node.id,
+          "caused",
         );
-        graph.addEdge(toolNodes.get(event.id)?.id ?? analysisNode.id, node.id, "caused");
 
         this.options.eventEmitter.emitEvent({
           type: "observation_summary",
@@ -132,7 +156,7 @@ export class ThinkingOrchestrator {
       if (
         profile.requiresWorkspaceEvidence &&
         this.options.evidenceProvider &&
-        !this.hasExplicitWorkspaceToolRequest(profile)
+        toolUsePolicy.allowPassiveEvidence
       ) {
         this.options.eventEmitter.emitEvent({
           type: "thinking_step",
@@ -156,7 +180,10 @@ export class ThinkingOrchestrator {
             "context",
             "Workspace evidence",
             evidence.summary,
-            { itemCount: evidence.items.length, totalTokens: evidence.totalTokens },
+            {
+              itemCount: evidence.items.length,
+              totalTokens: evidence.totalTokens,
+            },
           );
           graph.addEdge(analysisNode.id, contextNode.id, "depends_on");
 
@@ -200,14 +227,13 @@ export class ThinkingOrchestrator {
 
       const runtimeMessage = this.buildRuntimeMessage(
         input.initialMessage,
-        input.context,
-        profile,
         evidence,
       );
       const generator = this.options.agentLoop.run(
         runtimeMessage,
         input.context,
         input.previousMessages,
+        { toolUsePolicy },
       );
 
       let finalResult: AgentLoopResult | undefined;
@@ -224,6 +250,7 @@ export class ThinkingOrchestrator {
             evidence,
             observations,
             graph,
+            toolUsePolicy,
             shouldBufferResponse
               ? this.options.eventEmitter.getBufferedResponse()
               : streamedResponse,
@@ -245,6 +272,7 @@ export class ThinkingOrchestrator {
           evidence,
           observations,
           graph,
+          toolUsePolicy,
           this.options.eventEmitter.getBufferedResponse(),
           true,
         );
@@ -256,6 +284,7 @@ export class ThinkingOrchestrator {
           evidence,
           observations,
           graph,
+          toolUsePolicy,
           streamedResponse,
           false,
         );
@@ -296,26 +325,26 @@ export class ThinkingOrchestrator {
     return profile.requiresWorkspaceEvidence;
   }
 
-  private hasExplicitWorkspaceToolRequest(
-    profile: ReturnType<TaskAnalyzer["analyze"]>,
-  ): boolean {
-    return profile.constraints.includes("explicit_workspace_access");
-  }
-
   private validateResponse(
     profile: ReturnType<TaskAnalyzer["analyze"]>,
     evidence: EvidencePack | undefined,
     observations: readonly ObservationSummary[],
     graph: ExecutionGraph,
+    toolUsePolicy: ToolUsePolicy,
     response: string,
     flushResponse: boolean,
   ): ResponseValidationResult {
-    const validation = this.hallucinationGuard.validate({
+    const baseValidation = this.hallucinationGuard.validate({
       profile,
       evidence,
       observations,
       response,
     });
+    const validation = this.applyToolUsePolicyValidation(
+      baseValidation,
+      observations,
+      toolUsePolicy,
+    );
 
     const node = graph.addNode(
       "validation",
@@ -327,7 +356,9 @@ export class ThinkingOrchestrator {
     const responseNode = graph.addNode(
       "response",
       "Final response",
-      response.length > 0 ? "Assistant response prepared." : "No assistant text response.",
+      response.length > 0
+        ? "Assistant response prepared."
+        : "No assistant text response.",
       { responseLength: response.length },
     );
     graph.addEdge(node.id, responseNode.id, "validates");
@@ -344,10 +375,10 @@ export class ThinkingOrchestrator {
     });
 
     if (flushResponse) {
-      const finalResponse = this.hallucinationGuard.applyValidation(
-        response,
-        validation,
-      );
+      const finalResponse =
+        validation.status === "blocked"
+          ? this.buildBlockedToolUseResponse(toolUsePolicy)
+          : this.hallucinationGuard.applyValidation(response, validation);
       this.options.eventEmitter.flushBufferedResponse(finalResponse);
     }
 
@@ -356,43 +387,61 @@ export class ThinkingOrchestrator {
 
   private buildRuntimeMessage(
     message: string,
-    context: ThinkingRunInput["context"],
-    profile: ReturnType<TaskAnalyzer["analyze"]>,
     evidence?: EvidencePack,
   ): string {
-    const sections = [message];
-
-    if (
-      context.mode !== "ask" &&
-      this.hasExplicitWorkspaceToolRequest(profile)
-    ) {
-      sections.push(
-        "",
-        "<korix_tool_requirement>",
-        [
-          "The user explicitly asked you to read, list, search, or inspect workspace files.",
-          "You must satisfy that request with available workspace tools before the final answer.",
-          "If paths are not provided, use ListDirectory or SearchFiles to choose project files, then use ReadFile or FileChunks for the requested files.",
-          "Do not answer from preloaded context alone, and do not ask the user to paste files unless tools are unavailable.",
-        ].join(" "),
-        "</korix_tool_requirement>",
-      );
-    }
-
     if (!evidence || evidence.providerContext.trim().length === 0) {
-      return sections.join("\n");
+      return message;
     }
 
-    sections.push(
+    return [
+      message,
       "",
       "<korix_workspace_evidence>",
       evidence.providerContext,
       "</korix_workspace_evidence>",
       "",
       "Use the workspace evidence above for project-specific claims. If it is insufficient, say so explicitly.",
+    ].join("\n");
+  }
+
+  private applyToolUsePolicyValidation(
+    validation: ResponseValidationResult,
+    observations: readonly ObservationSummary[],
+    toolUsePolicy: ToolUsePolicy,
+  ): ResponseValidationResult {
+    if (toolUsePolicy.mode !== "required") {
+      return validation;
+    }
+
+    const hasSuccessfulObservation = observations.some(
+      (observation) => observation.success,
     );
 
-    return sections.join("\n");
+    if (hasSuccessfulObservation) {
+      return validation;
+    }
+
+    return {
+      ...validation,
+      status: "blocked",
+      summary: "Required tool execution did not produce successful evidence.",
+      requiresEvidence: true,
+      evidenceCount: 0,
+      riskFlags: [...validation.riskFlags, "required_tool_not_satisfied"],
+      suggestedPrefix: undefined,
+    };
+  }
+
+  private buildBlockedToolUseResponse(toolUsePolicy: ToolUsePolicy): string {
+    if (
+      toolUsePolicy.reason === "workspace_read" ||
+      toolUsePolicy.reason === "workspace_search" ||
+      toolUsePolicy.reason === "workspace_inspect"
+    ) {
+      return "Não consegui executar a leitura solicitada com as ferramentas disponíveis.";
+    }
+
+    return "Não consegui executar as ferramentas necessárias para atender a solicitação.";
   }
 
   private withThinkingSnapshot(

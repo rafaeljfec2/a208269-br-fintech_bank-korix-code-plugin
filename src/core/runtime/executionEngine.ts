@@ -22,6 +22,7 @@ import { CancellationManager } from "./cancellation";
 import { RuntimeState } from "./runtimeState";
 import type { StepResult } from "./runtimeTypes";
 import { ObservationEngine } from "./thinking/ObservationEngine";
+import type { ToolUsePolicy } from "./thinking/types";
 
 interface PendingToolCall {
   id: string;
@@ -40,6 +41,10 @@ interface ExecutedToolCall {
 export interface ExecutionEngineOptions {
   readonly toolPolicy?: "auto" | "disabled";
   readonly maxTokens?: number;
+}
+
+export interface ExecutionStepOptions {
+  readonly toolUsePolicy?: ToolUsePolicy;
 }
 
 export class ExecutionEngine {
@@ -63,7 +68,10 @@ export class ExecutionEngine {
     private readonly options: ExecutionEngineOptions = {},
   ) {}
 
-  async step(state: RuntimeState): Promise<StepResult> {
+  async step(
+    state: RuntimeState,
+    stepOptions: ExecutionStepOptions = {},
+  ): Promise<StepResult> {
     this.resetBuffers();
 
     const result: StepResult = {
@@ -76,10 +84,16 @@ export class ExecutionEngine {
     try {
       // Prepare messages and tools
       const conversation = state.getConversation();
+      const activeToolPolicy = stepOptions.toolUsePolicy;
       const tools =
-        this.options.toolPolicy === "disabled"
+        this.options.toolPolicy === "disabled" ||
+        activeToolPolicy?.mode === "none"
           ? []
-          : this.toolRegistry.toProviderDefinitions(state.getContext().mode);
+          : this.toolRegistry.toProviderDefinitions(
+              state.getContext().mode,
+              activeToolPolicy?.allowedTools ?? [],
+            );
+      const toolChoice = this.resolveToolChoice(activeToolPolicy, tools.length);
 
       // DEBUG: Log tools being sent
       this.logger.info("[ExecutionEngine] Sending tools to provider", {
@@ -101,6 +115,7 @@ export class ExecutionEngine {
         {
           messages: [...conversation.messages], // Copy readonly array
           ...(tools.length > 0 ? { tools } : {}),
+          ...(toolChoice ? { toolChoice } : {}),
           maxTokens: this.resolveMaxTokens(),
           system: this.systemPrompt,
         },
@@ -153,9 +168,10 @@ export class ExecutionEngine {
         }
 
         // Execute regular tools first (these trigger loop continuation)
+        let regularOutcomes: readonly ExecutedToolCall[] = [];
         if (regularTools.length > 0) {
           this.pendingToolCalls = regularTools;
-          await this.executeToolCalls(state);
+          regularOutcomes = await this.executeToolCalls(state);
           result.hadToolCalls = true;
         }
 
@@ -180,8 +196,17 @@ export class ExecutionEngine {
           }
         }
 
+        if (activeToolPolicy?.mode === "required") {
+          result.requiredToolSatisfied = [
+            ...regularOutcomes,
+            ...interactiveOutcomes,
+          ].some((outcome) => outcome.success);
+        }
+
         // Clear pending tools
         this.pendingToolCalls = [];
+      } else if (activeToolPolicy?.mode === "required") {
+        result.requiredToolSatisfied = false;
       }
 
       // NOTE: Don't emit "done" here! The agentLoop emits it when the entire
@@ -299,7 +324,9 @@ export class ExecutionEngine {
     }
   }
 
-  private async executeToolCalls(state: RuntimeState): Promise<readonly ExecutedToolCall[]> {
+  private async executeToolCalls(
+    state: RuntimeState,
+  ): Promise<readonly ExecutedToolCall[]> {
     // Early exit if no tools to execute
     if (this.pendingToolCalls.length === 0) {
       return [];
@@ -308,7 +335,7 @@ export class ExecutionEngine {
     // Check permissions for tools that explicitly require approval.
     const approvedCalls: typeof this.pendingToolCalls = [];
     const workspace = state.getWorkspace();
-    const toolContext = this.buildToolContext(workspace);
+    const toolContext = this.buildToolContext(workspace, state.getContext());
 
     for (const toolCall of this.pendingToolCalls) {
       this.cancellationManager.checkCancellation();
@@ -357,7 +384,7 @@ export class ExecutionEngine {
     const executor = async (tool: string, input: unknown) => {
       return await this.toolRegistry.execute(tool, input, {
         execution: {
-          mode: "agent",
+          mode: state.getContext().mode,
           workspaceRoot: workspace.root,
           openFiles: Array.from(workspace.openFiles),
         },
@@ -450,7 +477,9 @@ export class ExecutionEngine {
       return false;
     }
 
-    if (!interactiveTools.every((toolCall) => toolCall.name === "AskUserQuestion")) {
+    if (
+      !interactiveTools.every((toolCall) => toolCall.name === "AskUserQuestion")
+    ) {
       return false;
     }
 
@@ -466,7 +495,8 @@ export class ExecutionEngine {
     const userMessages = conversation.messages.filter(
       (message) => message.role === "user",
     );
-    const latestUserMessage = userMessages[userMessages.length - 1]?.content ?? "";
+    const latestUserMessage =
+      userMessages[userMessages.length - 1]?.content ?? "";
 
     return this.isDirectQuestionPresentationRequest(latestUserMessage);
   }
@@ -526,13 +556,16 @@ export class ExecutionEngine {
 
   private buildToolContext(
     workspace: ReturnType<RuntimeState["getWorkspace"]>,
+    context: ReturnType<RuntimeState["getContext"]>,
   ): ToolContext {
     return {
       execution: {
-        mode: "agent",
+        mode: context.mode,
         workspaceRoot: workspace.root,
         openFiles: Array.from(workspace.openFiles),
-        ...(workspace.currentFile ? { currentFile: workspace.currentFile } : {}),
+        ...(workspace.currentFile
+          ? { currentFile: workspace.currentFile }
+          : {}),
         ...(workspace.selection ? { selection: workspace.selection } : {}),
       },
       workspaceRoot: workspace.root,
@@ -566,6 +599,33 @@ export class ExecutionEngine {
     return this.options.maxTokens ?? this.provider.config.maxTokens ?? 4096;
   }
 
+  private resolveToolChoice(
+    policy: ToolUsePolicy | undefined,
+    toolCount: number,
+  ):
+    | "none"
+    | "auto"
+    | "required"
+    | {
+        readonly type: "tool";
+        readonly name: string;
+      }
+    | undefined {
+    if (!policy || toolCount === 0) {
+      return undefined;
+    }
+
+    if (policy.mode === "required") {
+      return "required";
+    }
+
+    if (policy.mode === "auto") {
+      return "auto";
+    }
+
+    return "none";
+  }
+
   /**
    * Handle cache invalidation after successful tool execution
    *
@@ -581,23 +641,30 @@ export class ExecutionEngine {
         const filePath = (input as { path?: string }).path;
         if (filePath) {
           // Invalidate ReadFile cache for this specific file
-          this.toolRegistry.invalidateCache(new RegExp(`ReadFile.*${this.escapeRegex(filePath)}`));
+          this.toolRegistry.invalidateCache(
+            new RegExp(`ReadFile.*${this.escapeRegex(filePath)}`),
+          );
 
           // Invalidate ListDirectory for parent directory
           const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
           if (dirPath) {
-            this.toolRegistry.invalidateCache(new RegExp(`ListDirectory.*${this.escapeRegex(dirPath)}`));
+            this.toolRegistry.invalidateCache(
+              new RegExp(`ListDirectory.*${this.escapeRegex(dirPath)}`),
+            );
           }
 
           // If .git/ file modified, invalidate all git tools
           if (filePath.includes(".git/")) {
             this.toolRegistry.invalidateCache(/^Git/);
-            this.logger.debug("Git cache invalidated after .git/ modification", { path: filePath });
+            this.logger.debug(
+              "Git cache invalidated after .git/ modification",
+              { path: filePath },
+            );
           }
 
           this.logger.debug("Cache invalidated after file write", {
             path: filePath,
-            tool: toolName
+            tool: toolName,
           });
         }
       }
@@ -606,14 +673,20 @@ export class ExecutionEngine {
       if (toolName === "DeleteFile") {
         const filePath = (input as { path?: string }).path;
         if (filePath) {
-          this.toolRegistry.invalidateCache(new RegExp(`ReadFile.*${this.escapeRegex(filePath)}`));
+          this.toolRegistry.invalidateCache(
+            new RegExp(`ReadFile.*${this.escapeRegex(filePath)}`),
+          );
 
           const dirPath = filePath.substring(0, filePath.lastIndexOf("/"));
           if (dirPath) {
-            this.toolRegistry.invalidateCache(new RegExp(`ListDirectory.*${this.escapeRegex(dirPath)}`));
+            this.toolRegistry.invalidateCache(
+              new RegExp(`ListDirectory.*${this.escapeRegex(dirPath)}`),
+            );
           }
 
-          this.logger.debug("Cache invalidated after file deletion", { path: filePath });
+          this.logger.debug("Cache invalidated after file deletion", {
+            path: filePath,
+          });
         }
       }
 
@@ -622,14 +695,16 @@ export class ExecutionEngine {
         const command = (input as { command?: string }).command;
         if (command?.startsWith("git ")) {
           this.toolRegistry.invalidateCache(/^Git/);
-          this.logger.debug("Git cache invalidated after git command", { command });
+          this.logger.debug("Git cache invalidated after git command", {
+            command,
+          });
         }
       }
     } catch (error) {
       // Non-critical - log but don't fail tool execution
       this.logger.warn("Cache invalidation failed", {
         error: (error as Error).message,
-        tool: toolName
+        tool: toolName,
       });
     }
   }

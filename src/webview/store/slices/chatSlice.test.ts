@@ -88,10 +88,8 @@ describe("chatSlice", () => {
 
   describe("thinking timeline", () => {
     it("should append thinking event to the last assistant message", () => {
-      const {
-        addMessage,
-        appendThinkingItemToLastAssistant,
-      } = store.getState();
+      const { addMessage, appendThinkingItemToLastAssistant } =
+        store.getState();
 
       addMessage(chatId, { role: "user", content: "Hello" });
       addMessage(chatId, { role: "assistant", content: "Hi" });

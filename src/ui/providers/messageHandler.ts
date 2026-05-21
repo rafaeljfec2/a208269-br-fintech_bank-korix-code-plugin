@@ -152,7 +152,10 @@ export class MessageHandler {
           );
 
           if (event.type === "user_question") {
-            console.error("[MessageHandler] FAILED to forward user_question to webview", error);
+            console.error(
+              "[MessageHandler] FAILED to forward user_question to webview",
+              error,
+            );
           }
         },
       );
@@ -222,6 +225,7 @@ export class MessageHandler {
         await this.handleSendMessage(
           message.payload.content,
           message.payload.messages ?? [],
+          message.payload.mode,
         );
         break;
 
@@ -284,8 +288,11 @@ export class MessageHandler {
       role: "user" | "assistant" | "system";
       content: string;
     }[],
+    mode: "ask" | "plan" | "agent",
   ): Promise<void> {
-    await this.agentExecutor.execute(content, previousMessages);
+    this.stateManager.setMode(mode);
+
+    await this.agentExecutor.execute(content, previousMessages, mode);
   }
 
   /**
@@ -366,10 +373,7 @@ export class MessageHandler {
   /**
    * User answers a question
    */
-  private handleAnswerQuestion(
-    questionId: string,
-    answers: string[],
-  ): void {
+  private handleAnswerQuestion(questionId: string, answers: string[]): void {
     this.logger.info("User answered question", { questionId, answers });
 
     // Emit user_answer event

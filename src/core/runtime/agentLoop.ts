@@ -25,8 +25,11 @@ import { CancellationManager } from "./cancellation";
 import { RuntimeMetrics } from "./runtimeMetrics";
 import { RuntimeEventEmitter } from "./runtimeEvents";
 import { RuntimeState } from "./runtimeState";
-import type { AgentLoopResult } from "./runtimeTypes";
+import type { AgentLoopResult, AgentLoopRunOptions } from "./runtimeTypes";
 import type { RuntimeEvent } from "./runtimeEvents";
+import type { ToolUsePolicy } from "./thinking/types";
+
+const MAX_REQUIRED_TOOL_RETRIES = 1;
 
 export class AgentLoop {
   constructor(
@@ -47,6 +50,7 @@ export class AgentLoop {
       role: "user" | "assistant" | "system";
       content: string;
     }[],
+    options: AgentLoopRunOptions = {},
   ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
     const state = new RuntimeState(context, 25);
 
@@ -74,6 +78,8 @@ export class AgentLoop {
 
     state.startExecution();
     let completed = false;
+    let requiredToolRepairCount = 0;
+    let requiredToolSatisfiedForRun = false;
 
     try {
       while (!completed) {
@@ -102,7 +108,13 @@ export class AgentLoop {
         // Execute step
         let stepResult;
         try {
-          stepResult = await this.engine.step(state);
+          const toolUsePolicy = this.resolveIterationToolUsePolicy(
+            options.toolUsePolicy,
+            requiredToolSatisfiedForRun,
+          );
+          stepResult = await this.engine.step(state, {
+            toolUsePolicy,
+          });
           this.recoveryManager.resetAttempts(
             `iteration_${execution.currentIteration}`,
           );
@@ -153,7 +165,10 @@ export class AgentLoop {
           timestamp: Date.now(),
         });
 
-        if (stepResult.syntheticResponse && stepResult.syntheticResponse.trim().length > 0) {
+        if (
+          stepResult.syntheticResponse &&
+          stepResult.syntheticResponse.trim().length > 0
+        ) {
           const tokenEvent: RuntimeEvent = {
             type: "token",
             content: stepResult.syntheticResponse,
@@ -189,7 +204,29 @@ export class AgentLoop {
           stepResult.completeAfterInteractiveToolCalls !== true;
         const hadAnyToolCalls =
           stepResult.hadToolCalls || interactiveToolsNeedProviderFollowup;
+        const requiredToolUnsatisfied =
+          options.toolUsePolicy?.mode === "required" &&
+          !requiredToolSatisfiedForRun &&
+          stepResult.requiredToolSatisfied !== true;
+
         if (
+          options.toolUsePolicy?.mode === "required" &&
+          stepResult.requiredToolSatisfied === true
+        ) {
+          requiredToolSatisfiedForRun = true;
+        }
+
+        if (
+          requiredToolUnsatisfied &&
+          requiredToolRepairCount < MAX_REQUIRED_TOOL_RETRIES
+        ) {
+          requiredToolRepairCount++;
+          this.eventEmitter.clearBufferedResponse();
+          continue;
+        }
+
+        if (
+          requiredToolUnsatisfied ||
           stepResult.completeAfterInteractiveToolCalls === true ||
           (isEndTurn && !hadAnyToolCalls)
         ) {
@@ -258,5 +295,19 @@ export class AgentLoop {
         error: err.message,
       };
     }
+  }
+
+  private resolveIterationToolUsePolicy(
+    policy: ToolUsePolicy | undefined,
+    requiredToolSatisfiedForRun: boolean,
+  ): ToolUsePolicy | undefined {
+    if (!policy || policy.mode !== "required" || !requiredToolSatisfiedForRun) {
+      return policy;
+    }
+
+    return {
+      ...policy,
+      mode: "auto",
+    };
   }
 }

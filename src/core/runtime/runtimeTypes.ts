@@ -12,6 +12,7 @@ import type {
   ObservationSummary,
   ResponseValidationResult,
   ThinkingRunProfile,
+  ToolUsePolicy,
 } from "./thinking/types";
 
 /**
@@ -35,11 +36,16 @@ export interface StepResult {
   hadInteractiveToolCalls?: boolean;
   completeAfterInteractiveToolCalls?: boolean;
   syntheticResponse?: string;
+  requiredToolSatisfied?: boolean;
   hadThinking: boolean;
   tokenCount: number;
   stopReason?: "end_turn" | "stop" | "max_tokens" | "stop_sequence";
   error?: string;
   recoverable: boolean;
+}
+
+export interface AgentLoopRunOptions {
+  readonly toolUsePolicy?: ToolUsePolicy;
 }
 
 /**

@@ -21,14 +21,19 @@ export function useExecutionTimeout() {
     });
 
     const timeout = setTimeout(() => {
-      logger.warn("[ExecutionTimeout] TIMEOUT - forcing isExecuting=false after", {
-        timeoutMs: EXECUTION_TIMEOUT_MS,
-      });
+      logger.warn(
+        "[ExecutionTimeout] TIMEOUT - forcing isExecuting=false after",
+        {
+          timeoutMs: EXECUTION_TIMEOUT_MS,
+        },
+      );
       setExecuting(false);
     }, EXECUTION_TIMEOUT_MS);
 
     return () => {
-      logger.log("[ExecutionTimeout] Cleared timeout (execution finished normally)");
+      logger.log(
+        "[ExecutionTimeout] Cleared timeout (execution finished normally)",
+      );
       clearTimeout(timeout);
     };
   }, [isExecuting, setExecuting]);

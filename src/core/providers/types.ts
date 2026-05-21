@@ -139,6 +139,14 @@ export interface RequestContext {
 export interface ProviderInput {
   readonly messages: readonly Message[];
   readonly tools?: readonly ToolDefinition[];
+  readonly toolChoice?:
+    | "none"
+    | "auto"
+    | "required"
+    | {
+        readonly type: "tool";
+        readonly name: string;
+      };
   readonly system?: string;
   readonly maxTokens?: number;
   readonly temperature?: number;

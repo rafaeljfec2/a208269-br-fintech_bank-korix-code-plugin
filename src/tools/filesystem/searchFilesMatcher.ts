@@ -1,4 +1,6 @@
-export function createPathMatcher(pattern: string): (filePath: string) => boolean {
+export function createPathMatcher(
+  pattern: string,
+): (filePath: string) => boolean {
   const regex = buildPatternRegex(pattern);
 
   return (filePath: string) => {

@@ -34,6 +34,22 @@ export class RuntimeStateManager {
   }
 
   /**
+   * Prepare state for a new user interaction using the context captured at send time.
+   * The webview session is preserved, but runtime state is fresh for this turn.
+   */
+  prepareInteraction(context: ExecutionContext, maxIterations = 25): void {
+    if (this.isExecuting()) {
+      throw new Error(
+        "Cannot prepare interaction while execution is active. Call stopExecution() first.",
+      );
+    }
+
+    this.currentState = new RuntimeState(context, maxIterations);
+    this.currentSessionId = this.currentSessionId ?? crypto.randomUUID();
+    this.currentMode = context.mode;
+  }
+
+  /**
    * Get current runtime state (INTERNAL - throws if not initialized)
    * @private - use specific getters instead
    */

@@ -61,9 +61,16 @@ describe("SearchFilesTool", () => {
     const registry = new ToolRegistry();
     registry.register(SearchFilesTool);
 
-    const result = await registry.execute("SearchFiles", { pattern: "*.ts" }, createMockToolContext());
+    const result = await registry.execute(
+      "SearchFiles",
+      { pattern: "*.ts" },
+      createMockToolContext(),
+    );
 
     expect(result.success, result.error).toBe(true);
-    expect(result.data).toEqual([{ path: "src/index.ts" }, { path: "src/app.ts" }]);
+    expect(result.data).toEqual([
+      { path: "src/index.ts" },
+      { path: "src/app.ts" },
+    ]);
   });
 });

@@ -34,7 +34,8 @@ export interface ToolsSlice {
 
   // Actions
   readonly addToolCall: (
-    toolCall: Omit<ToolCall, "timestamp"> & Partial<Pick<ToolCall, "timestamp">>,
+    toolCall: Omit<ToolCall, "timestamp"> &
+      Partial<Pick<ToolCall, "timestamp">>,
   ) => void;
   readonly updateToolCall: (id: string, updates: Partial<ToolCall>) => void;
   readonly addPendingApproval: (approval: PendingApproval) => void;

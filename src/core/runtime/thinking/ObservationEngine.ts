@@ -12,7 +12,12 @@ export class ObservationEngine {
     const importantLines = this.extractImportantLines(rawText);
     const sourceName = toolName;
     const retryHint = success ? undefined : this.inferRetryHint(rawText);
-    const summary = this.buildSummary(sourceName, rawText, importantLines, success);
+    const summary = this.buildSummary(
+      sourceName,
+      rawText,
+      importantLines,
+      success,
+    );
 
     return {
       id: `obs-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -111,9 +116,7 @@ export class ObservationEngine {
     return "Change strategy before retrying; do not repeat the same action blindly.";
   }
 
-  private inferSourceType(
-    toolName: string,
-  ): ObservationSummary["sourceType"] {
+  private inferSourceType(toolName: string): ObservationSummary["sourceType"] {
     if (toolName === "AskUserQuestion") {
       return "runtime";
     }

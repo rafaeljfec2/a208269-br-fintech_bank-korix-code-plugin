@@ -26,8 +26,7 @@ const QuestionOptionSchema = z.object({
   ).describe("Option label (5-10 words max)"),
   description: RequiredTextSchema.transform((value) =>
     truncateText(value, MAX_DESCRIPTION_LENGTH),
-  )
-    .describe("Why choose this? Trade-offs? Impact? (2 sentences max)"),
+  ).describe("Why choose this? Trade-offs? Impact? (2 sentences max)"),
 });
 
 const QuestionSchema = z.object({
@@ -111,8 +110,9 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
       // Get RuntimeEventEmitter from DI container
       const container = getGlobalContainer();
 
-      const emitter =
-        container.get<RuntimeEventEmitter>(TOKENS.RuntimeEventEmitter);
+      const emitter = container.get<RuntimeEventEmitter>(
+        TOKENS.RuntimeEventEmitter,
+      );
 
       if (!emitter) {
         throw new Error("RuntimeEventEmitter not available in DI container");
@@ -135,7 +135,9 @@ Example: "which database should I use for 1M users: Postgres or MongoDB?" → Pr
         });
 
         // Store answers keyed by question text
-        answers[q.question] = q.multiSelect ? userAnswers : userAnswers[0] ?? "";
+        answers[q.question] = q.multiSelect
+          ? userAnswers
+          : (userAnswers[0] ?? "");
       }
 
       return {

@@ -32,7 +32,7 @@ export class PluginContextBuilder {
     private readonly logger: Logger,
   ) {
     // Resolve prompts directory relative to this file
-    this.promptsDir = path.join(__dirname, 'prompts');
+    this.promptsDir = path.join(__dirname, "prompts");
   }
 
   /**
@@ -82,14 +82,16 @@ export class PluginContextBuilder {
 
     // Debug: verificar se Output Style está no prompt final
     const outputStyleSection = sections[1]; // Output Style é a 2ª seção
-    const hasOutputStyle = outputStyleSection?.includes('Response Style');
+    const hasOutputStyle = outputStyleSection?.includes("Response Style");
 
-    this.logger.debug('[KORIX] System prompt final', {
+    this.logger.debug("[KORIX] System prompt final", {
       totalLength: prompt.length,
       sections: sections.length,
       outputStyleIncluded: hasOutputStyle,
-      outputStylePreview: outputStyleSection ? outputStyleSection.substring(0, 150) : 'EMPTY',
-      promptPreview: prompt.substring(0, 500) + '...',
+      outputStylePreview: outputStyleSection
+        ? outputStyleSection.substring(0, 150)
+        : "EMPTY",
+      promptPreview: prompt.substring(0, 500) + "...",
     });
 
     this.logger.debug("System prompt built", {
@@ -124,7 +126,10 @@ export class PluginContextBuilder {
   /**
    * Carrega e interpola um arquivo markdown
    */
-  private loadMarkdown(filename: string, variables?: Record<string, string>): string {
+  private loadMarkdown(
+    filename: string,
+    variables?: Record<string, string>,
+  ): string {
     try {
       const filePath = path.join(this.promptsDir, filename);
       let content = readFileSync(filePath, "utf-8");
@@ -145,7 +150,10 @@ export class PluginContextBuilder {
    * Interpola variáveis em um template
    * Substitui {variableName} pelos valores fornecidos
    */
-  private interpolate(template: string, variables: Record<string, string>): string {
+  private interpolate(
+    template: string,
+    variables: Record<string, string>,
+  ): string {
     return template.replace(/\{(\w+)\}/g, (match, key: string) => {
       const value = variables[key];
       return value ?? match;
@@ -210,9 +218,9 @@ When asked about your capabilities or identity, reference these exact values.`;
     const access =
       mode === "agent"
         ? "full workspace tools, including read, write, edit, and approved command execution"
-      : mode === "plan"
-        ? "read-only workspace tools for planning and analysis"
-        : "normal chat only; no workspace tools, file reads, searches, writes, or command execution";
+        : mode === "plan"
+          ? "read-only workspace tools for planning and analysis"
+          : "normal chat only; no workspace tools, file reads, searches, writes, or command execution";
 
     return `## Current Mode
 
@@ -241,45 +249,55 @@ You are answering a low-risk request that does not require workspace lookup or t
    */
   private loadOutputStyle(): string {
     try {
-      const stylePath = path.join(this.promptsDir, 'output-styles', 'professional.md');
+      const stylePath = path.join(
+        this.promptsDir,
+        "output-styles",
+        "professional.md",
+      );
 
       if (!existsSync(stylePath)) {
-        console.warn('[KORIX] Output style NOT FOUND at:', stylePath);
-        this.logger.warn('Output style not found, using default');
-        return '';
+        console.warn("[KORIX] Output style NOT FOUND at:", stylePath);
+        this.logger.warn("Output style not found, using default");
+        return "";
       }
 
-      this.logger.debug('[KORIX] Loading Output style from', { stylePath });
+      this.logger.debug("[KORIX] Loading Output style from", { stylePath });
 
-      const content = readFileSync(stylePath, 'utf-8');
+      const content = readFileSync(stylePath, "utf-8");
 
       // Parse frontmatter
-      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+      const frontmatterMatch = content.match(
+        /^---\n([\s\S]*?)\n---\n([\s\S]*)$/,
+      );
       if (!frontmatterMatch) {
-        this.logger.error('Invalid output style format (missing frontmatter)');
-        return '';
+        this.logger.error("Invalid output style format (missing frontmatter)");
+        return "";
       }
 
       const frontmatter = frontmatterMatch[1];
       const body = frontmatterMatch[2];
 
       if (!frontmatter || !body) {
-        this.logger.error('Invalid output style format (empty frontmatter or body)');
-        return '';
+        this.logger.error(
+          "Invalid output style format (empty frontmatter or body)",
+        );
+        return "";
       }
 
-      const keepCodingInstructions = frontmatter.includes('keep-coding-instructions: true');
+      const keepCodingInstructions = frontmatter.includes(
+        "keep-coding-instructions: true",
+      );
 
-      this.logger.debug('Output style loaded', {
+      this.logger.debug("Output style loaded", {
         keepCodingInstructions,
         bodyLength: body.length,
-        preview: body.substring(0, 100) + '...',
+        preview: body.substring(0, 100) + "...",
       });
 
       return body.trim();
     } catch (error) {
-      this.logger.error('Failed to load output style', error);
-      return '';
+      this.logger.error("Failed to load output style", error);
+      return "";
     }
   }
 }

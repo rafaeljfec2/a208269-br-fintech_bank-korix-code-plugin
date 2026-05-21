@@ -15,14 +15,24 @@ export interface ResponseValidationInput {
 export class HallucinationGuard {
   validate(input: ResponseValidationInput): ResponseValidationResult {
     const evidenceCount = input.evidence?.items.length ?? 0;
-    const successfulObservations = input.observations.filter((item) => item.success);
+    const successfulObservations = input.observations.filter(
+      (item) => item.success,
+    );
     const riskFlags: string[] = [];
 
-    if (input.profile.requiresWorkspaceEvidence && evidenceCount === 0 && successfulObservations.length === 0) {
+    if (
+      input.profile.requiresWorkspaceEvidence &&
+      evidenceCount === 0 &&
+      successfulObservations.length === 0
+    ) {
       riskFlags.push("missing_workspace_evidence");
     }
 
-    if (input.response.length > 0 && this.hasOverconfidentLanguage(input.response) && riskFlags.length > 0) {
+    if (
+      input.response.length > 0 &&
+      this.hasOverconfidentLanguage(input.response) &&
+      riskFlags.length > 0
+    ) {
       riskFlags.push("overconfident_without_evidence");
     }
 
@@ -33,8 +43,8 @@ export class HallucinationGuard {
     const status = riskFlags.includes("missing_workspace_evidence")
       ? "warning"
       : riskFlags.length > 0
-      ? "warning"
-      : "passed";
+        ? "warning"
+        : "passed";
 
     return {
       status,
@@ -53,7 +63,10 @@ export class HallucinationGuard {
     };
   }
 
-  applyValidation(response: string, validation: ResponseValidationResult): string {
+  applyValidation(
+    response: string,
+    validation: ResponseValidationResult,
+  ): string {
     if (response.trim().length === 0) {
       return response;
     }

@@ -28,7 +28,6 @@ describe("ObservationEngine", () => {
     const result = { ok: true };
     const summary = engine.summarizeToolResult("ReadFile", result, true);
 
-    expect(engine.toToolMessageContent(summary, result)).toContain("\"ok\"");
+    expect(engine.toToolMessageContent(summary, result)).toContain('"ok"');
   });
 });
-

@@ -220,7 +220,9 @@ class MemoryState {
     this.lastCheckpointId = snapshot.lastCheckpointId;
     this.taskProfile = snapshot.thinking?.taskProfile;
     this.evidencePack = snapshot.thinking?.evidencePack;
-    this.observationSummaries = [...(snapshot.thinking?.observationSummaries ?? [])];
+    this.observationSummaries = [
+      ...(snapshot.thinking?.observationSummaries ?? []),
+    ];
     this.validationResult = snapshot.thinking?.validationResult;
     this.executionGraph = snapshot.thinking?.executionGraph;
   }

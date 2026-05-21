@@ -269,8 +269,15 @@ export class ToolRegistry {
   /**
    * Convert tools to provider tool definitions
    */
-  toProviderDefinitions(mode?: ExecutionContext["mode"]): ToolDefinition[] {
-    const tools = mode ? this.listForMode(mode) : this.list();
+  toProviderDefinitions(
+    mode?: ExecutionContext["mode"],
+    allowedTools: readonly string[] = [],
+  ): ToolDefinition[] {
+    const allowedToolSet =
+      allowedTools.length > 0 ? new Set(allowedTools) : undefined;
+    const tools = (mode ? this.listForMode(mode) : this.list()).filter(
+      (tool) => (allowedToolSet ? allowedToolSet.has(tool.name) : true),
+    );
 
     return tools.map((tool) => ({
       name: tool.name,

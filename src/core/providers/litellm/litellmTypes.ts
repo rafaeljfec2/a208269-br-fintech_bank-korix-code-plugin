@@ -48,9 +48,14 @@ export interface AnthropicMessagesRequest {
   readonly messages: readonly AnthropicMessage[];
   readonly system?: string | readonly AnthropicContentBlock[];
   readonly tools?: readonly AnthropicTool[];
+  readonly tool_choice?: AnthropicToolChoice;
   readonly temperature?: number;
   readonly stream?: boolean;
 }
+
+export type AnthropicToolChoice =
+  | { readonly type: "auto" | "any" | "none" }
+  | { readonly type: "tool"; readonly name: string };
 
 export interface AnthropicMessage {
   readonly role: "user" | "assistant";

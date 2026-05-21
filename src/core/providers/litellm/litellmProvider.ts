@@ -146,6 +146,7 @@ export class LiteLLMProvider implements AIProvider {
       messages,
       system: input.system, // Anthropic: system é campo separado, não mensagem
       tools: input.tools ? this.convertTools(input.tools) : undefined,
+      tool_choice: this.convertToolChoice(input.toolChoice),
       stream: true,
       // Claude 4.x deprecou temperature - só incluir para modelos anteriores
       temperature: this.isClaude4x(this.config.model)
@@ -353,6 +354,27 @@ export class LiteLLMProvider implements AIProvider {
       description: tool.description,
       input_schema: tool.input_schema,
     }));
+  }
+
+  private convertToolChoice(
+    toolChoice: ProviderInput["toolChoice"],
+  ): AnthropicMessagesRequest["tool_choice"] {
+    if (!toolChoice) {
+      return undefined;
+    }
+
+    if (toolChoice === "required") {
+      return { type: "any" };
+    }
+
+    if (toolChoice === "auto" || toolChoice === "none") {
+      return { type: toolChoice };
+    }
+
+    return {
+      type: "tool",
+      name: toolChoice.name,
+    };
   }
 
   /**

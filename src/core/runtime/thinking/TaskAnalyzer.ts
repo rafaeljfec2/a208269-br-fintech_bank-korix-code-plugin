@@ -3,6 +3,7 @@ import type {
   ThinkingIntent,
   ThinkingRiskLevel,
   ThinkingRunProfile,
+  WorkspaceAccessSignal,
 } from "./types";
 
 export class TaskAnalyzer {
@@ -72,8 +73,10 @@ export class TaskAnalyzer {
     const mentionedSymbols = this.extractMentionedSymbols(message);
     const intent = this.detectIntent(normalized);
     const riskLevel = this.detectRisk(normalized, intent);
-    const requiresInteractiveChoice = this.requiresInteractiveChoice(normalized);
-    const requestsWorkspaceAccess = this.requestsWorkspaceAccess(normalized);
+    const requiresInteractiveChoice =
+      this.requiresInteractiveChoice(normalized);
+    const workspaceAccess = this.detectWorkspaceAccess(message);
+    const requestsWorkspaceAccess = workspaceAccess.requested;
     const requiresWorkspaceAccess =
       context.mode !== "ask" && requestsWorkspaceAccess;
     const requiresWorkspaceEvidence = this.requiresWorkspaceEvidence(
@@ -94,6 +97,7 @@ export class TaskAnalyzer {
         requestsWorkspaceAccess ||
         requiresWorkspaceEvidence ||
         riskLevel !== "low",
+      workspaceAccess,
       mentionedSymbols,
       constraints,
       summary: this.buildSummary(intent, riskLevel, requiresWorkspaceEvidence),
@@ -101,15 +105,25 @@ export class TaskAnalyzer {
   }
 
   private detectIntent(message: string): ThinkingIntent {
-    if (/\b(implemente|implement|crie|create|altere|modify|fix|corrija|patch|refactor)\b/.test(message)) {
+    if (
+      /\b(implemente|implement|crie|create|altere|modify|fix|corrija|patch|refactor)\b/.test(
+        message,
+      )
+    ) {
       return "modify";
     }
 
-    if (/\b(plano|planeje|plan|roadmap|arquitetura|architecture)\b/.test(message)) {
+    if (
+      /\b(plano|planeje|plan|roadmap|arquitetura|architecture)\b/.test(message)
+    ) {
       return "plan";
     }
 
-    if (/\b(erro|bug|falha|failure|diagnose|debug|investigue|investigate)\b/.test(message)) {
+    if (
+      /\b(erro|bug|falha|failure|diagnose|debug|investigue|investigate)\b/.test(
+        message,
+      )
+    ) {
       return "diagnose";
     }
 
@@ -124,12 +138,22 @@ export class TaskAnalyzer {
     return "answer";
   }
 
-  private detectRisk(message: string, intent: ThinkingIntent): ThinkingRiskLevel {
-    if (/\b(delete|remove|rm\s+-rf|reset --hard|push|commit|deploy|produção|production)\b/.test(message)) {
+  private detectRisk(
+    message: string,
+    intent: ThinkingIntent,
+  ): ThinkingRiskLevel {
+    if (
+      /\b(delete|remove|rm\s+-rf|reset --hard|push|commit|deploy|produção|production)\b/.test(
+        message,
+      )
+    ) {
       return "high";
     }
 
-    if (intent === "modify" || /\b(run|execute|instale|install|migrate|migration)\b/.test(message)) {
+    if (
+      intent === "modify" ||
+      /\b(run|execute|instale|install|migrate|migration)\b/.test(message)
+    ) {
       return "medium";
     }
 
@@ -156,7 +180,11 @@ export class TaskAnalyzer {
     }
 
     if (context.currentFile || context.openFiles.length > 0) {
-      if (/\b(este|esse|essa|arquivo|file|repo|workspace|projeto|código|codigo|code)\b/.test(message)) {
+      if (
+        /\b(este|esse|essa|arquivo|file|repo|workspace|projeto|código|codigo|code)\b/.test(
+          message,
+        )
+      ) {
         return true;
       }
     }
@@ -165,11 +193,17 @@ export class TaskAnalyzer {
       return true;
     }
 
-    if (/\b(src\/|\.ts|\.tsx|\.js|\.jsx|classe|class|função|funcao|function|componente|component)\b/.test(message)) {
+    if (
+      /\b(src\/|\.ts|\.tsx|\.js|\.jsx|classe|class|função|funcao|function|componente|component)\b/.test(
+        message,
+      )
+    ) {
       return true;
     }
 
-    return intent === "modify" || intent === "diagnose" || intent === "validate";
+    return (
+      intent === "modify" || intent === "diagnose" || intent === "validate"
+    );
   }
 
   private extractMentionedSymbols(message: string): readonly string[] {
@@ -184,7 +218,9 @@ export class TaskAnalyzer {
     }
 
     const identifierSource = this.stripQuotedPayloadLiterals(message);
-    const identifierMatches = identifierSource.matchAll(/\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?\b/g);
+    const identifierMatches = identifierSource.matchAll(
+      /\b[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?\b/g,
+    );
     for (const match of identifierMatches) {
       const value = match[0];
       if (this.isLikelyWorkspaceSymbol(value)) {
@@ -230,7 +266,9 @@ export class TaskAnalyzer {
       return true;
     }
 
-    return this.workspaceSymbolSuffixes.some((suffix) => value.endsWith(suffix));
+    return this.workspaceSymbolSuffixes.some((suffix) =>
+      value.endsWith(suffix),
+    );
   }
 
   private isPastedStructuredContentQuestion(message: string): boolean {
@@ -262,9 +300,10 @@ export class TaskAnalyzer {
   }
 
   private requiresInteractiveChoice(message: string): boolean {
-    const asksForChoices = /\b(opcao|opcoes|option|options|alternativa|alternativas|choices|escolha|choose)\b/.test(
-      this.normalizeForIntent(message),
-    );
+    const asksForChoices =
+      /\b(opcao|opcoes|option|options|alternativa|alternativas|choices|escolha|choose)\b/.test(
+        this.normalizeForIntent(message),
+      );
 
     if (!asksForChoices) {
       return false;
@@ -279,21 +318,75 @@ export class TaskAnalyzer {
     return message.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
 
-  private requestsWorkspaceAccess(message: string): boolean {
-    const normalized = this.normalizeForIntent(message);
+  private detectWorkspaceAccess(message: string): WorkspaceAccessSignal {
+    const normalized = this.normalizeForIntent(message).toLowerCase();
 
-    if (/\b(readfile|filechunks|searchfiles|grep|findsymbols|findreferences|getcurrentfile|getopenfiles)\b/i.test(message)) {
-      return true;
+    if (
+      /\b(readfile|filechunks|searchfiles|grep|findsymbols|findreferences|getcurrentfile|getopenfiles)\b/i.test(
+        message,
+      )
+    ) {
+      return {
+        requested: true,
+        action: "inspect",
+        explicit: true,
+      };
     }
 
-    const hasWorkspaceTarget = /\b(arquivo|arquivos|file|files|workspace|repo|repositorio|projeto|codebase|diretorio|diretorios|pasta|pastas)\b/.test(
-      normalized,
-    );
-    const hasReadAction = /\b(leia|ler|leitura|abrir|abra|abre|liste|listar|lista|busque|buscar|procure|procurar|pesquise|pesquisar|read|open|list|search|find|grep|scan|inspecione|inspecionar)\b/.test(
-      normalized,
-    );
+    const hasWorkspaceTarget =
+      /\b(arquivo|arquivos|file|files|workspace|repo|repositorio|projeto|codebase|diretorio|diretorios|pasta|pastas)\b/.test(
+        normalized,
+      );
+    const hasSearchAction =
+      /\b(busque|buscar|procure|procurar|pesquise|pesquisar|search|find|grep)\b/.test(
+        normalized,
+      );
+    const hasInspectAction =
+      /\b(scan|inspecione|inspecionar|analise|analisar|verifique|check|inspect)\b/.test(
+        normalized,
+      );
+    const hasReadAction =
+      /\b(leia|ler|leitura|abrir|abra|abre|liste|listar|lista|read|open|list)\b/.test(
+        normalized,
+      );
 
-    return hasWorkspaceTarget && hasReadAction;
+    if (!hasWorkspaceTarget) {
+      return {
+        requested: false,
+        action: "none",
+        explicit: false,
+      };
+    }
+
+    if (hasSearchAction) {
+      return {
+        requested: true,
+        action: "search",
+        explicit: true,
+      };
+    }
+
+    if (hasInspectAction) {
+      return {
+        requested: true,
+        action: "inspect",
+        explicit: true,
+      };
+    }
+
+    if (hasReadAction) {
+      return {
+        requested: true,
+        action: "read",
+        explicit: true,
+      };
+    }
+
+    return {
+      requested: false,
+      action: "none",
+      explicit: false,
+    };
   }
 
   private extractConstraints(
@@ -306,11 +399,11 @@ export class TaskAnalyzer {
       constraints.push("read_only_mode");
     }
 
-    if (this.requestsWorkspaceAccess(message)) {
-      constraints.push("explicit_workspace_access");
-    }
-
-    if (/\b(sem alterar|não altere|nao altere|no changes|read-only)\b/.test(message)) {
+    if (
+      /\b(sem alterar|não altere|nao altere|no changes|read-only)\b/.test(
+        message,
+      )
+    ) {
       constraints.push("no_file_changes");
     }
 

@@ -48,7 +48,10 @@ export function formatToolActivity(
     case "SearchFiles":
     case "FindSymbols":
     case "FindReferences":
-      return buildDisplay("Search", pattern ? quote(truncate(pattern, 42)) : "workspace");
+      return buildDisplay(
+        "Search",
+        pattern ? quote(truncate(pattern, 42)) : "workspace",
+      );
     case "GetDiagnostics":
     case "GetProblems":
     case "Problems":
@@ -59,7 +62,10 @@ export function formatToolActivity(
       return buildDisplay("Ask", getQuestionLabel(record));
     default:
       if (/shell|terminal/i.test(toolName)) {
-        return buildDisplay("Shell", command ? truncate(command, 48) : "command");
+        return buildDisplay(
+          "Shell",
+          command ? truncate(command, 48) : "command",
+        );
       }
 
       if (fileToolNames.has(toolName)) {
@@ -70,7 +76,10 @@ export function formatToolActivity(
   }
 }
 
-function buildDisplay(action: string, targetLabel?: string): ToolActivityDisplay {
+function buildDisplay(
+  action: string,
+  targetLabel?: string,
+): ToolActivityDisplay {
   return {
     action,
     targetLabel,
@@ -84,7 +93,8 @@ function getQuestionLabel(record: UnknownRecord): string {
     const firstQuestion = questions[0];
     if (isRecord(firstQuestion)) {
       return (
-        firstString(firstQuestion, ["header", "title", "question"]) ?? "question"
+        firstString(firstQuestion, ["header", "title", "question"]) ??
+        "question"
       );
     }
   }

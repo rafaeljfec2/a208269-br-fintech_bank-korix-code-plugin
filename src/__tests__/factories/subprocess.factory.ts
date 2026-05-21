@@ -42,22 +42,14 @@ export function createMockProcess(
  * @param options - Configuração completa do processo
  * @returns Mock de ChildProcess
  */
-export function createMockProcessWithOptions(
-  options: MockProcessOptions,
-): {
+export function createMockProcessWithOptions(options: MockProcessOptions): {
   stdout: EventEmitter;
   stderr: EventEmitter;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   kill: ReturnType<typeof vi.fn>;
   pid?: number;
 } {
-  const {
-    exitCode = 0,
-    stdout = "",
-    stderr = "",
-    delay = 0,
-    signal,
-  } = options;
+  const { exitCode = 0, stdout = "", stderr = "", delay = 0, signal } = options;
 
   const stdoutEmitter = new EventEmitter();
   const stderrEmitter = new EventEmitter();

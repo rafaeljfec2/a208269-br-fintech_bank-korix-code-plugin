@@ -117,6 +117,27 @@ describe("useRuntimeEvents", () => {
     });
   });
 
+  describe("mode_changed message", () => {
+    it("should sync mode after extension acknowledgement", () => {
+      renderHook(() => useRuntimeEvents());
+
+      act(() => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              type: "mode_changed",
+              payload: {
+                mode: "agent",
+              },
+            },
+          }),
+        );
+      });
+
+      expect(mockSetMode).toHaveBeenCalledWith("agent");
+    });
+  });
+
   describe("runtime_event: iteration_start", () => {
     it("should handle iteration_start event", () => {
       renderHook(() => useRuntimeEvents());

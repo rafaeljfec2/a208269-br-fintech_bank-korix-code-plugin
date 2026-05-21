@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { Logger } from "../../../telemetry/logger";
 import { RuntimeEventEmitter } from "../runtimeEvents";
 import { RuntimeState } from "../runtimeState";
-import type { AgentLoopResult } from "../runtimeTypes";
+import type { AgentLoopResult, AgentLoopRunOptions } from "../runtimeTypes";
 import type { RuntimeEvent } from "../runtimeEvents";
-import { ThinkingOrchestrator, type AgentLoopLike } from "./ThinkingOrchestrator";
+import {
+  ThinkingOrchestrator,
+  type AgentLoopLike,
+} from "./ThinkingOrchestrator";
 import type { ThinkingRunInput } from "./types";
 
 describe("ThinkingOrchestrator", () => {
@@ -89,7 +92,9 @@ describe("ThinkingOrchestrator", () => {
     const validationIndex = emittedEvents.findIndex(
       (event) => event.type === "response_validation",
     );
-    const tokenIndex = emittedEvents.findIndex((event) => event.type === "token");
+    const tokenIndex = emittedEvents.findIndex(
+      (event) => event.type === "token",
+    );
 
     expect(yieldedEvents.some((event) => event.type === "done")).toBe(true);
     expect(validationIndex).toBeGreaterThanOrEqual(0);
@@ -97,7 +102,9 @@ describe("ThinkingOrchestrator", () => {
     expect(result?.finalState.memory.thinking?.validationResult?.status).toBe(
       "passed",
     );
-    expect(result?.finalState.memory.thinking?.executionGraph?.nodes.length).toBeGreaterThan(0);
+    expect(
+      result?.finalState.memory.thinking?.executionGraph?.nodes.length,
+    ).toBeGreaterThan(0);
   });
 
   it("should stream low-risk general answers before final validation", async () => {
@@ -165,7 +172,9 @@ describe("ThinkingOrchestrator", () => {
     const validationIndex = emittedEvents.findIndex(
       (event) => event.type === "response_validation",
     );
-    const tokenIndex = emittedEvents.findIndex((event) => event.type === "token");
+    const tokenIndex = emittedEvents.findIndex(
+      (event) => event.type === "token",
+    );
 
     expect(tokenIndex).toBeGreaterThanOrEqual(0);
     expect(validationIndex).toBeGreaterThan(tokenIndex);
@@ -179,14 +188,21 @@ describe("ThinkingOrchestrator", () => {
     };
 
     const eventEmitter = new RuntimeEventEmitter();
+    const emittedEvents: RuntimeEvent[] = [];
+    eventEmitter.onEvent((event) => emittedEvents.push(event));
     let runtimeMessage = "";
+    let runtimeOptions: AgentLoopRunOptions | undefined;
     let evidenceCalls = 0;
 
     const agentLoop: AgentLoopLike = {
       async *run(
         initialMessage: string,
+        _context,
+        _previousMessages,
+        options,
       ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
         runtimeMessage = initialMessage;
+        runtimeOptions = options;
 
         yield {
           type: "done",
@@ -235,7 +251,8 @@ describe("ThinkingOrchestrator", () => {
     });
 
     const generator = orchestrator.run({
-      initialMessage: "faça leitura e passe um resumo de tres arquivos do projeto",
+      initialMessage:
+        "faça leitura e passe um resumo de tres arquivos do projeto",
       context,
     });
 
@@ -247,9 +264,86 @@ describe("ThinkingOrchestrator", () => {
     }
 
     expect(evidenceCalls).toBe(0);
-    expect(runtimeMessage).toContain("<korix_tool_requirement>");
-    expect(runtimeMessage).toContain("ListDirectory or SearchFiles");
-    expect(runtimeMessage).toContain("ReadFile or FileChunks");
+    expect(runtimeOptions?.toolUsePolicy?.mode).toBe("required");
+    expect(runtimeOptions?.toolUsePolicy?.allowedTools).toEqual([
+      "ListDirectory",
+      "SearchFiles",
+      "ReadFile",
+      "FileChunks",
+    ]);
+    expect(runtimeMessage).not.toContain("<korix_tool_requirement>");
     expect(runtimeMessage).not.toContain("<korix_workspace_evidence>");
+    expect(
+      emittedEvents.some(
+        (event) =>
+          event.type === "response_validation" &&
+          event.validation.status === "blocked",
+      ),
+    ).toBe(true);
+  });
+
+  it("should emit generic blocked response for non-workspace required tools", async () => {
+    const context: ThinkingRunInput["context"] = {
+      mode: "plan",
+      workspaceRoot: "/workspace",
+      openFiles: ["/workspace/src/app.ts"],
+    };
+
+    const eventEmitter = new RuntimeEventEmitter();
+    const emittedEvents: RuntimeEvent[] = [];
+    eventEmitter.onEvent((event) => emittedEvents.push(event));
+
+    const agentLoop: AgentLoopLike = {
+      async *run(): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
+        yield {
+          type: "done",
+          stopReason: "end_turn",
+          timestamp: Date.now(),
+        };
+
+        const state = new RuntimeState(context, 25);
+        return {
+          success: true,
+          iterations: 1,
+          finalState: state.createSnapshot(),
+          metrics: {
+            totalTokens: 1,
+            totalToolCalls: 0,
+            iterations: 1,
+            duration: 1,
+            checkpoints: 0,
+            recoveries: 0,
+            toolBreakdown: {},
+            eventTimeline: [],
+          },
+        };
+      },
+    };
+
+    const orchestrator = new ThinkingOrchestrator({
+      agentLoop,
+      eventEmitter,
+      logger: new Logger({ level: "error" }),
+    });
+
+    const generator = orchestrator.run({
+      initialMessage: "Implemente retry no login",
+      context,
+    });
+
+    while (true) {
+      const next = await generator.next();
+      if (next.done) {
+        break;
+      }
+    }
+
+    expect(emittedEvents).toContainEqual(
+      expect.objectContaining({
+        type: "token",
+        content:
+          "Não consegui executar as ferramentas necessárias para atender a solicitação.",
+      }),
+    );
   });
 });

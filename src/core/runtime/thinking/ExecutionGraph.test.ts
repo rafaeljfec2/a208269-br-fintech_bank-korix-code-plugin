@@ -20,4 +20,3 @@ describe("ExecutionGraph", () => {
     expect(snapshot.edges[0]?.to).toBe(observation.id);
   });
 });
-

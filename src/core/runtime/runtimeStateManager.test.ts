@@ -46,6 +46,26 @@ describe("RuntimeStateManager", () => {
       expect(manager.getMode()).toBe("agent");
     });
 
+    it("should prepare a fresh interaction with the captured mode", () => {
+      manager.initialize(mockContext);
+      const sessionId = manager.getSessionId();
+      manager.addMessage({
+        role: "user",
+        content: "previous turn",
+        timestamp: Date.now(),
+      });
+
+      manager.prepareInteraction({
+        ...mockContext,
+        mode: "agent",
+      });
+
+      expect(manager.isInitialized()).toBe(true);
+      expect(manager.getMode()).toBe("agent");
+      expect(manager.getSessionId()).toBe(sessionId);
+      expect(manager.getMessages()).toEqual([]);
+    });
+
     it("should generate unique sessionId on each initialization", () => {
       manager.initialize(mockContext);
       const sessionId1 = manager.getSessionId();
@@ -98,6 +118,18 @@ describe("RuntimeStateManager", () => {
       expect(() => {
         manager.initialize(mockContext);
       }).not.toThrow();
+    });
+
+    it("should reject preparing a new interaction during active execution", () => {
+      manager.initialize(mockContext);
+      manager.startExecution();
+
+      expect(() => {
+        manager.prepareInteraction({
+          ...mockContext,
+          mode: "agent",
+        });
+      }).toThrow("Cannot prepare interaction while execution is active");
     });
   });
 

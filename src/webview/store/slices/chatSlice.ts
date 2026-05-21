@@ -260,7 +260,9 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
 
       const chat = state.conversations[chatId];
       if (!chat) {
-        logger.warn("[ChatSlice] finalizeStreaming: chat not found", { chatId });
+        logger.warn("[ChatSlice] finalizeStreaming: chat not found", {
+          chatId,
+        });
         return state;
       }
 
@@ -294,7 +296,8 @@ export const createChatSlice: StateCreator<ChatSlice, [], [], ChatSlice> = (
             content: chat.streamingContent,
             timestamp: Date.now(),
             metadata: {
-              ...(chat.activeThinkingItems && chat.activeThinkingItems.length > 0
+              ...(chat.activeThinkingItems &&
+              chat.activeThinkingItems.length > 0
                 ? {
                     thinking: {
                       items: chat.activeThinkingItems,

@@ -446,15 +446,10 @@ describe("askSingleChoice", () => {
     const eventSpy = vi.fn();
     emitter.onEvent(eventSpy);
 
-    const promise = askSingleChoice(
-      emitter,
-      "Test",
-      "Test?",
-      [
-        { value: "a", label: "A", description: "Option A" },
-        { value: "b", label: "B", description: "Option B" },
-      ],
-    );
+    const promise = askSingleChoice(emitter, "Test", "Test?", [
+      { value: "a", label: "A", description: "Option A" },
+      { value: "b", label: "B", description: "Option B" },
+    ]);
 
     const questionId = eventSpy.mock.calls[0][0].questionId;
 
@@ -474,15 +469,10 @@ describe("askSingleChoice", () => {
     const eventSpy = vi.fn();
     emitter.onEvent(eventSpy);
 
-    const promise = askSingleChoice(
-      emitter,
-      "Test",
-      "Test?",
-      [
-        { value: "a", label: "A", description: "Option A" },
-        { value: "b", label: "B", description: "Option B" },
-      ],
-    );
+    const promise = askSingleChoice(emitter, "Test", "Test?", [
+      { value: "a", label: "A", description: "Option A" },
+      { value: "b", label: "B", description: "Option B" },
+    ]);
 
     expect(eventSpy).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -507,15 +497,10 @@ describe("askSingleChoice", () => {
     const eventSpy = vi.fn();
     emitter.onEvent(eventSpy);
 
-    const promise = askSingleChoice(
-      emitter,
-      "Test",
-      "Test?",
-      [
-        { value: "a", label: "A", description: "Option A" },
-        { value: "b", label: "B", description: "Option B" },
-      ],
-    );
+    const promise = askSingleChoice(emitter, "Test", "Test?", [
+      { value: "a", label: "A", description: "Option A" },
+      { value: "b", label: "B", description: "Option B" },
+    ]);
 
     const questionId = eventSpy.mock.calls[0][0].questionId;
 
@@ -543,16 +528,11 @@ describe("askMultipleChoice", () => {
     const eventSpy = vi.fn();
     emitter.onEvent(eventSpy);
 
-    const promise = askMultipleChoice(
-      emitter,
-      "Test",
-      "Test?",
-      [
-        { value: "a", label: "A", description: "Option A" },
-        { value: "b", label: "B", description: "Option B" },
-        { value: "c", label: "C", description: "Option C" },
-      ],
-    );
+    const promise = askMultipleChoice(emitter, "Test", "Test?", [
+      { value: "a", label: "A", description: "Option A" },
+      { value: "b", label: "B", description: "Option B" },
+      { value: "c", label: "C", description: "Option C" },
+    ]);
 
     const questionId = eventSpy.mock.calls[0][0].questionId;
 
@@ -572,15 +552,10 @@ describe("askMultipleChoice", () => {
     const eventSpy = vi.fn();
     emitter.onEvent(eventSpy);
 
-    const promise = askMultipleChoice(
-      emitter,
-      "Test",
-      "Test?",
-      [
-        { value: "a", label: "A", description: "Option A" },
-        { value: "b", label: "B", description: "Option B" },
-      ],
-    );
+    const promise = askMultipleChoice(emitter, "Test", "Test?", [
+      { value: "a", label: "A", description: "Option A" },
+      { value: "b", label: "B", description: "Option B" },
+    ]);
 
     expect(eventSpy).toHaveBeenCalledWith(
       expect.objectContaining({
