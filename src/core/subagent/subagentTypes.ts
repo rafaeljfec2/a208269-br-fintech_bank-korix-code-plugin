@@ -1,6 +1,6 @@
 import type { ExecutionContext } from "../types";
 
-export type SubagentType = "explore" | "plan";
+export type SubagentType = "explore" | "plan" | "review";
 
 export interface SubagentConfig {
   readonly type: SubagentType;
@@ -73,6 +73,26 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     timeout: 120_000,
     isolated: true,
   },
+  review: {
+    type: "review",
+    allowedTools: [
+      "ReadFile",
+      "ListDirectory",
+      "Grep",
+      "FindReferences",
+      "FindSymbols",
+      "GitStatus",
+      "GitDiff",
+      "ChangedFiles",
+      "Problems",
+      "GetDiagnostics",
+      "WorkspaceGraph",
+      "Glob",
+    ],
+    maxIterations: 12,
+    timeout: 120_000,
+    isolated: true,
+  },
 };
 
 export function buildSubagentPrompt(type: SubagentType): string {
@@ -92,6 +112,17 @@ export function buildSubagentPrompt(type: SubagentType): string {
       "Produce a concise implementation plan in Markdown with SDD and TDD traceability.",
       "Include: relevant files, acceptance criteria, Red tests, Green implementation steps, verification commands, risks, and open questions.",
       "Ground claims in file paths, symbols, diffs, diagnostics, or workspace graph evidence when available.",
+      "Do not modify files, run commands, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
+    ].join("\n");
+  }
+
+  if (type === "review") {
+    return [
+      "You are a code review subagent for Korix Code.",
+      "Search and read the codebase using only read-only tools.",
+      "Review changed code for correctness, security, quality, maintainability, project conventions, and regression risk.",
+      "Return structured findings with severity, file/path/line evidence when available, issue, impact, recommendation, and test gaps.",
+      "Prioritize real bugs and risks over style preferences, and state when no issues are found.",
       "Do not modify files, run commands, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
     ].join("\n");
   }

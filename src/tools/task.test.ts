@@ -21,7 +21,7 @@ function resetGlobalRegistry(): void {
 }
 
 describe("TaskTool", () => {
-  it("should accept explore and plan tasks in the schema", () => {
+  it("should accept read-only explore, plan, and review tasks in the schema", () => {
     expect(
       TaskTool.schema.safeParse({ type: "explore", prompt: "Find auth" })
         .success,
@@ -31,7 +31,14 @@ describe("TaskTool", () => {
         .success,
     ).toBe(true);
     expect(
+      TaskTool.schema.safeParse({ type: "review", prompt: "Review auth fix" })
+        .success,
+    ).toBe(true);
+    expect(
       TaskTool.schema.safeParse({ type: "shell", prompt: "Run tests" }).success,
+    ).toBe(false);
+    expect(
+      TaskTool.schema.safeParse({ type: "test", prompt: "Run tests" }).success,
     ).toBe(false);
   });
 
@@ -111,6 +118,35 @@ describe("TaskTool", () => {
     expect(runSubagent).toHaveBeenCalledWith({
       type: "plan",
       prompt: "Plan auth fix",
+      context: undefined,
+      executionContext: expect.objectContaining({ mode: "agent" }),
+    });
+  });
+
+  it("should call the runtime subagent callback for review tasks", async () => {
+    const runSubagent = vi.fn(async () => ({
+      success: true,
+      output: "Findings:\n- high src/auth.ts:12 missing authorization check",
+      iterations: 1,
+      duration: 10,
+      metadata: {
+        toolsCalled: ["GitDiff", "ReadFile"],
+      },
+    }));
+
+    const result = await TaskTool.execute(
+      { type: "review", prompt: "Review auth fix" },
+      createMockToolContext({ runSubagent }),
+    );
+
+    expect(result.success, result.error).toBe(true);
+    expect(result.data).toMatchObject({
+      type: "review",
+      output: "Findings:\n- high src/auth.ts:12 missing authorization check",
+    });
+    expect(runSubagent).toHaveBeenCalledWith({
+      type: "review",
+      prompt: "Review auth fix",
       context: undefined,
       executionContext: expect.objectContaining({ mode: "agent" }),
     });

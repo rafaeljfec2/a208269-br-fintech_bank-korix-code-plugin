@@ -34,12 +34,14 @@ function createParentRegistry(): ToolRegistry {
     "GetDiagnostics",
     "Glob",
     "WriteFile",
+    "EditFile",
     "DeleteFile",
     "RunCommand",
     "Await",
     "TodoWrite",
     "WebFetch",
     "Task",
+    "AskUserQuestion",
   ]) {
     registry.register(createTool(name));
   }
@@ -73,6 +75,7 @@ describe("SubagentRunner", () => {
       "GetCurrentFile",
     ]);
     expect(registry.has("WriteFile")).toBe(false);
+    expect(registry.has("EditFile")).toBe(false);
     expect(registry.has("DeleteFile")).toBe(false);
     expect(registry.has("RunCommand")).toBe(false);
   });
@@ -119,6 +122,52 @@ describe("SubagentRunner", () => {
     expect(prompt).toContain("SDD");
     expect(prompt).toContain("TDD");
     expect(prompt).toContain("implementation plan");
+    expect(prompt).toContain("Do not modify files");
+  });
+
+  it("should create a review registry with only read-only review tools", () => {
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: vi.fn(),
+    });
+
+    const registry = runner.createSubagentRegistry(SUBAGENT_CONFIGS.review);
+    const toolNames = registry.list().map((tool) => tool.name);
+
+    expect(toolNames).toEqual([
+      "ReadFile",
+      "ListDirectory",
+      "Grep",
+      "FindReferences",
+      "FindSymbols",
+      "GitStatus",
+      "GitDiff",
+      "ChangedFiles",
+      "Problems",
+      "GetDiagnostics",
+      "WorkspaceGraph",
+      "Glob",
+    ]);
+    expect(registry.has("WriteFile")).toBe(false);
+    expect(registry.has("DeleteFile")).toBe(false);
+    expect(registry.has("RunCommand")).toBe(false);
+    expect(registry.has("Await")).toBe(false);
+    expect(registry.has("TodoWrite")).toBe(false);
+    expect(registry.has("WebFetch")).toBe(false);
+    expect(registry.has("Task")).toBe(false);
+    expect(registry.has("AskUserQuestion")).toBe(false);
+  });
+
+  it("should build a severity and evidence-oriented prompt for review subagents", () => {
+    const prompt = buildSubagentPrompt("review");
+
+    expect(prompt).toContain("code review subagent");
+    expect(prompt).toContain("severity");
+    expect(prompt).toContain("security");
+    expect(prompt).toContain("quality");
+    expect(prompt).toContain("evidence");
+    expect(prompt).toContain("test gaps");
     expect(prompt).toContain("Do not modify files");
   });
 

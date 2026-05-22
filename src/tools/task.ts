@@ -4,7 +4,7 @@ import type { SubagentType } from "../core/subagent/subagentTypes";
 import type { SubagentResult } from "../core/subagent/subagentTypes";
 
 const TaskSchema = z.object({
-  type: z.enum(["explore", "plan"]).describe("Subagent type to run"),
+  type: z.enum(["explore", "plan", "review"]).describe("Subagent type to run"),
   prompt: z.string().min(1).describe("Focused task prompt for the subagent"),
   context: z.record(z.unknown()).optional(),
 });
@@ -28,9 +28,10 @@ export const TaskTool: Tool<TaskInput, TaskOutput> = {
   description: `Launch a read-only focused subagent.
 
 MVP scope:
-- Supported types: "explore" and "plan".
+- Supported types: "explore", "plan", and "review".
 - explore finds relevant files, symbols, references, and evidence.
 - plan designs implementation strategy with SDD/TDD traceability.
+- review analyzes code for correctness, security, quality, and test gaps.
 - Subagents can search/read code with isolated read-only tool sets.
 - It cannot edit files, delete files, run shell commands, or ask the user questions.`,
   schema: TaskSchema,
