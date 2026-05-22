@@ -18,6 +18,7 @@ import { FindSymbolsTool } from "./search/findSymbols";
 import { FileChunksTool } from "./filesystem/fileChunks";
 import { SearchFilesTool } from "./filesystem/searchFiles";
 import { DeleteFileTool } from "./filesystem/deleteFile";
+import { WebFetchTool } from "./web";
 import { ProblemsTool } from "./diagnostics/problems";
 import { WorkspaceGraphTool } from "./workspace/workspaceGraph";
 import {
@@ -41,6 +42,7 @@ export function registerAllTools(): void {
     SearchFilesTool,
     GlobTool,
     DeleteFileTool,
+    WebFetchTool,
     // Terminal tools
     RunCommandTool,
     AwaitTool,
