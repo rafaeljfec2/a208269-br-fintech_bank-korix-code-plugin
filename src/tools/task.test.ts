@@ -40,7 +40,7 @@ describe("TaskTool", () => {
     ).toBe(true);
     expect(
       TaskTool.schema.safeParse({ type: "test", prompt: "Run tests" }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("should only be available in agent mode", () => {
@@ -177,6 +177,35 @@ describe("TaskTool", () => {
     expect(runSubagent).toHaveBeenCalledWith({
       type: "shell",
       prompt: "Run git status",
+      context: undefined,
+      executionContext: expect.objectContaining({ mode: "agent" }),
+    });
+  });
+
+  it("should call the runtime subagent callback for test tasks", async () => {
+    const runSubagent = vi.fn(async () => ({
+      success: true,
+      output: "Tests passed\ncommand: pnpm exec vitest run src/auth.test.ts",
+      iterations: 1,
+      duration: 10,
+      metadata: {
+        toolsCalled: ["RunCommand", "ReadFile"],
+      },
+    }));
+
+    const result = await TaskTool.execute(
+      { type: "test", prompt: "Run auth tests" },
+      createMockToolContext({ runSubagent }),
+    );
+
+    expect(result.success, result.error).toBe(true);
+    expect(result.data).toMatchObject({
+      type: "test",
+      output: "Tests passed\ncommand: pnpm exec vitest run src/auth.test.ts",
+    });
+    expect(runSubagent).toHaveBeenCalledWith({
+      type: "test",
+      prompt: "Run auth tests",
       context: undefined,
       executionContext: expect.objectContaining({ mode: "agent" }),
     });

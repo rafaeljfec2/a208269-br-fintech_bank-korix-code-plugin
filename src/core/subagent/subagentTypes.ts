@@ -1,6 +1,6 @@
 import type { ExecutionContext } from "../types";
 
-export type SubagentType = "explore" | "plan" | "review" | "shell";
+export type SubagentType = "explore" | "plan" | "review" | "shell" | "test";
 
 export interface SubagentConfig {
   readonly type: SubagentType;
@@ -100,6 +100,13 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     timeout: 300_000,
     isolated: true,
   },
+  test: {
+    type: "test",
+    allowedTools: ["RunCommand", "Await", "ReadFile"],
+    maxIterations: 8,
+    timeout: 600_000,
+    isolated: true,
+  },
 };
 
 export function buildSubagentPrompt(type: SubagentType): string {
@@ -142,6 +149,17 @@ export function buildSubagentPrompt(type: SubagentType): string {
       "Report the command, stdout, stderr, exit code, timeout status, and any failures.",
       "Avoid destructive commands unless explicitly requested and approved by the runtime.",
       "Do not modify files directly, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
+    ].join("\n");
+  }
+
+  if (type === "test") {
+    return [
+      "You are a test execution subagent for Korix Code.",
+      "Use only RunCommand, Await, and ReadFile through the runtime approval flow.",
+      "Run focused tests relevant to the request, prefer explicit timeouts, and use background execution plus Await for long-running suites.",
+      "Report the command, pass/fail status, stdout, stderr, exit code, failure details, and verification gaps.",
+      "Inspect test files or failure artifacts with ReadFile only when it helps explain failures.",
+      "Do not modify files, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
     ].join("\n");
   }
 

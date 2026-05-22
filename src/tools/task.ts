@@ -5,7 +5,7 @@ import type { SubagentResult } from "../core/subagent/subagentTypes";
 
 const TaskSchema = z.object({
   type: z
-    .enum(["explore", "plan", "review", "shell"])
+    .enum(["explore", "plan", "review", "shell", "test"])
     .describe("Subagent type to run"),
   prompt: z.string().min(1).describe("Focused task prompt for the subagent"),
   context: z.record(z.unknown()).optional(),
@@ -30,11 +30,12 @@ export const TaskTool: Tool<TaskInput, TaskOutput> = {
   description: `Launch a focused subagent with an isolated tool set.
 
 MVP scope:
-- Supported types: "explore", "plan", "review", and "shell".
+- Supported types: "explore", "plan", "review", "shell", and "test".
 - explore finds relevant files, symbols, references, and evidence.
 - plan designs implementation strategy with SDD/TDD traceability.
 - review analyzes code for correctness, security, quality, and test gaps.
 - shell runs approval-aware terminal commands using RunCommand and Await only.
+- test runs focused test commands and summarizes pass/fail details.
 - Subagents run with isolated, type-specific tool sets.
 - It cannot edit files, delete files, launch nested subagents, fetch the web, or ask the user questions.`,
   schema: TaskSchema,
