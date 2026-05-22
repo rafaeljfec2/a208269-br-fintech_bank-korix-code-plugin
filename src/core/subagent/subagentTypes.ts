@@ -1,6 +1,6 @@
 import type { ExecutionContext } from "../types";
 
-export type SubagentType = "explore" | "plan" | "review";
+export type SubagentType = "explore" | "plan" | "review" | "shell";
 
 export interface SubagentConfig {
   readonly type: SubagentType;
@@ -93,6 +93,13 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     timeout: 120_000,
     isolated: true,
   },
+  shell: {
+    type: "shell",
+    allowedTools: ["RunCommand", "Await"],
+    maxIterations: 5,
+    timeout: 300_000,
+    isolated: true,
+  },
 };
 
 export function buildSubagentPrompt(type: SubagentType): string {
@@ -124,6 +131,17 @@ export function buildSubagentPrompt(type: SubagentType): string {
       "Return structured findings with severity, file/path/line evidence when available, issue, impact, recommendation, and test gaps.",
       "Prioritize real bugs and risks over style preferences, and state when no issues are found.",
       "Do not modify files, run commands, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
+    ].join("\n");
+  }
+
+  if (type === "shell") {
+    return [
+      "You are a shell execution subagent for Korix Code.",
+      "Use only RunCommand and Await through the runtime approval flow.",
+      "Run only necessary commands, prefer explicit timeouts, and use background execution plus Await for long-running commands.",
+      "Report the command, stdout, stderr, exit code, timeout status, and any failures.",
+      "Avoid destructive commands unless explicitly requested and approved by the runtime.",
+      "Do not modify files directly, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
     ].join("\n");
   }
 

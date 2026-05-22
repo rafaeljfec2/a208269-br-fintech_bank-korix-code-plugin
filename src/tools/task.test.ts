@@ -21,7 +21,7 @@ function resetGlobalRegistry(): void {
 }
 
 describe("TaskTool", () => {
-  it("should accept read-only explore, plan, and review tasks in the schema", () => {
+  it("should accept supported subagent tasks in the schema", () => {
     expect(
       TaskTool.schema.safeParse({ type: "explore", prompt: "Find auth" })
         .success,
@@ -35,8 +35,9 @@ describe("TaskTool", () => {
         .success,
     ).toBe(true);
     expect(
-      TaskTool.schema.safeParse({ type: "shell", prompt: "Run tests" }).success,
-    ).toBe(false);
+      TaskTool.schema.safeParse({ type: "shell", prompt: "Run git status" })
+        .success,
+    ).toBe(true);
     expect(
       TaskTool.schema.safeParse({ type: "test", prompt: "Run tests" }).success,
     ).toBe(false);
@@ -147,6 +148,35 @@ describe("TaskTool", () => {
     expect(runSubagent).toHaveBeenCalledWith({
       type: "review",
       prompt: "Review auth fix",
+      context: undefined,
+      executionContext: expect.objectContaining({ mode: "agent" }),
+    });
+  });
+
+  it("should call the runtime subagent callback for shell tasks", async () => {
+    const runSubagent = vi.fn(async () => ({
+      success: true,
+      output: "Command succeeded\nexit code: 0",
+      iterations: 1,
+      duration: 10,
+      metadata: {
+        toolsCalled: ["RunCommand"],
+      },
+    }));
+
+    const result = await TaskTool.execute(
+      { type: "shell", prompt: "Run git status" },
+      createMockToolContext({ runSubagent }),
+    );
+
+    expect(result.success, result.error).toBe(true);
+    expect(result.data).toMatchObject({
+      type: "shell",
+      output: "Command succeeded\nexit code: 0",
+    });
+    expect(runSubagent).toHaveBeenCalledWith({
+      type: "shell",
+      prompt: "Run git status",
       context: undefined,
       executionContext: expect.objectContaining({ mode: "agent" }),
     });

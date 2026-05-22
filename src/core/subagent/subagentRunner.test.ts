@@ -171,6 +171,51 @@ describe("SubagentRunner", () => {
     expect(prompt).toContain("Do not modify files");
   });
 
+  it("should create a shell registry with only terminal execution tools", () => {
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: vi.fn(),
+    });
+
+    const registry = runner.createSubagentRegistry(SUBAGENT_CONFIGS.shell);
+    const toolNames = registry.list().map((tool) => tool.name);
+
+    expect(toolNames).toEqual(["RunCommand", "Await"]);
+    expect(registry.has("ReadFile")).toBe(false);
+    expect(registry.has("ListDirectory")).toBe(false);
+    expect(registry.has("Grep")).toBe(false);
+    expect(registry.has("FindReferences")).toBe(false);
+    expect(registry.has("FindSymbols")).toBe(false);
+    expect(registry.has("GitStatus")).toBe(false);
+    expect(registry.has("GitDiff")).toBe(false);
+    expect(registry.has("ChangedFiles")).toBe(false);
+    expect(registry.has("Problems")).toBe(false);
+    expect(registry.has("GetDiagnostics")).toBe(false);
+    expect(registry.has("WorkspaceGraph")).toBe(false);
+    expect(registry.has("Glob")).toBe(false);
+    expect(registry.has("WriteFile")).toBe(false);
+    expect(registry.has("EditFile")).toBe(false);
+    expect(registry.has("DeleteFile")).toBe(false);
+    expect(registry.has("TodoWrite")).toBe(false);
+    expect(registry.has("WebFetch")).toBe(false);
+    expect(registry.has("Task")).toBe(false);
+    expect(registry.has("AskUserQuestion")).toBe(false);
+  });
+
+  it("should build an approval-aware prompt for shell subagents", () => {
+    const prompt = buildSubagentPrompt("shell");
+
+    expect(prompt).toContain("shell execution subagent");
+    expect(prompt).toContain("RunCommand");
+    expect(prompt).toContain("Await");
+    expect(prompt).toContain("approval");
+    expect(prompt).toContain("stdout");
+    expect(prompt).toContain("stderr");
+    expect(prompt).toContain("exit code");
+    expect(prompt).toContain("Do not modify files");
+  });
+
   it("should run an explore subagent and return final assistant output", async () => {
     const createAgentLoop = vi.fn(
       (_registry: ToolRegistry, _prompt: string) => {
