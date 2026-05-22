@@ -52,7 +52,7 @@ export class AgentLoop {
     }[],
     options: AgentLoopRunOptions = {},
   ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
-    const state = new RuntimeState(context, 25);
+    const state = new RuntimeState(context, options.maxIterations ?? 25);
 
     // Add previous messages for conversation history
     if (previousMessages && previousMessages.length > 0) {

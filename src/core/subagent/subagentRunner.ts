@@ -75,6 +75,7 @@ export class SubagentRunner {
         },
         undefined,
         {
+          maxIterations: config.maxIterations,
           toolUsePolicy: {
             mode: "auto",
             allowedTools: config.allowedTools,

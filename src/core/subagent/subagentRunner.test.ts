@@ -349,4 +349,81 @@ describe("SubagentRunner", () => {
     expect(result.output).toBe("Found src/example.ts");
     expect(result.metadata.toolsCalled).toEqual(["ReadFile"]);
   });
+
+  it("should pass configured max iterations to the child agent loop", async () => {
+    const run = vi.fn(async function* (
+      _prompt: string,
+      _context: unknown,
+      _previousMessages: unknown,
+      options: { readonly maxIterations?: number },
+    ) {
+      yield {
+        type: "iteration_start",
+        iteration: 0,
+        timestamp: Date.now(),
+      };
+      return {
+        success: true,
+        iterations: 1,
+        metrics: {
+          totalTokens: 0,
+          totalToolCalls: 0,
+          iterations: 1,
+          duration: 10,
+          checkpoints: 0,
+          recoveries: 0,
+          toolBreakdown: {},
+          eventTimeline: [],
+        },
+        finalState: {
+          conversation: {
+            messages: [
+              {
+                role: "assistant",
+                content: "ok",
+                timestamp: Date.now(),
+              },
+            ],
+            turnCount: 1,
+            toolCallHistory: [],
+          },
+          execution: {
+            isExecuting: false,
+            currentIteration: 1,
+            maxIterations: 5,
+            startTime: 0,
+            lastActivityTime: 0,
+          },
+          workspace: {
+            root: "/repo",
+            openFiles: [],
+            modifiedFiles: new Set(),
+          },
+          memory: {
+            shortTerm: new Map(),
+            conversationContext: [],
+          },
+          correlationId: "corr-1",
+        },
+      };
+    });
+
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: () => ({ run }) as unknown as AgentLoop,
+    });
+
+    await runner.run({
+      type: "shell",
+      prompt: "Run command",
+      executionContext: {
+        mode: "agent",
+        workspaceRoot: "/repo",
+        openFiles: [],
+      },
+    });
+
+    expect(run.mock.calls[0]?.[3]?.maxIterations).toBe(5);
+  });
 });
