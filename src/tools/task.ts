@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { Tool, ToolContext, ToolResult } from "../harness/toolRegistry";
+import type { SubagentType } from "../core/subagent/subagentTypes";
 import type { SubagentResult } from "../core/subagent/subagentTypes";
 
 const TaskSchema = z.object({
-  type: z.enum(["explore"]).describe("Subagent type to run"),
+  type: z.enum(["explore", "plan"]).describe("Subagent type to run"),
   prompt: z.string().min(1).describe("Focused task prompt for the subagent"),
   context: z.record(z.unknown()).optional(),
 });
@@ -11,7 +12,7 @@ const TaskSchema = z.object({
 type TaskInput = z.infer<typeof TaskSchema>;
 
 interface TaskOutput {
-  readonly type: "explore";
+  readonly type: SubagentType;
   readonly success: boolean;
   readonly output: string;
   readonly iterations: number;
@@ -24,11 +25,13 @@ interface TaskOutput {
 
 export const TaskTool: Tool<TaskInput, TaskOutput> = {
   name: "Task",
-  description: `Launch a read-only exploration subagent.
+  description: `Launch a read-only focused subagent.
 
 MVP scope:
-- Only type "explore" is supported.
-- The subagent can search/read code with an isolated read-only tool set.
+- Supported types: "explore" and "plan".
+- explore finds relevant files, symbols, references, and evidence.
+- plan designs implementation strategy with SDD/TDD traceability.
+- Subagents can search/read code with isolated read-only tool sets.
 - It cannot edit files, delete files, run shell commands, or ask the user questions.`,
   schema: TaskSchema,
 

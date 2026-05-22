@@ -21,9 +21,13 @@ function resetGlobalRegistry(): void {
 }
 
 describe("TaskTool", () => {
-  it("should only accept explore tasks in the schema", () => {
+  it("should accept explore and plan tasks in the schema", () => {
     expect(
       TaskTool.schema.safeParse({ type: "explore", prompt: "Find auth" })
+        .success,
+    ).toBe(true);
+    expect(
+      TaskTool.schema.safeParse({ type: "plan", prompt: "Plan auth fix" })
         .success,
     ).toBe(true);
     expect(
@@ -78,6 +82,35 @@ describe("TaskTool", () => {
     expect(runSubagent).toHaveBeenCalledWith({
       type: "explore",
       prompt: "Find auth",
+      context: undefined,
+      executionContext: expect.objectContaining({ mode: "agent" }),
+    });
+  });
+
+  it("should call the runtime subagent callback for plan tasks", async () => {
+    const runSubagent = vi.fn(async () => ({
+      success: true,
+      output: "Plan:\n1. Write Red tests\n2. Implement Green",
+      iterations: 1,
+      duration: 10,
+      metadata: {
+        toolsCalled: ["ReadFile", "Grep"],
+      },
+    }));
+
+    const result = await TaskTool.execute(
+      { type: "plan", prompt: "Plan auth fix" },
+      createMockToolContext({ runSubagent }),
+    );
+
+    expect(result.success, result.error).toBe(true);
+    expect(result.data).toMatchObject({
+      type: "plan",
+      output: "Plan:\n1. Write Red tests\n2. Implement Green",
+    });
+    expect(runSubagent).toHaveBeenCalledWith({
+      type: "plan",
+      prompt: "Plan auth fix",
       context: undefined,
       executionContext: expect.objectContaining({ mode: "agent" }),
     });

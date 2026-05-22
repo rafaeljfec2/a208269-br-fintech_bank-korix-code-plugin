@@ -1,6 +1,6 @@
 import type { ExecutionContext } from "../types";
 
-export type SubagentType = "explore";
+export type SubagentType = "explore" | "plan";
 
 export interface SubagentConfig {
   readonly type: SubagentType;
@@ -51,6 +51,28 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     timeout: 60_000,
     isolated: true,
   },
+  plan: {
+    type: "plan",
+    allowedTools: [
+      "ReadFile",
+      "ListDirectory",
+      "Grep",
+      "FindReferences",
+      "FindSymbols",
+      "WorkspaceGraph",
+      "GetOpenFiles",
+      "GetCurrentFile",
+      "GitStatus",
+      "GitDiff",
+      "ChangedFiles",
+      "Problems",
+      "GetDiagnostics",
+      "Glob",
+    ],
+    maxIterations: 12,
+    timeout: 120_000,
+    isolated: true,
+  },
 };
 
 export function buildSubagentPrompt(type: SubagentType): string {
@@ -60,6 +82,17 @@ export function buildSubagentPrompt(type: SubagentType): string {
       "Search and read the codebase using only read-only tools.",
       "Return concise findings with file paths, symbols, and relevant evidence.",
       "Do not modify files, run commands, delete files, or ask the user questions.",
+    ].join("\n");
+  }
+
+  if (type === "plan") {
+    return [
+      "You are a planning subagent for Korix Code.",
+      "Search and read the codebase using only read-only tools.",
+      "Produce a concise implementation plan in Markdown with SDD and TDD traceability.",
+      "Include: relevant files, acceptance criteria, Red tests, Green implementation steps, verification commands, risks, and open questions.",
+      "Ground claims in file paths, symbols, diffs, diagnostics, or workspace graph evidence when available.",
+      "Do not modify files, run commands, delete files, update todos, launch subagents, fetch the web, or ask the user questions.",
     ].join("\n");
   }
 

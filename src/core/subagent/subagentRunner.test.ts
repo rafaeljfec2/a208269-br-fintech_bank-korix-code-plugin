@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ToolRegistry, type Tool } from "../../harness/toolRegistry";
 import { SubagentRunner } from "./subagentRunner";
-import { SUBAGENT_CONFIGS } from "./subagentTypes";
+import { SUBAGENT_CONFIGS, buildSubagentPrompt } from "./subagentTypes";
 import type { AgentLoop } from "../runtime/agentLoop";
 
 const createTool = (
@@ -24,9 +24,22 @@ function createParentRegistry(): ToolRegistry {
     "FindReferences",
     "FindSymbols",
     "ListDirectory",
+    "WorkspaceGraph",
+    "GetOpenFiles",
+    "GetCurrentFile",
+    "GitStatus",
+    "GitDiff",
+    "ChangedFiles",
+    "Problems",
+    "GetDiagnostics",
+    "Glob",
     "WriteFile",
     "DeleteFile",
     "RunCommand",
+    "Await",
+    "TodoWrite",
+    "WebFetch",
+    "Task",
   ]) {
     registry.register(createTool(name));
   }
@@ -50,10 +63,63 @@ describe("SubagentRunner", () => {
       "Grep",
       "FindReferences",
       "FindSymbols",
+      "GitStatus",
+      "GitDiff",
+      "ChangedFiles",
+      "Problems",
+      "GetDiagnostics",
+      "WorkspaceGraph",
+      "GetOpenFiles",
+      "GetCurrentFile",
     ]);
     expect(registry.has("WriteFile")).toBe(false);
     expect(registry.has("DeleteFile")).toBe(false);
     expect(registry.has("RunCommand")).toBe(false);
+  });
+
+  it("should create a plan registry with only read-only planning tools", () => {
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: vi.fn(),
+    });
+
+    const registry = runner.createSubagentRegistry(SUBAGENT_CONFIGS.plan);
+    const toolNames = registry.list().map((tool) => tool.name);
+
+    expect(toolNames).toEqual([
+      "ReadFile",
+      "ListDirectory",
+      "Grep",
+      "FindReferences",
+      "FindSymbols",
+      "WorkspaceGraph",
+      "GetOpenFiles",
+      "GetCurrentFile",
+      "GitStatus",
+      "GitDiff",
+      "ChangedFiles",
+      "Problems",
+      "GetDiagnostics",
+      "Glob",
+    ]);
+    expect(registry.has("WriteFile")).toBe(false);
+    expect(registry.has("DeleteFile")).toBe(false);
+    expect(registry.has("RunCommand")).toBe(false);
+    expect(registry.has("Await")).toBe(false);
+    expect(registry.has("TodoWrite")).toBe(false);
+    expect(registry.has("WebFetch")).toBe(false);
+    expect(registry.has("Task")).toBe(false);
+  });
+
+  it("should build an SDD/TDD-oriented prompt for plan subagents", () => {
+    const prompt = buildSubagentPrompt("plan");
+
+    expect(prompt).toContain("planning subagent");
+    expect(prompt).toContain("SDD");
+    expect(prompt).toContain("TDD");
+    expect(prompt).toContain("implementation plan");
+    expect(prompt).toContain("Do not modify files");
   });
 
   it("should run an explore subagent and return final assistant output", async () => {
