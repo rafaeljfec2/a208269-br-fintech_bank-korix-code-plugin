@@ -46,6 +46,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] enforcement de `SubagentConfig.maxIterations`.
 - [x] enforcement de `SubagentConfig.timeout`.
 - [x] propagação de `AbortSignal` do runtime para providers.
+- [x] propagação de `AbortSignal` do runtime para tools via `ToolContext`.
 
 ### Commits de Referência
 
@@ -170,19 +171,51 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Criar `.sdd/tool-context-signal-propagation/intake.md`.
-- [ ] Criar `.sdd/tool-context-signal-propagation/spec.md`.
-- [ ] Red test: runtime/scheduler passa um `AbortSignal` para tool execution context.
-- [ ] Red test: signal fica `aborted` quando `AgentLoop` timeout dispara durante execução de tool.
-- [ ] Estender `ToolContext` com `readonly signal?: AbortSignal` mantendo compatibilidade.
-- [ ] Propagar o signal no executor usado por `ToolScheduler`.
-- [ ] Rodar testes focados de runtime/tool scheduler.
+- [x] Criar `.sdd/tool-context-signal-propagation/intake.md`.
+- [x] Criar `.sdd/tool-context-signal-propagation/spec.md`.
+- [x] Red test: runtime/scheduler passa um `AbortSignal` para tool execution context.
+- [x] Red test: signal fica `aborted` quando `AgentLoop` timeout dispara durante execução de tool.
+- [x] Estender `ToolContext` com `readonly signal?: AbortSignal` mantendo compatibilidade.
+- [x] Propagar o signal no executor usado por `ToolScheduler`.
+- [x] Rodar testes focados de runtime/tool scheduler.
+- [x] Rodar `pnpm run lint`.
+- [x] Rodar `pnpm run test`.
+- [x] Rodar `git diff --check`.
+- [x] Rodar architecture gate e registrar violações preexistentes.
+
+**Critério de aceitação**: tools passam a poder observar cancelamento do runtime sem exigir alteração imediata em cada tool individual.
+
+**Status**: ✅ Implementado.
+
+**Evidência**:
+
+- `src/core/runtime/executionEngine.toolCancellation.test.ts`
+- `src/core/runtime/executionEngine.ts`
+- `src/harness/toolRegistry.ts`
+- `.sdd/tool-context-signal-propagation/ac-coverage.md`
+
+## 5.5 Signal-Aware Tool Adoption
+
+**Prioridade**: 🔴 P0
+
+**Dependências**: 5.4.
+
+### Subtasks
+
+- [ ] Criar `.sdd/signal-aware-tool-adoption/intake.md`.
+- [ ] Criar `.sdd/signal-aware-tool-adoption/spec.md`.
+- [ ] Red test: `WebFetch` aborta quando `context.signal` aborta.
+- [ ] Red test: polling/await-style tool para de aguardar quando `context.signal` aborta.
+- [ ] Implementar merge entre timeout local e `context.signal` em `WebFetch`.
+- [ ] Implementar observação de `context.signal` em `Await`/polling sem quebrar timeout atual.
+- [ ] Manter terminal process cleanup fora desta fatia, salvo se o spec reduzir para caso seguro.
+- [ ] Rodar testes focados de tools.
 - [ ] Rodar `pnpm run lint`.
 - [ ] Rodar `pnpm run test`.
 - [ ] Rodar `git diff --check`.
 - [ ] Rodar architecture gate e registrar violações preexistentes.
 
-**Critério de aceitação**: tools passam a poder observar cancelamento do runtime sem exigir alteração imediata em cada tool individual.
+**Critério de aceitação**: pelo menos as tools long-running de menor risco consomem `ToolContext.signal` de forma cooperativa e preservam seus timeouts próprios.
 
 ---
 

@@ -17,6 +17,7 @@ import { ToolScheduler } from "../tools/registry/ToolScheduler";
 export interface ToolContext {
   execution: ExecutionContext;
   workspaceRoot: string;
+  readonly signal?: AbortSignal;
   userId?: string;
   runSubagent?: (request: SubagentRequest) => Promise<SubagentResult>;
   updateTodos?: (todos: readonly TodoItem[]) => readonly TodoItem[];

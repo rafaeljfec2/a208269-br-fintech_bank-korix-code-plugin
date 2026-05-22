@@ -444,8 +444,15 @@ export class ExecutionEngine {
     const tasks = this.prepareSchedulerTasks(approvedCalls);
 
     // Create executor function for scheduler
-    const executor = async (tool: string, input: unknown) => {
-      return await this.toolRegistry.execute(tool, input, toolContext);
+    const executor = async (
+      tool: string,
+      input: unknown,
+      signal?: AbortSignal,
+    ) => {
+      const executionContext: ToolContext = signal
+        ? { ...toolContext, signal }
+        : toolContext;
+      return await this.toolRegistry.execute(tool, input, executionContext);
     };
 
     // Execute via scheduler (parallel when possible)
@@ -885,6 +892,7 @@ export class ExecutionEngine {
     input: unknown;
     priority: number;
     dependencies?: string[];
+    abortSignal?: AbortSignal;
   }> {
     const tasks: Array<{
       id: string;
@@ -892,6 +900,7 @@ export class ExecutionEngine {
       input: unknown;
       priority: number;
       dependencies?: string[];
+      abortSignal?: AbortSignal;
     }> = [];
 
     // Track write operations for dependency detection
@@ -953,6 +962,7 @@ export class ExecutionEngine {
         input: toolCall.input,
         priority: this.inferToolPriority(toolCall.name),
         dependencies: dependencies.length > 0 ? dependencies : undefined,
+        abortSignal: this.cancellationManager.getSignal(),
       });
     }
 
