@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import type { ExecutionContext } from "../core/types";
+import type { TodoItem } from "../core/runtime/runtimeTypes";
 import type {
   SubagentRequest,
   SubagentResult,
@@ -18,6 +19,8 @@ export interface ToolContext {
   workspaceRoot: string;
   userId?: string;
   runSubagent?: (request: SubagentRequest) => Promise<SubagentResult>;
+  updateTodos?: (todos: readonly TodoItem[]) => readonly TodoItem[];
+  getTodos?: () => readonly TodoItem[];
 }
 
 export interface ToolResult<T = unknown> {
@@ -394,6 +397,7 @@ export class ToolRegistry {
       "DeleteFile",
       "OpenFile",
       "Task",
+      "TodoWrite",
     ];
     return writeTools.includes(name);
   }

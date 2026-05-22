@@ -15,6 +15,7 @@ import type {
   ExecutionStateSnapshot,
   WorkspaceStateSnapshot,
   MemorySnapshot,
+  TodoItem,
   ToolCallRecord,
 } from "./runtimeTypes";
 import type {
@@ -32,6 +33,7 @@ class ConversationState {
   private messages: Message[] = [];
   private turnCount = 0;
   private toolCallHistory: ToolCallRecord[] = [];
+  private todos: TodoItem[] = [];
 
   addMessage(message: Message): void {
     this.messages.push(message);
@@ -44,11 +46,22 @@ class ConversationState {
     this.toolCallHistory.push(record);
   }
 
+  updateTodos(todos: readonly TodoItem[]): readonly TodoItem[] {
+    validateTodos(todos);
+    this.todos = todos.map((todo) => ({ ...todo }));
+    return this.getTodos();
+  }
+
+  getTodos(): readonly TodoItem[] {
+    return this.todos.map((todo) => ({ ...todo }));
+  }
+
   getSnapshot(): ConversationStateSnapshot {
     return {
       messages: [...this.messages],
       turnCount: this.turnCount,
       toolCallHistory: [...this.toolCallHistory],
+      todos: this.getTodos(),
     };
   }
 
@@ -56,6 +69,17 @@ class ConversationState {
     this.messages = [...snapshot.messages];
     this.turnCount = snapshot.turnCount;
     this.toolCallHistory = [...snapshot.toolCallHistory];
+    this.todos = [...(snapshot.todos ?? [])];
+  }
+}
+
+function validateTodos(todos: readonly TodoItem[]): void {
+  const inProgressCount = todos.filter(
+    (todo) => todo.status === "in_progress",
+  ).length;
+
+  if (inProgressCount > 1) {
+    throw new Error("Only one todo can be in_progress");
   }
 }
 
@@ -319,6 +343,16 @@ export class RuntimeState {
     };
     this.conversation.recordToolCall(record);
     this.execution.updateActivity();
+  }
+
+  updateTodos(todos: readonly TodoItem[]): readonly TodoItem[] {
+    const updated = this.conversation.updateTodos(todos);
+    this.execution.updateActivity();
+    return updated;
+  }
+
+  getTodos(): readonly TodoItem[] {
+    return this.conversation.getTodos();
   }
 
   startExecution(): void {

@@ -384,8 +384,7 @@ export class ExecutionEngine {
 
     // Check permissions for tools that explicitly require approval.
     const approvedCalls: typeof this.pendingToolCalls = [];
-    const workspace = state.getWorkspace();
-    const toolContext = this.buildToolContext(workspace, state.getContext());
+    const toolContext = this.buildToolContext(state);
 
     for (const toolCall of this.pendingToolCalls) {
       this.cancellationManager.checkCancellation();
@@ -445,14 +444,7 @@ export class ExecutionEngine {
 
     // Create executor function for scheduler
     const executor = async (tool: string, input: unknown) => {
-      return await this.toolRegistry.execute(tool, input, {
-        execution: {
-          mode: state.getContext().mode,
-          workspaceRoot: workspace.root,
-          openFiles: Array.from(workspace.openFiles),
-        },
-        workspaceRoot: workspace.root,
-      });
+      return await this.toolRegistry.execute(tool, input, toolContext);
     };
 
     // Execute via scheduler (parallel when possible)
@@ -618,10 +610,10 @@ export class ExecutionEngine {
     return typeof value === "object" && value !== null && !Array.isArray(value);
   }
 
-  private buildToolContext(
-    workspace: ReturnType<RuntimeState["getWorkspace"]>,
-    context: ReturnType<RuntimeState["getContext"]>,
-  ): ToolContext {
+  private buildToolContext(state: RuntimeState): ToolContext {
+    const workspace = state.getWorkspace();
+    const context = state.getContext();
+
     return {
       execution: {
         mode: context.mode,
@@ -633,6 +625,16 @@ export class ExecutionEngine {
         ...(workspace.selection ? { selection: workspace.selection } : {}),
       },
       workspaceRoot: workspace.root,
+      updateTodos: (todos) => {
+        const updated = state.updateTodos(todos);
+        this.eventEmitter.emitEvent({
+          type: "todos_updated",
+          todos: updated,
+          timestamp: Date.now(),
+        });
+        return updated;
+      },
+      getTodos: () => state.getTodos(),
       runSubagent: (request) => {
         const runner = new SubagentRunner({
           parentRegistry: this.toolRegistry,

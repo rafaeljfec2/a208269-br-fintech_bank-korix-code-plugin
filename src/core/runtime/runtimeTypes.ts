@@ -48,6 +48,14 @@ export interface AgentLoopRunOptions {
   readonly toolUsePolicy?: ToolUsePolicy;
 }
 
+export type TodoStatus = "pending" | "in_progress" | "completed";
+
+export interface TodoItem {
+  readonly content: string;
+  readonly status: TodoStatus;
+  readonly activeForm: string;
+}
+
 /**
  * Final result of agent loop execution
  */
@@ -164,6 +172,7 @@ export interface ConversationStateSnapshot {
   readonly messages: readonly Message[];
   readonly turnCount: number;
   readonly toolCallHistory: readonly ToolCallRecord[];
+  readonly todos: readonly TodoItem[];
 }
 
 /**

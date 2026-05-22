@@ -9,6 +9,7 @@ import { EventEmitter } from "events";
 import type { Disposable } from "./disposable";
 import { SimpleDisposable } from "./disposable";
 import type { RuntimeMetricsSnapshot } from "./runtimeTypes";
+import type { TodoItem } from "./runtimeTypes";
 import type {
   EvidencePack,
   ExecutionGraphSnapshot,
@@ -195,6 +196,12 @@ export interface ToolDeniedEvent {
   readonly timestamp: number;
 }
 
+export interface TodosUpdatedEvent {
+  readonly type: "todos_updated";
+  readonly todos: readonly TodoItem[];
+  readonly timestamp: number;
+}
+
 /**
  * Patch events
  */
@@ -359,6 +366,7 @@ export type RuntimeEvent =
   | ToolApprovalRequiredEvent
   | ToolApprovedEvent
   | ToolDeniedEvent
+  | TodosUpdatedEvent
   // Patches
   | PatchAppliedEvent
   | PatchFailedEvent
