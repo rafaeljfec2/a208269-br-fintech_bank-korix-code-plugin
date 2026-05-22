@@ -106,6 +106,8 @@ export class SettingsHandler {
         await config.update("temperature", payload.temperature, configTarget);
       }
 
+      this.configManager.invalidateCache();
+
       // Notify success
       const message: ExtensionToWebviewMessage = {
         type: "settings_saved",

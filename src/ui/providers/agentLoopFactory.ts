@@ -23,13 +23,17 @@ import { RuntimeMetrics } from "../../core/runtime/runtimeMetrics";
 import { TOKENS } from "../../di/tokens";
 
 export class AgentLoopFactory {
+  private readonly liteLlmFactory: LiteLLMFactory;
+
   constructor(
     private readonly container: Container,
     private readonly logger: Logger,
     private readonly eventEmitter: RuntimeEventEmitter,
     private readonly checkpointManager: CheckpointManager,
     private readonly permissionManager: PermissionManager,
-  ) {}
+  ) {
+    this.liteLlmFactory = new LiteLLMFactory(this.logger);
+  }
 
   /**
    * Create provider instance based on config
@@ -37,8 +41,7 @@ export class AgentLoopFactory {
   createProvider(config: ProviderConfig): AIProvider {
     // Use LiteLLM factory (supports all provider types)
     // Type assertion needed due to dual type hierarchies (will be unified in future refactor)
-    const factory = new LiteLLMFactory(this.logger);
-    return factory.create(config) as unknown as AIProvider;
+    return this.liteLlmFactory.create(config) as unknown as AIProvider;
   }
 
   /**

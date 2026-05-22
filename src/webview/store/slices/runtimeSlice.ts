@@ -13,19 +13,10 @@ export interface RuntimeMetrics {
   readonly cachedTokens?: number;
 }
 
-export interface CompletionStats {
-  readonly iterations: number;
-  readonly toolCalls: number;
-  readonly tokens: number;
-  readonly duration: number; // seconds
-  readonly timestamp: number;
-}
-
 export interface RuntimeSlice {
   readonly isExecuting: boolean;
   readonly currentIteration: number;
   readonly metrics: RuntimeMetrics;
-  readonly completionStats: CompletionStats | null;
   readonly mode: "ask" | "plan" | "agent";
   readonly model: string;
 
@@ -33,7 +24,6 @@ export interface RuntimeSlice {
   readonly setExecuting: (isExecuting: boolean) => void;
   readonly setIteration: (iteration: number) => void;
   readonly updateMetrics: (metrics: Partial<RuntimeMetrics>) => void;
-  readonly setCompletionStats: (stats: CompletionStats | null) => void;
   readonly setMode: (mode: "ask" | "plan" | "agent") => void;
   readonly setModel: (model: string) => void;
 }
@@ -55,7 +45,6 @@ export const createRuntimeSlice = (
     outputTokens: 0,
     cachedTokens: 0,
   },
-  completionStats: null,
   mode: "agent",
   model: "claude-opus-4-7",
 
@@ -74,8 +63,6 @@ export const createRuntimeSlice = (
     set((state: RuntimeSlice) => ({
       metrics: { ...state.metrics, ...newMetrics },
     })),
-
-  setCompletionStats: (stats) => set({ completionStats: stats }),
 
   setMode: (mode) => set({ mode }),
 

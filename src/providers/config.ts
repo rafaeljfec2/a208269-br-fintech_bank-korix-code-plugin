@@ -8,18 +8,41 @@ import type { ProviderConfig, ProviderType } from "./types";
 const API_KEY_PREFIX = "korix.apiKey";
 
 export class ProviderConfigManager {
-  constructor(private context: vscode.ExtensionContext) {}
+  private readonly configCache = new Map<ProviderType, ProviderConfig | null>();
+
+  constructor(private context: vscode.ExtensionContext) {
+    const workspaceEvents = vscode.workspace as typeof vscode.workspace & {
+      readonly onDidChangeConfiguration?:
+        typeof vscode.workspace.onDidChangeConfiguration;
+    };
+    const disposable = workspaceEvents.onDidChangeConfiguration?.((event) => {
+      if (event.affectsConfiguration("korix")) {
+        this.invalidateCache();
+      }
+    });
+
+    if (disposable) {
+      this.context.subscriptions.push(disposable);
+    }
+  }
 
   async getConfig(type: ProviderType): Promise<ProviderConfig | null> {
+    const cached = this.configCache.get(type);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const config = vscode.workspace.getConfiguration("korix");
     const providerType = config.get<ProviderType>("provider", "anthropic");
 
     if (providerType !== type) {
+      this.configCache.set(type, null);
       return null;
     }
 
     const apiKey = await this.getApiKey(type);
     if (!apiKey) {
+      this.configCache.set(type, null);
       return null;
     }
 
@@ -28,7 +51,7 @@ export class ProviderConfigManager {
     const maxTokens = config.get<number>("maxTokens");
     const temperature = config.get<number>("temperature");
 
-    return {
+    const providerConfig = {
       type,
       apiKey,
       model,
@@ -36,11 +59,15 @@ export class ProviderConfigManager {
       maxTokens,
       temperature,
     };
+    this.configCache.set(type, providerConfig);
+
+    return providerConfig;
   }
 
   async setApiKey(type: ProviderType, apiKey: string): Promise<void> {
     const key = `${API_KEY_PREFIX}.${type}`;
     await this.context.secrets.store(key, apiKey);
+    this.invalidateCache(type);
   }
 
   async getApiKey(type: ProviderType): Promise<string | undefined> {
@@ -65,6 +92,16 @@ export class ProviderConfigManager {
   async deleteApiKey(type: ProviderType): Promise<void> {
     const key = `${API_KEY_PREFIX}.${type}`;
     await this.context.secrets.delete(key);
+    this.invalidateCache(type);
+  }
+
+  invalidateCache(type?: ProviderType): void {
+    if (type) {
+      this.configCache.delete(type);
+      return;
+    }
+
+    this.configCache.clear();
   }
 
   private getModel(type: ProviderType): string {

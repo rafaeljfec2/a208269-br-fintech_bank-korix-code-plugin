@@ -10,7 +10,6 @@ export default function ExecutionFeedback() {
   // FIX: Correct property name is 'items' not 'timelineEvents'
   const timelineItems = useStore((state) => state.items);
   const isExecuting = useStore((state) => state.isExecuting);
-  const completionStats = useStore((state) => state.completionStats);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
 
@@ -28,16 +27,6 @@ export default function ExecutionFeedback() {
 
     return () => clearInterval(interval);
   }, [isExecuting]);
-
-  // Show completion stats for 5 seconds after execution
-  if (!isExecuting && completionStats) {
-    return (
-      <div className="flex items-center gap-1.5 px-1 py-1 mb-2 text-[10px] text-[var(--vscode-terminal-ansiGreen)]">
-        <span>✓</span>
-        <span>Korix concluído: {completionStats.iterations} iterações • {completionStats.toolCalls} ferramentas • {completionStats.tokens} tokens • {completionStats.duration.toFixed(1)}s</span>
-      </div>
-    );
-  }
 
   // Early return AFTER all hooks (React rules)
   if (!isExecuting) return null;
@@ -98,4 +87,3 @@ export default function ExecutionFeedback() {
     </div>
   );
 }
-

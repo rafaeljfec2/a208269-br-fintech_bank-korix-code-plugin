@@ -22,7 +22,6 @@ describe("useRuntimeEvents", () => {
   const mockSetExecuting = vi.fn();
   const mockSetIteration = vi.fn();
   const mockUpdateMetrics = vi.fn();
-  const mockSetCompletionStats = vi.fn();
   const mockSetMode = vi.fn();
   const mockSetModel = vi.fn();
   const mockCreateSession = vi.fn();
@@ -56,7 +55,6 @@ describe("useRuntimeEvents", () => {
       setExecuting: mockSetExecuting,
       setIteration: mockSetIteration,
       updateMetrics: mockUpdateMetrics,
-      setCompletionStats: mockSetCompletionStats,
       setMode: mockSetMode,
       setModel: mockSetModel,
       createSession: mockCreateSession,

@@ -41,11 +41,30 @@ interface IndexedHistoryMessage {
 export class InteractionContextCompiler {
   compile(input: InteractionContextCompileInput): CompiledInteractionContext {
     if (input.mode === "ask") {
+      if (
+        input.maxPreviousMessages === undefined &&
+        input.maxPreviousChars === undefined
+      ) {
+        return {
+          currentMessage: input.message,
+          effectiveMessage: input.message,
+          previousMessages: input.previousMessages,
+          omittedMessages: [],
+          mode: input.mode,
+        };
+      }
+
+      const indexedMessages = input.previousMessages.map((message, index) => ({
+        index,
+        message,
+      }));
+      const budgeted = this.applyHistoryBudget(indexedMessages, input);
+
       return {
         currentMessage: input.message,
         effectiveMessage: input.message,
-        previousMessages: input.previousMessages,
-        omittedMessages: [],
+        previousMessages: budgeted.messages.map((entry) => entry.message),
+        omittedMessages: budgeted.omittedMessages,
         mode: input.mode,
       };
     }

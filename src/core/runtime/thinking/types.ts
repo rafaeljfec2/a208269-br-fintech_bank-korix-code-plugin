@@ -36,6 +36,25 @@ export interface ToolUsePolicy {
   readonly reason: ToolUseReason;
 }
 
+export type RuntimeExecutionPath = "direct_llm" | "agent_loop";
+
+export type RuntimeExecutionProfile = "simple_chat" | "direct_answer";
+
+export type RuntimeExecutionReason =
+  | "simple_chat"
+  | "low_risk_answer"
+  | "tool_required"
+  | "workspace_required";
+
+export interface RuntimeExecutionPlan {
+  readonly path: RuntimeExecutionPath;
+  readonly profile?: RuntimeExecutionProfile;
+  readonly maxTokens?: number;
+  readonly maxHistoryMessages?: number;
+  readonly maxHistoryChars?: number;
+  readonly reason: RuntimeExecutionReason;
+}
+
 export interface WorkspaceEvidencePlan {
   readonly kind: "list" | "read" | "search" | "inspect";
   readonly toolNames: readonly string[];

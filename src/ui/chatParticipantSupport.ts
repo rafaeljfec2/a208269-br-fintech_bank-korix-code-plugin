@@ -8,10 +8,7 @@ import type {
 import type {
   EvidencePack,
   EvidenceRequest,
-  ThinkingRunProfile,
-  ToolUsePolicy,
 } from "../core/runtime/thinking";
-import type { ExecutionEngineOptions } from "../core/runtime/executionEngine";
 import type { ApprovalRequest, ApprovalResponse } from "../harness/permissions";
 
 export interface ChatParticipantMetadata {
@@ -73,6 +70,19 @@ export function forwardRuntimeEvent(
         `${event.name} ${event.success ? "concluída" : "falhou"}`,
       );
       return "";
+    case "provider_request_start":
+      response.progress("Aguardando modelo");
+      return "";
+    case "provider_first_output":
+      response.progress(
+        `Modelo começou a responder em ${(event.latency / 1000).toFixed(1)}s`,
+      );
+      return "";
+    case "provider_request_end":
+      response.progress(
+        `Modelo concluiu em ${(event.duration / 1000).toFixed(1)}s`,
+      );
+      return "";
     case "response_validation":
       if (event.validation.status === "blocked") {
         response.progress(event.validation.summary);
@@ -126,55 +136,6 @@ export function buildChatParticipantCompletionMarkdown(
   }
 
   return `${prefix}${status}: ${iterations} ${iterationLabel}, ${totalToolCalls} ${toolLabel}${failureSuffix}, ${tokenCount} tokens em ${duration.toFixed(1)}s.`;
-}
-
-export function shouldUseFastDirectPath(
-  profile: ThinkingRunProfile,
-  content: string,
-  mode: Mode,
-  toolUsePolicy: ToolUsePolicy,
-): boolean {
-  if (toolUsePolicy.mode !== "none") {
-    return false;
-  }
-
-  if (
-    mode === "ask" &&
-    profile.riskLevel === "low" &&
-    (profile.intent === "answer" || profile.intent === "explain")
-  ) {
-    return true;
-  }
-
-  if (
-    profile.riskLevel !== "low" ||
-    profile.requiresWorkspaceEvidence ||
-    profile.requiresToolUse
-  ) {
-    return false;
-  }
-
-  if (profile.intent !== "answer" && profile.intent !== "explain") {
-    return false;
-  }
-
-  return !looksLikeInteractiveChoiceRequest(content);
-}
-
-export function buildExecutionOptions(
-  useFastDirectPath: boolean,
-  configuredMaxTokens: number | undefined,
-): ExecutionEngineOptions {
-  if (!useFastDirectPath) {
-    return {
-      maxTokens: configuredMaxTokens,
-    };
-  }
-
-  return {
-    toolPolicy: "disabled",
-    maxTokens: Math.min(configuredMaxTokens ?? 1536, 1536),
-  };
 }
 
 export function buildExecutionContext(mode: Mode): ExecutionContext {
@@ -301,17 +262,6 @@ export async function requestApprovalInChat(
     default:
       return { approved: false };
   }
-}
-
-function looksLikeInteractiveChoiceRequest(content: string): boolean {
-  const normalized = content
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-  return /\b(opcao|opcoes|option|options|alternativa|alternativas|choices|escolha|choose|pergunta|question)\b/.test(
-    normalized,
-  );
 }
 
 function isRequestTurn(

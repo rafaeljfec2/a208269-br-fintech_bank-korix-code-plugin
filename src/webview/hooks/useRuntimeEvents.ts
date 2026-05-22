@@ -905,7 +905,6 @@ export function useRuntimeEvents() {
                   iterationCount: event.iterations ?? 0,
                 });
 
-                // Set completion stats for ExecutionFeedback
                 if (event.success) {
                   const duration = event.metrics.duration
                     ? event.metrics.duration / 1000
@@ -927,28 +926,6 @@ export function useRuntimeEvents() {
                       summary,
                     );
                   }
-
-                  const stats = {
-                    iterations: event.iterations,
-                    toolCalls: event.metrics.totalToolCalls ?? 0,
-                    tokens: event.metrics.totalTokens ?? 0,
-                    duration,
-                    timestamp: Date.now(),
-                  };
-
-                  logger.log(
-                    "[RuntimeEvents] Setting completion stats:",
-                    stats,
-                  );
-                  store.setCompletionStats(stats);
-
-                  // Auto-clear after 5 seconds
-                  setTimeout(() => {
-                    logger.log(
-                      "[RuntimeEvents] Auto-clearing completion stats",
-                    );
-                    store.setCompletionStats(null);
-                  }, 5000);
                 }
                 break;
               }

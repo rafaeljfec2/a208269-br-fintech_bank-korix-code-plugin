@@ -12,7 +12,7 @@
  * - Interpolar variáveis nos templates
  */
 
-import { existsSync, readFileSync } from "fs";
+import * as fs from "fs";
 import * as path from "path";
 import type { Logger } from "../telemetry/logger";
 import type { ToolRegistry } from "../harness/toolRegistry";
@@ -24,7 +24,17 @@ export interface ContextBuildOptions {
   readonly maxIterations?: number;
 }
 
+export interface DirectAnswerContextBuildOptions {
+  readonly mode: "ask" | "plan" | "agent";
+  readonly providerType: string;
+  readonly model: string;
+  readonly profile?: "simple_chat" | "direct_answer";
+}
+
 export class PluginContextBuilder {
+  private static readonly markdownCache = new Map<string, string>();
+  private static readonly directPromptCache = new Map<string, string>();
+
   private readonly promptsDir: string;
 
   constructor(
@@ -32,7 +42,10 @@ export class PluginContextBuilder {
     private readonly logger: Logger,
   ) {
     // Resolve prompts directory relative to this file
-    this.promptsDir = path.join(__dirname, "prompts");
+    const localPromptsDir = __dirname;
+    this.promptsDir = fs.existsSync(path.join(localPromptsDir, "base.md"))
+      ? localPromptsDir
+      : path.join(__dirname, "prompts");
   }
 
   /**
@@ -81,7 +94,7 @@ export class PluginContextBuilder {
     const prompt = sections.join("\n\n");
 
     // Debug: verificar se Output Style está no prompt final
-    const outputStyleSection = sections[1]; // Output Style é a 2ª seção
+    const outputStyleSection = sections[0];
     const hasOutputStyle = outputStyleSection?.includes("Response Style");
 
     this.logger.debug("[KORIX] System prompt final", {
@@ -109,18 +122,31 @@ export class PluginContextBuilder {
    * provider catalogs so simple explanations do not pay the full agent prompt
    * latency cost.
    */
-  buildDirectAnswer(
-    options: Pick<ContextBuildOptions, "mode" | "providerType" | "model">,
-  ): string {
+  buildDirectAnswer(options: DirectAnswerContextBuildOptions): string {
+    const cacheKey = [
+      options.mode,
+      options.providerType,
+      options.model,
+      options.profile ?? "direct_answer",
+    ].join("\u0000");
+    const cached = PluginContextBuilder.directPromptCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const sections = [
       this.loadOutputStyle(),
       this.getModelInfo(options.providerType, options.model),
       this.getCurrentModeInfo(options.mode),
-      this.loadMarkdown("base.md"),
-      this.getDirectAnswerPolicy(),
+      this.getDirectAnswerPolicy(options.profile ?? "direct_answer"),
     ];
 
-    return sections.filter((section) => section.trim().length > 0).join("\n\n");
+    const prompt = sections
+      .filter((section) => section.trim().length > 0)
+      .join("\n\n");
+    PluginContextBuilder.directPromptCache.set(cacheKey, prompt);
+
+    return prompt;
   }
 
   /**
@@ -132,7 +158,11 @@ export class PluginContextBuilder {
   ): string {
     try {
       const filePath = path.join(this.promptsDir, filename);
-      let content = readFileSync(filePath, "utf-8");
+      const cached = PluginContextBuilder.markdownCache.get(filePath);
+      let content = cached ?? fs.readFileSync(filePath, "utf-8");
+      if (cached === undefined) {
+        PluginContextBuilder.markdownCache.set(filePath, content);
+      }
 
       // Interpolar variáveis se fornecidas
       if (variables) {
@@ -230,12 +260,19 @@ When asked about your capabilities or identity, reference these exact values.`;
 If asked what mode you are in, answer with the current mode above. Do not mention internal routing paths such as fast direct answer.`;
   }
 
-  private getDirectAnswerPolicy(): string {
+  private getDirectAnswerPolicy(
+    profile: DirectAnswerContextBuildOptions["profile"],
+  ): string {
+    const profileInstruction =
+      profile === "simple_chat"
+        ? "- Keep greetings and social replies brief, natural, and model-generated."
+        : "- Answer directly and concisely.";
+
     return `## Fast Direct Answer Policy
 
 You are answering a low-risk request that does not require workspace lookup or tools.
 
-- Answer directly and concisely.
+${profileInstruction}
 - Use the user's pasted content as the primary evidence.
 - Do not claim facts about the current repository, files, or workspace.
 - In ASK mode, do not claim you can access files or workspace tools.
@@ -255,7 +292,7 @@ You are answering a low-risk request that does not require workspace lookup or t
         "professional.md",
       );
 
-      if (!existsSync(stylePath)) {
+      if (!fs.existsSync(stylePath)) {
         console.warn("[KORIX] Output style NOT FOUND at:", stylePath);
         this.logger.warn("Output style not found, using default");
         return "";
@@ -263,7 +300,11 @@ You are answering a low-risk request that does not require workspace lookup or t
 
       this.logger.debug("[KORIX] Loading Output style from", { stylePath });
 
-      const content = readFileSync(stylePath, "utf-8");
+      const cached = PluginContextBuilder.markdownCache.get(stylePath);
+      const content = cached ?? fs.readFileSync(stylePath, "utf-8");
+      if (cached === undefined) {
+        PluginContextBuilder.markdownCache.set(stylePath, content);
+      }
 
       // Parse frontmatter
       const frontmatterMatch = content.match(
