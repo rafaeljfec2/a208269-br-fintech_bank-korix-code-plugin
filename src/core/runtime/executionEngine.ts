@@ -709,7 +709,7 @@ export class ExecutionEngine {
     }
 
     // Low risk: read-only operations
-    if (/read|list|get|search|find|grep|status|diff/.test(lowerName)) {
+    if (/read|list|get|search|find|grep|status|diff|chunk/.test(lowerName)) {
       return "low";
     }
 
