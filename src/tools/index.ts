@@ -14,6 +14,7 @@ import { FindReferencesTool } from "./search/findReferences";
 import { FindSymbolsTool } from "./search/findSymbols";
 import { FileChunksTool } from "./filesystem/fileChunks";
 import { SearchFilesTool } from "./filesystem/searchFiles";
+import { DeleteFileTool } from "./filesystem/deleteFile";
 import { ProblemsTool } from "./diagnostics/problems";
 import { WorkspaceGraphTool } from "./workspace/workspaceGraph";
 import {
@@ -35,6 +36,7 @@ export function registerAllTools(): void {
     ListDirectoryTool,
     FileChunksTool,
     SearchFilesTool,
+    DeleteFileTool,
     // Terminal tools
     RunCommandTool,
     // Edit tools
