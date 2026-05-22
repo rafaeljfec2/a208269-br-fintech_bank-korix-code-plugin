@@ -10,14 +10,35 @@ import type { Tool, ToolContext, ToolResult } from "../harness/toolRegistry";
 // ReadFile Tool
 const ReadFileSchema = z.object({
   path: z.string().describe("Absolute or relative path to the file"),
-  encoding: z.enum(["utf-8", "utf8", "base64"]).optional(),
+  encoding: z.enum(["utf-8", "utf8", "base64", "image"]).optional(),
+  imageMetadata: z.boolean().optional(),
 });
 
 type ReadFileInput = z.infer<typeof ReadFileSchema>;
 
-export const ReadFileTool: Tool<ReadFileInput, string> = {
+type ImageFormat = "png" | "jpeg" | "gif" | "webp";
+
+interface ImageDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+
+interface ReadFileImageOutput {
+  readonly image: {
+    readonly base64: string;
+    readonly format: ImageFormat;
+    readonly width: number;
+    readonly height: number;
+    readonly size: number;
+  };
+}
+
+type ReadFileOutput = string | ReadFileImageOutput;
+
+export const ReadFileTool: Tool<ReadFileInput, ReadFileOutput> = {
   name: "ReadFile",
-  description: "Read the contents of a file",
+  description:
+    "Read the contents of a file. Supports utf-8, base64, and image metadata reads for PNG, JPEG, GIF, and WebP.",
   schema: ReadFileSchema,
 
   allowedInMode(_mode: "ask" | "plan" | "agent"): boolean {
@@ -27,7 +48,7 @@ export const ReadFileTool: Tool<ReadFileInput, string> = {
   async execute(
     input: ReadFileInput,
     context: ToolContext,
-  ): Promise<ToolResult<string>> {
+  ): Promise<ToolResult<ReadFileOutput>> {
     try {
       const absolutePath = path.isAbsolute(input.path)
         ? input.path
@@ -37,6 +58,29 @@ export const ReadFileTool: Tool<ReadFileInput, string> = {
       const content = await vscode.workspace.fs.readFile(uri);
 
       const encoding = input.encoding ?? "utf-8";
+      const imageFormat = getImageFormat(absolutePath);
+      if (encoding === "image" && imageFormat) {
+        const dimensions = parseImageDimensions(content, imageFormat);
+
+        return {
+          success: true,
+          data: {
+            image: {
+              base64: Buffer.from(content).toString("base64"),
+              format: imageFormat,
+              width: dimensions.width,
+              height: dimensions.height,
+              size: content.byteLength,
+            },
+          },
+          metadata: {
+            duration: 0,
+            approved: true,
+            timestamp: Date.now(),
+          },
+        };
+      }
+
       const text =
         encoding === "base64"
           ? Buffer.from(content).toString("base64")
@@ -65,6 +109,98 @@ export const ReadFileTool: Tool<ReadFileInput, string> = {
     }
   },
 };
+
+function getImageFormat(filePath: string): ImageFormat | undefined {
+  const ext = path.extname(filePath).toLowerCase();
+
+  if (ext === ".png") {
+    return "png";
+  }
+  if (ext === ".jpg" || ext === ".jpeg") {
+    return "jpeg";
+  }
+  if (ext === ".gif") {
+    return "gif";
+  }
+  if (ext === ".webp") {
+    return "webp";
+  }
+
+  return undefined;
+}
+
+function parseImageDimensions(
+  buffer: Uint8Array,
+  format: ImageFormat,
+): ImageDimensions {
+  switch (format) {
+    case "png":
+      return parsePngDimensions(buffer);
+    case "jpeg":
+      return parseJpegDimensions(buffer);
+    case "gif":
+      return parseGifDimensions(buffer);
+    case "webp":
+      return { width: 0, height: 0 };
+  }
+}
+
+function parsePngDimensions(buffer: Uint8Array): ImageDimensions {
+  const bytes = Buffer.from(buffer);
+  if (bytes.length < 24) {
+    return { width: 0, height: 0 };
+  }
+
+  return {
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+  };
+}
+
+function parseJpegDimensions(buffer: Uint8Array): ImageDimensions {
+  const bytes = Buffer.from(buffer);
+  const sofMarkers = new Set([
+    0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce,
+    0xcf,
+  ]);
+  let offset = 2;
+
+  while (offset < bytes.length - 9) {
+    if (bytes[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    const marker = bytes[offset + 1];
+    if (marker !== undefined && sofMarkers.has(marker)) {
+      return {
+        height: bytes.readUInt16BE(offset + 5),
+        width: bytes.readUInt16BE(offset + 7),
+      };
+    }
+
+    if (offset + 3 >= bytes.length) {
+      break;
+    }
+
+    const segmentLength = bytes.readUInt16BE(offset + 2);
+    offset += 2 + segmentLength;
+  }
+
+  return { width: 0, height: 0 };
+}
+
+function parseGifDimensions(buffer: Uint8Array): ImageDimensions {
+  const bytes = Buffer.from(buffer);
+  if (bytes.length < 10) {
+    return { width: 0, height: 0 };
+  }
+
+  return {
+    width: bytes.readUInt16LE(6),
+    height: bytes.readUInt16LE(8),
+  };
+}
 
 // WriteFile Tool
 const WriteFileSchema = z.object({
