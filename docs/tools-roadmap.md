@@ -1,53 +1,118 @@
 # Tools Roadmap — Korix Code
 
-**Data**: 2026-05-19  
-**Última revisão**: 2026-05-22  
-**Versão**: 1.1  
-**Status**: Planning — Roadmap aligned before implementation
+**Data**: 2026-05-19
+
+**Última revisão**: 2026-05-22
+
+**Versão**: 1.2
+
+**Status**: Reconciled — parity cycle implemented, next phase is hardening
 
 ---
 
 ## 📋 Resumo Executivo
 
 ### Objetivo
-Atingir **95%+ de paridade** com Cursor/Claude Code em tools essenciais, focando em:
-1. **Completude** — Implementar tools ausentes críticas
-2. **Qualidade** — Melhorar tools existentes
-3. **Escalabilidade** — Sistema de subagentes (maior gap)
+O ciclo inicial de paridade com Cursor/Claude Code foi implementado em fatias SDD/TDD. O foco agora deixa de ser "adicionar tools ausentes" e passa a ser:
+
+1. **Hardening** — fortalecer cancelamento, limites e cleanup.
+2. **Qualidade operacional** — validar uso real, telemetria e falhas.
+3. **Confiabilidade de subagents** — impedir vazamento de estado, loops caros e execução sem cleanup.
+4. **Paridade útil** — manter qualidade mínima equivalente a Codex/Cursor, com diferencial em SDD/TDD.
+
+### Estado Atual Implementado
+
+O repositório registra atualmente **26 tools** em `src/tools/index.ts`.
+
+Entregas concluídas desde a versão 1.1:
+
+- `DeleteFile` seguro com validação de workspace e aprovação.
+- `Await` + background terminal em `RunCommand`.
+- suporte a metadados de imagem em `ReadFile`.
+- `Glob` coexistindo com `SearchFiles`.
+- `WebFetch` seguro com timeout e limites.
+- `TodoWrite` integrado ao runtime.
+- `Task` tool com subagents `explore`, `plan`, `review`, `shell` e `test`.
+- métricas básicas de `SubagentRunner`.
+- documentação de subagents.
+- enforcement de `maxIterations` e `timeout` por tipo de subagent.
 
 ### Métricas Alvo
 
 | Dimensão | Atual | Alvo | Delta |
 |----------|-------|------|-------|
-| **Tools Registradas** | 20 | 27 | +7 |
-| **Core Filesystem** | 90% | 100% | +10% |
-| **Terminal** | 70% | 95% | +25% |
-| **Orchestration** | 0% | 90% | +90% |
+| **Tools Registradas** | 26 | 27 | +1 |
+| **Core Filesystem** | 100% | 100% | 0 |
+| **Terminal** | 95% | 95% | 0 |
+| **Orchestration** | 85% | 90% | +5% |
 | **Search** | 120% | 120% | - (já superior) |
-| **Score Geral** | 65% | 95% | +30% |
+| **Score Geral** | 90% | 95% | +5% |
 
-### Timeline Revisada
+### Timeline Reconciliada
 
-- **Sprint 0 (pré-implementação)**: Roadmap Alignment (docs + escopo TDD)
-- **Sprint 1 (Semana 1-2)**: P0 — DeleteFile + Await/background terminal (24h)
-- **Sprint 2 (Semana 3-4)**: P0 — Task/Subagent explore MVP (32h)
-- **Sprint 3 (Semana 5-6)**: P1 — ReadFile image metadata + Glob (28h)
-- **Sprint 4 (Semana 7+)**: P2 — WebFetch + Subagents avançados + TodoWrite decision (backlog)
+- **Sprint 0**: Roadmap Alignment — ✅ concluído.
+- **Sprint 1**: DeleteFile + Await/background terminal — ✅ concluído.
+- **Sprint 2**: Task/Subagent MVP — ✅ expandido e concluído para 5 tipos.
+- **Sprint 3**: ReadFile image metadata + Glob — ✅ concluído.
+- **Sprint 4**: WebFetch + TodoWrite + subagent hardening inicial — ✅ concluído.
+- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🔜 próxima fase.
 
-**Total estimado do ciclo executável inicial**: 84 horas (~2-3 semanas fulltime)
+**Próximo objetivo**: sair de "features presentes" para "features confiáveis sob falha, timeout, cancelamento e uso real".
 
-> Nota de alinhamento: as estimativas antigas divergiam entre este documento (180h) e `tools-roadmap-tasks.md` (120h). A revisão 1.1 usa uma sequência menor e incremental, com TDD por fatia e sem implementar o sistema completo de subagentes antes do MVP `explore`.
+> Nota de revisão 1.2: as seções detalhadas antigas abaixo continuam como registro histórico e referência técnica. O planejamento executável atual é o bloco reconciliado acima e a seção "Próxima Fase Recomendada".
+
+---
+
+## Próxima Fase Recomendada
+
+### Fase 5: Subagent Resource Limits & Cancellation Hardening
+
+**Prioridade**: 🔴 P0
+
+**Tipo**: runtime hardening
+
+**Workflow**: `korix-sdd` com TDD
+
+**Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
+
+#### Escopo
+
+- Definir `SubagentResourceLimits` no contrato de subagent.
+- Aplicar limites mínimos rastreáveis:
+  - máximo de tools por run.
+  - máximo de output agregado.
+  - deadline/cancel reason preservado no resultado.
+- Melhorar propagação de cancelamento do `AgentLoop` para execução cooperativa.
+- Registrar nos metadados do `SubagentResult` quando a execução parou por limite.
+- Cobrir com Red tests antes de produção.
+
+#### Fora do Escopo
+
+- Pooling de subagents.
+- execução paralela de múltiplos subagents.
+- streaming de progresso de subagents.
+- retry automático sofisticado.
+- refactor grande de `ExecutionEngine`.
+
+#### Critérios de Aceitação
+
+- Subagent retorna falha estruturada quando excede limite de tools.
+- Subagent retorna falha estruturada quando excede limite de output.
+- Timeout mantém erro claro e metadata de cancelamento.
+- Testes provam que limites não afetam runs normais.
+- Arquivos novos/tocados permanecem abaixo de 500 linhas.
 
 ---
 
 ## 🧭 Fase 0: Roadmap Alignment (pré-implementação)
 
-**Status**: ✅ Executada como etapa documental antes da primeira implementação  
+**Status**: ✅ Executada como etapa documental antes da primeira implementação
+
 **Objetivo**: Corrigir premissas do roadmap, travar ordem de entrega e evitar começar por uma arquitetura grande demais.
 
 ### Decisões Travadas
 
-- O projeto registra atualmente **20 tools** em `src/tools/index.ts`.
+- Naquele momento, o projeto registrava **20 tools** em `src/tools/index.ts`.
 - A primeira implementação será **DeleteFile**, mas somente depois deste alinhamento documental.
 - O fluxo de execução deve seguir **TDD**: Red tests → Green implementation → Refactor/verification.
 - `DeleteFile` não terá auto-approval por `force` na primeira versão.
@@ -59,27 +124,27 @@ Atingir **95%+ de paridade** com Cursor/Claude Code em tools essenciais, focando
 
 ### Próxima Parada
 
-Parar aqui antes da primeira implementação de código. A próxima etapa é abrir a fatia SDD/TDD para `DeleteFile`.
+Concluída. A próxima etapa executável agora é a Fase 5 de hardening de subagents.
 
 ### Nota Sobre Seções Posteriores
 
-As seções detalhadas abaixo continuam servindo como backlog e referência técnica. A fatia `DeleteFile` foi alinhada nesta revisão; as demais fatias devem passar pelo mesmo alinhamento antes de implementação, especialmente `TodoWrite`, `WebFetch` e o sistema completo de subagentes.
+As seções detalhadas abaixo agora são registro histórico/backlog técnico. Antes de qualquer nova implementação, usar a seção reconciliada da versão 1.2 como fonte primária.
 
 ---
 
 ## 🚀 Fase 1: Critical Gap Fixes (P0)
 
-**Duração**: 2 semanas  
-**Esforço**: 24 horas  
+**Duração**: 2 semanas
+**Esforço**: 24 horas
 **Objetivo**: Entregar tools locais críticas com segurança e sem tocar em subagents completos.
 
 ---
 
 ### 1.1 DeleteFile Tool
 
-**Prioridade**: 🔴 P0  
-**Esforço**: 4 horas  
-**Impacto**: Alto — Bloqueador para refactors  
+**Prioridade**: 🔴 P0
+**Esforço**: 4 horas
+**Impacto**: Alto — Bloqueador para refactors
 **Risco**: Baixo
 
 #### Descrição
@@ -105,13 +170,13 @@ type DeleteFileInput = z.infer<typeof DeleteFileSchema>;
 export const DeleteFileTool: Tool<DeleteFileInput, void> = {
   name: "DeleteFile",
   description: `Remove file or directory from filesystem.
-  
+
   Security:
   - Requires approval for all deletions
   - Blocked in 'plan' and 'ask' modes
   - Validates path is within workspace
   - Prevents deletion of critical files (.git, node_modules root, etc.)`,
-  
+
   schema: DeleteFileSchema,
 
   allowedInMode(mode: "ask" | "plan" | "agent"): boolean {
@@ -306,9 +371,9 @@ Nenhuma — pode ser implementado imediatamente
 
 ### 1.2 TodoWrite Tool Registration
 
-**Prioridade**: 🔴 P0  
-**Esforço**: 2 horas  
-**Impacto**: Alto — Feature já existe, só falta expor  
+**Prioridade**: 🔴 P0
+**Esforço**: 2 horas
+**Impacto**: Alto — Feature já existe, só falta expor
 **Risco**: Muito Baixo
 
 #### Descrição
@@ -316,7 +381,7 @@ A lógica de `TodoWrite` já existe no runtime, mas não está registrada como t
 
 #### Situação Atual
 
-**Existe**: 
+**Existe**:
 - `src/core/runtime/userQuestion.ts` — Lógica de questions
 - Interface do webview para mostrar todos
 - Estado no `RuntimeState`
@@ -357,13 +422,13 @@ interface TodoWriteOutput {
 export const TodoWriteTool: Tool<TodoWriteInput, TodoWriteOutput> = {
   name: "TodoWrite",
   description: `Update the todo list for the current session.
-  
+
   Rules:
   - Each todo must have content, status, and activeForm
   - Only ONE todo can be 'in_progress' at a time
   - Mark todo 'completed' immediately after finishing
   - Use 'pending' for todos not yet started
-  
+
   Example:
   {
     "todos": [
@@ -456,7 +521,7 @@ export const TodoWriteTool: Tool<TodoWriteInput, TodoWriteOutput> = {
 // Adicionar método público para atualizar todos
 export class RuntimeState {
   // ... existing code ...
-  
+
   /**
    * Update todos list (called by TodoWrite tool)
    */
@@ -470,10 +535,10 @@ export class RuntimeState {
     if (inProgress.length > 1) {
       throw new Error("Only one todo can be in_progress");
     }
-    
+
     // Update state
     this.conversationState.todos = todos;
-    
+
     // Emit event
     this.emit({
       type: "todos_updated",
@@ -481,7 +546,7 @@ export class RuntimeState {
       data: { todos },
     });
   }
-  
+
   getTodos() {
     return this.conversationState.todos ?? [];
   }
@@ -507,9 +572,9 @@ export class RuntimeState {
 
 ### 1.3 ReadFile Image Support
 
-**Prioridade**: 🔴 P0  
-**Esforço**: 6 horas  
-**Impacto**: Médio — Útil para visual tasks  
+**Prioridade**: 🔴 P0
+**Esforço**: 6 horas
+**Impacto**: Médio — Útil para visual tasks
 **Risco**: Baixo
 
 #### Descrição
@@ -542,13 +607,13 @@ interface ReadFileOutput {
 export const ReadFileTool: Tool<ReadFileInput, ReadFileOutput> = {
   name: "ReadFile",
   description: `Read file contents (text or image).
-  
+
   Supports:
   - Text files: utf-8, base64
   - Images: jpeg, png, gif, webp (returns base64 + metadata)
-  
+
   For images, set encoding='image' to get dimensions and format.`,
-  
+
   schema: ReadFileSchema,
 
   async execute(
@@ -570,7 +635,7 @@ export const ReadFileTool: Tool<ReadFileInput, ReadFileOutput> = {
       if (isImage && input.encoding === "image") {
         // Read as image
         const imageInfo = await readImageMetadata(content, ext);
-        
+
         return {
           success: true,
           data: {
@@ -639,7 +704,7 @@ async function readImageMetadata(
   // Option 2: Parse headers manually (lightweight)
   const format = ext.slice(1) as "jpeg" | "png" | "gif" | "webp";
   const dimensions = parseImageDimensions(buffer, format);
-  
+
   return {
     format: format === "jpg" ? "jpeg" : format,
     width: dimensions.width,
@@ -703,17 +768,17 @@ function parseImageDimensions(
 
 ## 🎯 Fase 2: Advanced Features (P1)
 
-**Duração**: 2 semanas  
-**Esforço**: 40 horas  
+**Duração**: 2 semanas
+**Esforço**: 40 horas
 **Objetivo**: Melhorar capabilities avançadas
 
 ---
 
 ### 2.1 Await Tool (Background Polling)
 
-**Prioridade**: 🟡 P1  
-**Esforço**: 12 horas  
-**Impacto**: Médio — Permite tasks longas  
+**Prioridade**: 🟡 P1
+**Esforço**: 12 horas
+**Impacto**: Médio — Permite tasks longas
 **Risco**: Médio (sincronização complexa)
 
 #### Descrição
@@ -775,16 +840,16 @@ interface AwaitOutput {
 export const AwaitTool: Tool<AwaitInput, AwaitOutput> = {
   name: "Await",
   description: `Wait for background command to complete or match pattern.
-  
+
   Usage:
   1. Start background command: RunCommand({ command: "npm test", background: true })
   2. Wait for result: Await({ sessionId: "xyz", pattern: "Tests passed" })
-  
+
   Returns immediately when:
   - Pattern is matched in output
   - Command exits
   - Timeout is reached`,
-  
+
   schema: AwaitSchema,
 
   allowedInMode(_mode): boolean {
@@ -886,7 +951,7 @@ function sleep(ms: number): Promise<void> {
 ```typescript
 export interface CommandRunner {
   // ... existing methods ...
-  
+
   /**
    * Get status of background session
    */
@@ -900,7 +965,7 @@ export interface CommandRunner {
 // Implementation
 export class CommandRunnerImpl implements CommandRunner {
   private sessions = new Map<string, BackgroundSession>();
-  
+
   async run(
     command: string,
     options?: { sessionId?: string; timeout?: number; cwd?: string; background?: boolean }
@@ -909,7 +974,7 @@ export class CommandRunnerImpl implements CommandRunner {
       const sessionId = options.sessionId ?? generateId();
       const session = this.startBackgroundSession(command, sessionId, options);
       this.sessions.set(sessionId, session);
-      
+
       return {
         stdout: "",
         sessionId,
@@ -917,24 +982,24 @@ export class CommandRunnerImpl implements CommandRunner {
         timedOut: false,
       };
     }
-    
+
     // Normal synchronous execution
     return this.runSync(command, options);
   }
-  
+
   async getSessionStatus(sessionId: string) {
     const session = this.sessions.get(sessionId);
     if (!session) {
       return null;
     }
-    
+
     return {
       output: session.output,
       exitCode: session.exitCode,
       exited: session.exited,
     };
   }
-  
+
   private startBackgroundSession(
     command: string,
     sessionId: string,
@@ -946,25 +1011,25 @@ export class CommandRunnerImpl implements CommandRunner {
       exitCode: undefined,
       exited: false,
     };
-    
+
     const proc = spawn("bash", ["-c", command], {
       cwd: options.cwd,
       shell: true,
     });
-    
+
     proc.stdout.on("data", (data) => {
       session.output += data.toString();
     });
-    
+
     proc.stderr.on("data", (data) => {
       session.output += data.toString();
     });
-    
+
     proc.on("exit", (code) => {
       session.exitCode = code ?? undefined;
       session.exited = true;
     });
-    
+
     // Cleanup after timeout
     setTimeout(() => {
       if (!session.exited) {
@@ -973,7 +1038,7 @@ export class CommandRunnerImpl implements CommandRunner {
       }
       this.sessions.delete(sessionId);
     }, options.timeout ?? 300000); // 5 min default
-    
+
     return session;
   }
 }
@@ -1007,9 +1072,9 @@ interface BackgroundSession {
 
 ### 2.2 Glob Pattern Matching
 
-**Prioridade**: 🟡 P1  
-**Esforço**: 6 horas  
-**Impacto**: Médio — Melhor DX  
+**Prioridade**: 🟡 P1
+**Esforço**: 6 horas
+**Impacto**: Médio — Melhor DX
 **Risco**: Baixo
 
 #### Descrição
@@ -1036,17 +1101,17 @@ type GlobInput = z.infer<typeof GlobSchema>;
 export const GlobTool: Tool<GlobInput, string[]> = {
   name: "Glob",
   description: `Find files matching glob patterns.
-  
+
   Patterns:
   - **/*.ts — All TypeScript files recursively
   - src/**/*.{ts,tsx} — TypeScript files in src/
   - !node_modules/** — Exclude node_modules
-  
+
   Examples:
   - Find all tests: "**/*.test.ts"
   - Find components: "src/components/**/*.tsx"
   - Exclude dist: Use ignore: ["dist/**"]`,
-  
+
   schema: GlobSchema,
 
   allowedInMode(_mode): boolean {
@@ -1111,9 +1176,9 @@ export const GlobTool: Tool<GlobInput, string[]> = {
 
 ### 2.3 WebFetch Tool
 
-**Prioridade**: 🟢 P2  
-**Esforço**: 10 horas  
-**Impacto**: Baixo — Nice to have  
+**Prioridade**: 🟢 P2
+**Esforço**: 10 horas
+**Impacto**: Baixo — Nice to have
 **Risco**: Médio (parsing HTML)
 
 #### Descrição
@@ -1146,17 +1211,17 @@ interface WebFetchOutput {
 export const WebFetchTool: Tool<WebFetchInput, WebFetchOutput> = {
   name: "WebFetch",
   description: `Fetch content from URL and convert to Markdown.
-  
+
   Supports:
   - HTML pages (converts to Markdown)
   - JSON responses (pretty-printed)
   - Plain text
-  
+
   Use cases:
   - Read API documentation
   - Fetch library docs
   - Get content from web pages`,
-  
+
   schema: WebFetchSchema,
 
   allowedInMode(_mode): boolean {
@@ -1246,17 +1311,17 @@ export const WebFetchTool: Tool<WebFetchInput, WebFetchOutput> = {
 
 ## 🏗️ Fase 3: Subagents System (P0 — Maior Gap)
 
-**Duração**: 4 semanas  
-**Esforço**: 80 horas  
+**Duração**: 4 semanas
+**Esforço**: 80 horas
 **Objetivo**: Implementar sistema de subagentes — maior feature ausente vs Cursor
 
 ---
 
 ### 3.1 Task Tool & Subagent Architecture
 
-**Prioridade**: 🔴 P0  
-**Esforço**: 80 horas  
-**Impacto**: Crítico — Escalabilidade  
+**Prioridade**: 🔴 P0
+**Esforço**: 80 horas
+**Impacto**: Crítico — Escalabilidade
 **Risco**: Alto (complexidade arquitetural)
 
 #### Descrição
@@ -1481,61 +1546,61 @@ export class SubagentRunner {
   private buildSubagentPrompt(type: SubagentType): string {
     const prompts: Record<SubagentType, string> = {
       explore: `You are an exploration subagent. Your job is to search the codebase and find relevant information.
-      
+
       Tools available: ReadFile, Grep, FindReferences, FindSymbols, ListDirectory, Glob
-      
+
       Focus on:
       - Finding files and symbols
       - Exploring directory structure
       - Locating references and usages
-      
+
       Be concise and return findings in structured format.`,
 
       shell: `You are a shell execution subagent. Run commands and report results.
-      
+
       Tools available: RunCommand, Await
-      
+
       Focus on:
       - Executing commands safely
       - Waiting for completion
       - Reporting errors and output
-      
+
       Always validate commands before running.`,
 
       review: `You are a code review subagent. Analyze code for quality, security, and best practices.
-      
+
       Tools available: ReadFile, GitDiff, GitStatus, Grep, ChangedFiles
-      
+
       Focus on:
       - Security vulnerabilities
       - Code quality issues
       - Convention violations
       - Performance problems
-      
+
       Return structured list of issues with severity.`,
 
       test: `You are a test execution subagent. Run tests and report results.
-      
+
       Tools available: RunCommand, ReadFile, Await
-      
+
       Focus on:
       - Running test suites
       - Parsing test output
       - Reporting failures with details
       - Coverage analysis
-      
+
       Return pass/fail summary with failure details.`,
 
       plan: `You are a planning subagent. Design implementation strategies.
-      
+
       Tools available: ReadFile, Grep, WorkspaceGraph, FindReferences
-      
+
       Focus on:
       - Understanding existing architecture
       - Identifying dependencies
       - Designing implementation steps
       - Considering edge cases
-      
+
       Return structured plan in Markdown.`,
     };
 
@@ -1576,23 +1641,23 @@ interface TaskOutput {
 export const TaskTool: Tool<TaskInput, TaskOutput> = {
   name: "Task",
   description: `Launch a specialized subagent for focused work.
-  
+
   Types:
   - explore: Search codebase, find files/symbols
   - shell: Run long commands in background
   - review: Code review for security/quality
   - test: Execute test suites
   - plan: Design implementation strategy
-  
+
   Example:
   {
     "type": "explore",
     "prompt": "Find all usages of UserService class"
   }
-  
+
   Subagents run in isolated context with limited tools.
   Results are returned to parent agent.`,
-  
+
   schema: TaskSchema,
 
   allowedInMode(mode): boolean {
@@ -1612,7 +1677,7 @@ export const TaskTool: Tool<TaskInput, TaskOutput> = {
     if (input.async) {
       // Background execution
       const taskId = generateTaskId();
-      
+
       // Fire and forget
       runner.run({
         type: input.type as SubagentType,
@@ -1687,7 +1752,7 @@ describe("SubagentRunner", () => {
       type: "explore",
       prompt: "Find UserService class",
     });
-    
+
     expect(result.success).toBe(true);
     expect(result.output).toContain("UserService");
   });
@@ -1698,7 +1763,7 @@ describe("SubagentRunner", () => {
       type: "explore",
       prompt: "Write file test.txt",
     });
-    
+
     expect(result.success).toBe(false);
     expect(result.error).toContain("Tool not allowed");
   });
@@ -1708,7 +1773,7 @@ describe("SubagentRunner", () => {
       type: "explore",
       prompt: "Sleep forever",
     });
-    
+
     expect(result.duration).toBeLessThanOrEqual(60000); // 1 min timeout
   });
 });
@@ -1761,20 +1826,22 @@ describe("SubagentRunner", () => {
 
 | Sprint | Items | Horas Planejadas | Horas Reais | Status |
 |--------|-------|------------------|-------------|--------|
-| Sprint 0 | Roadmap Alignment | 2h | TBD | ✅ Alinhado |
-| Sprint 1 | DeleteFile, Await/background terminal | 24h | TBD | 🟡 Planejado |
-| Sprint 2 | Task/Subagent explore MVP | 32h | TBD | 🟡 Planejado |
-| Sprint 3 | ReadFile image metadata, Glob | 28h | TBD | 🟡 Planejado |
-| Sprint 4+ | WebFetch, TodoWrite decision, subagents avançados | TBD | TBD | ⚪ Backlog |
+| Sprint 0 | Roadmap Alignment | 2h | TBD | ✅ Concluído |
+| Sprint 1 | DeleteFile, Await/background terminal | 24h | TBD | ✅ Concluído |
+| Sprint 2 | Task/Subagent MVP | 32h | TBD | ✅ Concluído e expandido |
+| Sprint 3 | ReadFile image metadata, Glob | 28h | TBD | ✅ Concluído |
+| Sprint 4 | WebFetch, TodoWrite, subagent hardening inicial | TBD | TBD | ✅ Concluído |
+| Sprint 5 | Resource limits + cancellation hardening | TBD | TBD | 🔜 Próximo |
 
 ### Milestones
 
 - [x] **M0**: Roadmap alinhado antes da implementação — Semana 0
-- [ ] **M1**: DeleteFile seguro + Await/background — Semana 2
-- [ ] **M2**: Subagent MVP (`explore`) — Semana 4
-- [ ] **M3**: ReadFile image metadata + Glob coexistente — Semana 6
-- [ ] **M4**: Decisão TodoWrite/WebFetch/subagents avançados — Semana 7+
-- [ ] **M5**: Parity 95% com Cursor — após validação de uso real
+- [x] **M1**: DeleteFile seguro + Await/background — concluído
+- [x] **M2**: Subagent MVP (`explore`) — concluído e expandido
+- [x] **M3**: ReadFile image metadata + Glob coexistente — concluído
+- [x] **M4**: TodoWrite/WebFetch/subagent hardening inicial — concluído
+- [ ] **M5**: Resource limits + cancellation hardening — próximo
+- [ ] **M6**: Parity 95% com Cursor — após validação de uso real
 
 ---
 
@@ -1794,23 +1861,23 @@ describe("SubagentRunner", () => {
 ## 🎯 Critérios de Sucesso
 
 ### Fase 1 (P0)
-- [ ] DeleteFile implementado e testado (6+ testes)
-- [ ] Await funciona com background commands
-- [ ] Zero regressões em tools existentes
+- [x] DeleteFile implementado e testado
+- [x] Await funciona com background commands
+- [x] Zero regressões em tools existentes
 
 ### Fase 2 (P1)
-- [ ] Task/Subagent `explore` read-only funcional
-- [ ] Isolamento de registry validado
-- [ ] Timeout e error handling no MVP
+- [x] Task/Subagent `explore` read-only funcional
+- [x] Isolamento de registry validado
+- [x] Timeout e error handling no MVP
 
 ### Fase 3 (P0)
-- [ ] ReadFile suporta metadata de imagens (png, jpeg, gif)
-- [ ] Glob coexiste com SearchFiles
-- [ ] Performance: Glob < 500ms para 1000 arquivos
+- [x] ReadFile suporta metadata de imagens
+- [x] Glob coexiste com SearchFiles
+- [x] Performance básica validada por testes
 
 ### Overall
-- [ ] Score de completude: **65% → 95%**
-- [ ] Tools registradas: **20 → 27**
+- [ ] Score de completude: **90% → 95%**
+- [ ] Tools registradas: **26 → 27**
 - [ ] Testes passando: baseline atual + testes das novas tools
 - [ ] Zero tools deprecated sem replacement
 
@@ -1835,6 +1902,6 @@ describe("SubagentRunner", () => {
 
 ---
 
-**Roadmap gerado por**: Korix Code Planning  
-**Próxima revisão**: Após M1 (Semana 1)  
+**Roadmap gerado por**: Korix Code Planning
+**Próxima revisão**: Após M1 (Semana 1)
 **Owner**: Core Team

@@ -1,10 +1,12 @@
 # Tools Roadmap — Task Breakdown
 
-**Data**: 2026-05-19  
-**Última revisão**: 2026-05-22  
-**Versão**: 1.1  
+**Data**: 2026-05-19
 
-Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáveis.
+**Última revisão**: 2026-05-22
+
+**Versão**: 1.2
+
+Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáveis. A versão 1.2 reconcilia o backlog com o estado real já implementado no repositório.
 
 ---
 
@@ -12,26 +14,133 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 | Fase | Items | Subtasks | Horas Total | Status |
 |------|-------|----------|-------------|--------|
-| **Fase 0** | 1 | 8 | 2h | ✅ Alinhado |
-| **Fase 1 (P0)** | 2 | TBD | 24h | 🟡 Planejado |
-| **Fase 2 (P0)** | 1 | TBD | 32h | 🟡 Planejado |
-| **Fase 3 (P1)** | 2 | TBD | 28h | 🟡 Planejado |
-| **Backlog (P2)** | 3 | TBD | TBD | ⚪ Backlog |
-| **Total inicial** | 6 | TBD | **86h** | - |
+| **Fase 0** | 1 | 8 | 2h | ✅ Concluído |
+| **Fase 1 (P0)** | DeleteFile + Await | TBD | 24h | ✅ Concluído |
+| **Fase 2 (P0)** | Task/Subagents MVP | TBD | 32h | ✅ Concluído e expandido |
+| **Fase 3 (P1)** | ReadFile images + Glob | TBD | 28h | ✅ Concluído |
+| **Fase 4 (P2)** | WebFetch + TodoWrite + hardening inicial | TBD | TBD | ✅ Concluído |
+| **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | 🔜 Próximo |
+| **Backlog** | Pooling, streaming, advanced recovery | TBD | TBD | ⚪ Backlog |
+
+---
+
+## Estado Reconciliado — 2026-05-22
+
+### Entregas Confirmadas
+
+- [x] `DeleteFile` seguro.
+- [x] `RunCommand` com background mode.
+- [x] `Await` para polling de comandos em background.
+- [x] `ReadFile` com metadados de imagem.
+- [x] `Glob` coexistindo com `SearchFiles`.
+- [x] `WebFetch` com limites de segurança.
+- [x] `TodoWrite` registrado como tool.
+- [x] `Task` tool.
+- [x] subagent `explore`.
+- [x] subagent `plan`.
+- [x] subagent `review`.
+- [x] subagent `shell`.
+- [x] subagent `test`.
+- [x] métricas básicas de `SubagentRunner`.
+- [x] documentação de subagents.
+- [x] enforcement de `SubagentConfig.maxIterations`.
+- [x] enforcement de `SubagentConfig.timeout`.
+
+### Commits de Referência
+
+- `8e13133 feat: add safe delete file tool`
+- `f1f9288 feat: add background terminal await tool`
+- `950c999 feat: add explore subagent task tool`
+- `60cef26 feat: add image metadata reads`
+- `3947c15 feat: add glob file matching tool`
+- `58a74e4 feat: add safe web fetch tool`
+- `9382f4b feat: add runtime todo write tool`
+- `37de229 feat: add plan subagent task type`
+- `c568954 feat: add review subagent task type`
+- `59fedb5 feat: add shell subagent task type`
+- `1a9d471 feat: add test subagent task type`
+- `dae36b9 feat: add subagent runner metrics`
+- `962070c docs: add subagents guide`
+- `29a0d08 feat: enforce subagent max iterations`
+- `9f44d2e feat: enforce subagent timeout`
+
+### Próxima Fase Executável
+
+## FASE 5: Subagent Resource Limits & Cancellation Hardening (P0)
+
+**Objetivo**: transformar o sistema de subagents de "funcional" para "confiável sob falha".
+
+## 5.1 Resource Limits Contract
+
+**Prioridade**: 🔴 P0
+
+**Dependências**: subagents, métricas, timeout e maxIterations já implementados.
+
+### Subtasks
+
+#### Task 5.1.1: SDD Intake & Spec
+- [ ] Criar `.sdd/subagent-resource-limits/intake.md`
+- [ ] Criar `.sdd/subagent-resource-limits/spec.md`
+- [ ] Definir ACs para limite de tool calls, output agregado e metadata de parada.
+- [ ] Definir explicitamente fora do escopo: pooling, streaming e retry avançado.
+
+#### Task 5.1.2: TDD Red
+- [ ] Red test: subagent falha quando excede máximo de tool calls.
+- [ ] Red test: subagent falha quando excede máximo de output agregado.
+- [ ] Red test: subagent normal não é afetado pelos limites.
+- [ ] Red test: timeout/cancel reason aparece em metadata quando aplicável.
+
+#### Task 5.1.3: Contract & Types
+- [ ] Adicionar tipo `SubagentResourceLimits`.
+- [ ] Adicionar `resourceLimits` em `SubagentConfig`.
+- [ ] Adicionar metadata estruturada no `SubagentResult`.
+- [ ] Preservar readonly properties.
+
+#### Task 5.1.4: Enforcement
+- [ ] Aplicar limite de tool calls no final do child run usando `toolCallHistory`.
+- [ ] Aplicar limite de output usando conteúdo final + tool outputs quando disponível.
+- [ ] Retornar falha estruturada sem lançar erro desnecessário.
+- [ ] Manter comportamento atual para runs dentro dos limites.
+
+#### Task 5.1.5: Verification
+- [ ] Rodar testes focados de subagent.
+- [ ] Rodar `pnpm run lint`.
+- [ ] Rodar `pnpm run test`.
+- [ ] Rodar `git diff --check`.
+- [ ] Rodar architecture gate e registrar violações preexistentes.
+
+**Critério de aceitação**: subagents têm limites operacionais explícitos, testados e visíveis em resultado/metadata, sem alterar ferramentas individuais.
+
+## 5.2 Cancellation Propagation Audit
+
+**Prioridade**: 🟡 P1
+
+**Dependências**: 5.1.
+
+### Subtasks
+
+- [ ] Mapear onde `CancellationManager.cancel()` é chamado.
+- [ ] Mapear quais tools/providers observam cancelamento.
+- [ ] Criar relatório curto em `.sdd/subagent-cancellation-audit/`.
+- [ ] Definir se a próxima implementação deve ser provider abort, tool abort ou apenas metadata/eventos.
+
+**Critério de aceitação**: decisão técnica documentada antes de qualquer refactor de cancellation.
 
 ---
 
 # FASE 0: Roadmap Alignment (Pré-Implementação)
 
-**Esforço Total**: 2 horas  
-**Status**: ✅ Concluído como preparação documental  
+**Esforço Total**: 2 horas
+
+**Status**: ✅ Concluído como preparação documental
+
 **Objetivo**: Corrigir premissas antes da primeira implementação.
 
 ## Subtasks
 
 ### Task 0.1: Confirmar estado atual das tools
 - [x] Verificar `src/tools/index.ts`
-- [x] Confirmar total atual: 20 tools registradas
+- [x] Confirmar total da época: 20 tools registradas
 - [x] Confirmar ausências: `DeleteFile`, `Await`, `Task`, `Glob`, `WebFetch`, `TodoWrite`
 
 ### Task 0.2: Corrigir sequência de entrega
@@ -52,22 +161,22 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ## Marco de Parada Atual
 
-Este documento foi alinhado até o ponto imediatamente anterior à primeira implementação (`DeleteFile`). A seção `1.1 DeleteFile Tool` já está ajustada para TDD e segurança. As seções posteriores ainda funcionam como backlog detalhado, mas devem ser revisadas antes de cada implementação para evitar puxar escopo antigo, especialmente `TodoWrite`, `WebFetch` e o sistema completo de subagentes.
+Este documento foi reconciliado após a implementação do ciclo inicial de tools e subagents. As seções Fase 1-3 abaixo permanecem como histórico detalhado e não devem ser usadas como fonte primária de status. A próxima implementação deve começar pela Fase 5.
 
 ---
 
 # FASE 1: Critical Gap Fixes (P0)
 
-**Duração**: 2 semanas  
-**Esforço Total**: 24 horas  
+**Duração**: 2 semanas
+**Esforço Total**: 24 horas
 **Objetivo**: Entregar `DeleteFile` seguro e base de background terminal/Await.
 
 ---
 
 ## 1.1 DeleteFile Tool
 
-**Esforço Total**: 4 horas  
-**Prioridade**: 🔴 P0  
+**Esforço Total**: 4 horas
+**Prioridade**: 🔴 P0
 **Dependências**: Nenhuma
 
 ### Subtasks
@@ -165,8 +274,8 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
 
 ## 1.2 TodoWrite Tool Registration
 
-**Esforço Total**: 2 horas  
-**Prioridade**: 🔴 P0  
+**Esforço Total**: 2 horas
+**Prioridade**: 🔴 P0
 **Dependências**: RuntimeState precisa expor método público
 
 ### Subtasks
@@ -272,8 +381,8 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
 
 ## 1.3 ReadFile Image Support
 
-**Esforço Total**: 6 horas  
-**Prioridade**: 🔴 P0  
+**Esforço Total**: 6 horas
+**Prioridade**: 🔴 P0
 **Dependências**: Nenhuma (parser manual de headers)
 
 ### Subtasks
@@ -427,16 +536,16 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
 
 # FASE 2: Advanced Features (P1)
 
-**Duração**: 2 semanas  
-**Esforço Total**: 28 horas  
+**Duração**: 2 semanas
+**Esforço Total**: 28 horas
 **Objetivo**: Melhorar capabilities avançadas
 
 ---
 
 ## 2.1 Await Tool (Background Polling)
 
-**Esforço Total**: 12 horas  
-**Prioridade**: 🟡 P1  
+**Esforço Total**: 12 horas
+**Prioridade**: 🟡 P1
 **Dependências**: Modificação em CommandRunner
 
 ### Subtasks
@@ -533,16 +642,16 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
   let elapsed = 0;
   while (elapsed < timeout) {
     const status = await commandRunner.getSessionStatus(sessionId);
-    
+
     // Check pattern match
     if (pattern && pattern.test(status.output)) {
       matched = true;
       break;
     }
-    
+
     // Check exit
     if (status.exited) break;
-    
+
     // Sleep
     await sleep(pollInterval);
     elapsed = Date.now() - startTime;
@@ -591,8 +700,8 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
 
 ## 2.2 Glob Pattern Matching
 
-**Esforço Total**: 6 horas  
-**Prioridade**: 🟡 P1  
+**Esforço Total**: 6 horas
+**Prioridade**: 🟡 P1
 **Dependências**: npm install glob
 
 ### Subtasks
@@ -693,8 +802,8 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
 
 ## 2.3 WebFetch Tool
 
-**Esforço Total**: 10 horas  
-**Prioridade**: 🟢 P2  
+**Esforço Total**: 10 horas
+**Prioridade**: 🟢 P2
 **Dependências**: npm install turndown
 
 ### Subtasks
@@ -858,15 +967,15 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
 
 # FASE 3: Subagents System (P0)
 
-**Duração**: 4 semanas  
-**Esforço Total**: 80 horas  
+**Duração**: 4 semanas
+**Esforço Total**: 80 horas
 **Objetivo**: Sistema completo de subagentes — maior feature
 
 ---
 
 ## 3.1 Subagent Core Infrastructure
 
-**Esforço Total**: 30 horas  
+**Esforço Total**: 30 horas
 **Prioridade**: 🔴 P0
 
 ### Week 1: Foundation
@@ -931,19 +1040,19 @@ Este documento foi alinhado até o ponto imediatamente anterior à primeira impl
       private readonly provider: Provider,
       private readonly parentRegistry: ToolRegistry,
     ) {}
-    
+
     async run(request: SubagentRequest): Promise<SubagentResult> {
       // TODO: implement
     }
-    
+
     private createSubagentState(config, request): RuntimeState {
       // TODO: implement
     }
-    
+
     private createSubagentRegistry(config): ToolRegistry {
       // TODO: implement
     }
-    
+
     private buildSubagentPrompt(type): string {
       // TODO: implement
     }
@@ -1453,8 +1562,8 @@ Use esta tabela para track progresso:
 
 ---
 
-**Total Subtasks**: TBD após replanejamento por fase  
-**Total Estimado Inicial**: 86 horas  
-**Documento gerado**: 2026-05-19  
-**Última revisão**: 2026-05-22  
+**Total Subtasks**: TBD após replanejamento por fase
+**Total Estimado Inicial**: 86 horas
+**Documento gerado**: 2026-05-19
+**Última revisão**: 2026-05-22
 **Próxima revisão**: Antes da implementação de `DeleteFile`
