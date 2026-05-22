@@ -6,6 +6,7 @@ import {
   type SubagentRequest,
   type SubagentResult,
   type SubagentConfig,
+  type SubagentType,
 } from "./subagentTypes";
 
 export interface SubagentRunnerOptions {
@@ -17,7 +18,43 @@ export interface SubagentRunnerOptions {
   readonly createRegistry: () => ToolRegistry;
 }
 
+export interface SubagentRunnerMetrics {
+  readonly totalRuns: number;
+  readonly successfulRuns: number;
+  readonly failedRuns: number;
+  readonly totalDuration: number;
+  readonly totalIterations: number;
+  readonly runsByType: Readonly<Record<SubagentType, number>>;
+  readonly toolUsage: Readonly<Record<string, number>>;
+}
+
+interface MutableSubagentRunnerMetrics {
+  totalRuns: number;
+  successfulRuns: number;
+  failedRuns: number;
+  totalDuration: number;
+  totalIterations: number;
+  runsByType: Record<SubagentType, number>;
+  toolUsage: Record<string, number>;
+}
+
 export class SubagentRunner {
+  private readonly metrics: MutableSubagentRunnerMetrics = {
+    totalRuns: 0,
+    successfulRuns: 0,
+    failedRuns: 0,
+    totalDuration: 0,
+    totalIterations: 0,
+    runsByType: {
+      explore: 0,
+      plan: 0,
+      review: 0,
+      shell: 0,
+      test: 0,
+    },
+    toolUsage: {},
+  };
+
   constructor(private readonly options: SubagentRunnerOptions) {}
 
   async run(request: SubagentRequest): Promise<SubagentResult> {
@@ -59,7 +96,7 @@ export class SubagentRunner {
         .reverse()
         .find((message) => message.role === "assistant")?.content;
 
-      return {
+      const subagentResult: SubagentResult = {
         success: finalResult.success,
         output: output ?? "",
         iterations: finalResult.iterations,
@@ -71,10 +108,14 @@ export class SubagentRunner {
           ),
         },
       };
+
+      this.recordRunMetrics(request.type, subagentResult);
+
+      return subagentResult;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown subagent error";
-      return {
+      const subagentResult: SubagentResult = {
         success: false,
         output: "",
         iterations: 0,
@@ -84,7 +125,23 @@ export class SubagentRunner {
           toolsCalled: [],
         },
       };
+
+      this.recordRunMetrics(request.type, subagentResult);
+
+      return subagentResult;
     }
+  }
+
+  getMetrics(): SubagentRunnerMetrics {
+    return {
+      totalRuns: this.metrics.totalRuns,
+      successfulRuns: this.metrics.successfulRuns,
+      failedRuns: this.metrics.failedRuns,
+      totalDuration: this.metrics.totalDuration,
+      totalIterations: this.metrics.totalIterations,
+      runsByType: { ...this.metrics.runsByType },
+      toolUsage: { ...this.metrics.toolUsage },
+    };
   }
 
   createSubagentRegistry(config: SubagentConfig): ToolRegistry {
@@ -98,5 +155,23 @@ export class SubagentRunner {
     }
 
     return registry;
+  }
+
+  private recordRunMetrics(type: SubagentType, result: SubagentResult): void {
+    this.metrics.totalRuns += 1;
+    this.metrics.totalDuration += result.duration;
+    this.metrics.totalIterations += result.iterations;
+    this.metrics.runsByType[type] += 1;
+
+    if (result.success) {
+      this.metrics.successfulRuns += 1;
+    } else {
+      this.metrics.failedRuns += 1;
+    }
+
+    for (const toolName of result.metadata.toolsCalled) {
+      this.metrics.toolUsage[toolName] =
+        (this.metrics.toolUsage[toolName] ?? 0) + 1;
+    }
   }
 }

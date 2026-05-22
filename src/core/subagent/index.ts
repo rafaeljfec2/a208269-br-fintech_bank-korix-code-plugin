@@ -6,4 +6,8 @@ export {
   type SubagentResult,
   type SubagentType,
 } from "./subagentTypes";
-export { SubagentRunner, type SubagentRunnerOptions } from "./subagentRunner";
+export {
+  SubagentRunner,
+  type SubagentRunnerMetrics,
+  type SubagentRunnerOptions,
+} from "./subagentRunner";
