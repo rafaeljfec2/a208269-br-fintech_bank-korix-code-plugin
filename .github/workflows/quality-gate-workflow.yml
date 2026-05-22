@@ -1,0 +1,8 @@
+name: PR - Quality Gate
+on:
+  pull_request:
+
+jobs:
+  quality-gate:
+    uses: tr/a208269-br-fintech_workflows/.github/workflows/reusable_quality_gate.yml@v2
+    secrets: inherit

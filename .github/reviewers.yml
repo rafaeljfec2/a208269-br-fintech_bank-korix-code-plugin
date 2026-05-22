@@ -1,0 +1,4 @@
+reviewers:
+  defaults:
+options:
+  number_of_reviewers: 1
