@@ -1,7 +1,8 @@
 # Tools Roadmap — Task Breakdown
 
 **Data**: 2026-05-19  
-**Versão**: 1.0  
+**Última revisão**: 2026-05-22  
+**Versão**: 1.1  
 
 Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáveis.
 
@@ -11,18 +12,55 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 | Fase | Items | Subtasks | Horas Total | Status |
 |------|-------|----------|-------------|--------|
-| **Fase 1 (P0)** | 3 | 28 | 12h | 🟡 Planejado |
-| **Fase 2 (P1)** | 3 | 35 | 28h | 🟡 Planejado |
-| **Fase 3 (P0)** | 1 | 47 | 80h | 🟡 Planejado |
-| **Total** | 7 | **110** | **120h** | - |
+| **Fase 0** | 1 | 8 | 2h | ✅ Alinhado |
+| **Fase 1 (P0)** | 2 | TBD | 24h | 🟡 Planejado |
+| **Fase 2 (P0)** | 1 | TBD | 32h | 🟡 Planejado |
+| **Fase 3 (P1)** | 2 | TBD | 28h | 🟡 Planejado |
+| **Backlog (P2)** | 3 | TBD | TBD | ⚪ Backlog |
+| **Total inicial** | 6 | TBD | **86h** | - |
+
+---
+
+# FASE 0: Roadmap Alignment (Pré-Implementação)
+
+**Esforço Total**: 2 horas  
+**Status**: ✅ Concluído como preparação documental  
+**Objetivo**: Corrigir premissas antes da primeira implementação.
+
+## Subtasks
+
+### Task 0.1: Confirmar estado atual das tools
+- [x] Verificar `src/tools/index.ts`
+- [x] Confirmar total atual: 20 tools registradas
+- [x] Confirmar ausências: `DeleteFile`, `Await`, `Task`, `Glob`, `WebFetch`, `TodoWrite`
+
+### Task 0.2: Corrigir sequência de entrega
+- [x] Definir `DeleteFile` como primeira implementação
+- [x] Mover `TodoWrite` para backlog/decisão de produto
+- [x] Definir `Task/Subagents` como MVP `explore` antes de sistema completo
+- [x] Definir `Glob` como coexistente com `SearchFiles`
+- [x] Definir `WebFetch` como P2 por risco de rede
+
+### Task 0.3: Preparar TDD antes da primeira implementação
+- [x] Registrar que cada fatia começa com testes Red
+- [x] Corrigir segurança de `DeleteFile`: sem auto-approval por `force`
+- [x] Corrigir validação de path: usar `path.resolve` + `path.relative`, não `startsWith`
+
+**Critério de aceitação**: Roadmap alinhado e pronto para abrir a fatia SDD/TDD de `DeleteFile`, sem alterar código de runtime/tools.
+
+---
+
+## Marco de Parada Atual
+
+Este documento foi alinhado até o ponto imediatamente anterior à primeira implementação (`DeleteFile`). A seção `1.1 DeleteFile Tool` já está ajustada para TDD e segurança. As seções posteriores ainda funcionam como backlog detalhado, mas devem ser revisadas antes de cada implementação para evitar puxar escopo antigo, especialmente `TodoWrite`, `WebFetch` e o sistema completo de subagentes.
 
 ---
 
 # FASE 1: Critical Gap Fixes (P0)
 
 **Duração**: 2 semanas  
-**Esforço Total**: 12 horas  
-**Objetivo**: Eliminar blockers críticos
+**Esforço Total**: 24 horas  
+**Objetivo**: Entregar `DeleteFile` seguro e base de background terminal/Await.
 
 ---
 
@@ -40,7 +78,6 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [ ] Definir `DeleteFileSchema` com Zod
   - `path: string`
   - `recursive?: boolean`
-  - `force?: boolean`
 - [ ] Criar type `DeleteFileInput` com `z.infer`
 - [ ] Criar skeleton da tool com name, description, schema
 
@@ -48,64 +85,61 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ---
 
-#### Task 1.1.2: Security Validation (45min)
+#### Task 1.1.2: TDD Red — Security & Approval Tests (1h)
+- [ ] Criar arquivo `src/tools/filesystem/deleteFile.test.ts`
+- [ ] Escrever teste Red: "should delete file within workspace using trash"
+- [ ] Escrever teste Red: "should block deletion outside workspace"
+- [ ] Escrever teste Red: "should block sibling path with same prefix as workspace"
+- [ ] Escrever teste Red: "should block deletion of .git directory"
+- [ ] Escrever teste Red: "should block deletion of node_modules root"
+- [ ] Escrever teste Red: "should require approval for every deletion"
+- [ ] Rodar teste alvo e registrar falhas esperadas
+
+**Critério de aceitação**: Testes falham por comportamento ausente, não por erro de setup.
+
+---
+
+#### Task 1.1.3: Security Validation (1h)
 - [ ] Implementar função `isCriticalPath(absolutePath, workspaceRoot)`
-  - [ ] Lista de paths críticos: `.git`, `package.json`, `tsconfig.json`, `node_modules`, `.env`, `pnpm-lock.yaml`
-  - [ ] Retornar `true` se path começa com qualquer critical path
-- [ ] Implementar função `isSafePath(filePath)`
-  - [ ] Regex patterns: `/\.cache/`, `/tmp/`, `/temp/`, `/\.tmp$/`, `/\.log$/`
-  - [ ] Retornar `true` se match qualquer pattern
+  - [ ] Lista de paths críticos: `.git`, `package.json`, `tsconfig.json`, `node_modules`, `.env`, `.env.*`, `pnpm-lock.yaml`
+  - [ ] Usar `path.relative` para detectar path igual ou descendente de critical path
 - [ ] Adicionar validação de workspace bounds
-  - [ ] Verificar se `absolutePath.startsWith(workspaceRoot)`
+  - [ ] Resolver `workspaceRoot` com `path.resolve`
+  - [ ] Resolver `absolutePath` com `path.resolve(workspaceRoot, input.path)`
+  - [ ] Verificar se `path.relative(workspaceRoot, absolutePath)` começa com `..` ou é absoluto
   - [ ] Retornar erro se fora do workspace
 
 **Critério de aceitação**: Funções utilitárias testáveis isoladamente
 
 ---
 
-#### Task 1.1.3: Core Execute Logic (1h)
+#### Task 1.1.4: Core Execute Logic (1h)
 - [ ] Implementar método `execute()`
   - [ ] Normalizar path (absoluto vs relativo)
-  - [ ] Validar workspace bounds (usar validação de 1.1.2)
-  - [ ] Validar critical paths (usar validação de 1.1.2)
+  - [ ] Validar workspace bounds (usar validação de 1.1.3)
+  - [ ] Validar critical paths (usar validação de 1.1.3)
   - [ ] Criar `vscode.Uri.file(absolutePath)`
   - [ ] Verificar se path existe (`vscode.workspace.fs.stat`)
   - [ ] Chamar `vscode.workspace.fs.delete(uri, { recursive, useTrash: true })`
   - [ ] Retornar `ToolResult` com success/error
 - [ ] Implementar `allowedInMode()` — apenas `agent`
-- [ ] Implementar `requiresApproval()` — usar `isSafePath()` + `force` flag
+- [ ] Implementar `requiresApproval()` — sempre `true`
 
 **Critério de aceitação**: Tool executa delete com validações
 
 ---
 
-#### Task 1.1.4: Unit Tests (1h)
-- [ ] Criar arquivo `src/tools/filesystem/deleteFile.test.ts`
-- [ ] Setup mocks (vscode.workspace.fs, context)
-- [ ] Teste: "should delete file within workspace"
-  - Input: `{ path: "test.txt" }`
-  - Assert: `result.success === true`
-- [ ] Teste: "should block deletion outside workspace"
-  - Input: `{ path: "/etc/passwd" }`
-  - Assert: `result.success === false`, error contains "outside workspace"
-- [ ] Teste: "should block deletion of .git directory"
-  - Input: `{ path: ".git" }`
-  - Assert: error contains "critical files"
-- [ ] Teste: "should require approval for normal files"
-  - Input: `{ path: "src/index.ts" }`
-  - Assert: `requiresApproval === true`
-- [ ] Teste: "should not require approval for temp files with force"
-  - Input: `{ path: "tmp/cache.tmp", force: true }`
-  - Assert: `requiresApproval === false`
-- [ ] Teste: "should use trash for safety"
-  - Assert: `delete()` called with `{ useTrash: true }`
+#### Task 1.1.5: Green Tests & Regression (45min)
+- [ ] Rodar `pnpm test deleteFile.test.ts`
+- [ ] Confirmar que todos os testes Red viraram Green sem enfraquecer assertions
+- [ ] Adicionar teste de `allowedInMode`: bloqueia `ask` e `plan`, permite `agent`
 - [ ] Rodar testes: `pnpm test deleteFile.test.ts`
 
 **Critério de aceitação**: 6+ testes passando
 
 ---
 
-#### Task 1.1.5: Integration & Registration (30min)
+#### Task 1.1.6: Integration & Registration (30min)
 - [ ] Exportar `DeleteFileTool` em `src/tools/filesystem/deleteFile.ts`
 - [ ] Importar em `src/tools/index.ts`
 - [ ] Adicionar à lista de tools registradas (linha ~31)
@@ -118,7 +152,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ---
 
-#### Task 1.1.6: Documentation (15min)
+#### Task 1.1.7: Documentation (15min)
 - [ ] Adicionar JSDoc ao `DeleteFileTool`
 - [ ] Documentar security policies no description
 - [ ] Adicionar exemplo de uso no description
@@ -1375,16 +1409,13 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 Use esta tabela para track progresso:
 
 ```markdown
-## Sprint 1 — Phase 1 (Week 1-2)
+## Sprint 0 — Roadmap Alignment
 
 | Task ID | Descrição | Esforço | Status | Completed |
 |---------|-----------|---------|--------|-----------|
-| 1.1.1 | DeleteFile: Setup & Schema | 30min | ⚪ Todo | - |
-| 1.1.2 | DeleteFile: Security Validation | 45min | ⚪ Todo | - |
-| 1.1.3 | DeleteFile: Core Execute | 1h | ⚪ Todo | - |
-| 1.1.4 | DeleteFile: Unit Tests | 1h | ⚪ Todo | - |
-| 1.1.5 | DeleteFile: Integration | 30min | ⚪ Todo | - |
-| 1.1.6 | DeleteFile: Documentation | 15min | ⚪ Todo | - |
+| 0.1 | Confirmar estado atual das tools | 30min | ✅ Done | 2026-05-22 |
+| 0.2 | Corrigir sequência de entrega | 45min | ✅ Done | 2026-05-22 |
+| 0.3 | Preparar TDD antes da primeira implementação | 45min | ✅ Done | 2026-05-22 |
 | ... | ... | ... | ... | ... |
 
 **Status Legend**: ⚪ Todo | 🟡 In Progress | ✅ Done | ❌ Blocked
@@ -1396,35 +1427,34 @@ Use esta tabela para track progresso:
 
 ### Checkpoint 1: End of Phase 1 (Week 2)
 - [ ] DeleteFile completo e testado
-- [ ] TodoWrite registrado e funcional
-- [ ] ReadFile suporta imagens (PNG, JPEG, GIF)
+- [ ] Await/background terminal funcional
 - [ ] **Review**: Code review com time
 - [ ] **Decision**: Go/No-go para Phase 2
 
 ### Checkpoint 2: End of Phase 2 (Week 4)
-- [ ] Await tool funcional
-- [ ] Glob substituiu SearchFiles
-- [ ] WebFetch funcional (HTML→Markdown)
+- [ ] Task/Subagent `explore` MVP funcional
+- [ ] Registry read-only isolado
 - [ ] **Review**: Performance review
 - [ ] **Decision**: Priorizar optimizations ou avançar para Phase 3
 
 ### Checkpoint 3: Subagent MVP (Week 6)
-- [ ] SubagentRunner core completo
-- [ ] Task tool funcional (sync)
-- [ ] Explore + Shell subagents funcionando
+- [ ] ReadFile image metadata funcional
+- [ ] Glob coexistente com SearchFiles
 - [ ] **Review**: Architecture review
 - [ ] **Decision**: Prosseguir com outros tipos ou otimizar MVP
 
 ### Checkpoint 4: Final (Week 8)
-- [ ] Todos os 5 tipos de subagents
-- [ ] Testes completos (30+)
+- [ ] Decisão TodoWrite documentada
+- [ ] Decisão WebFetch documentada
+- [ ] Plano de subagents avançados revisado
 - [ ] Metrics & monitoring
 - [ ] Docs completos
 - [ ] **Review**: Final review & launch readiness
 
 ---
 
-**Total Subtasks**: 110  
-**Total Estimado**: 120 horas  
+**Total Subtasks**: TBD após replanejamento por fase  
+**Total Estimado Inicial**: 86 horas  
 **Documento gerado**: 2026-05-19  
-**Próxima revisão**: Após cada checkpoint
+**Última revisão**: 2026-05-22  
+**Próxima revisão**: Antes da implementação de `DeleteFile`

@@ -1,8 +1,9 @@
 # Tools Roadmap — Korix Code
 
 **Data**: 2026-05-19  
-**Versão**: 1.0  
-**Status**: Planning
+**Última revisão**: 2026-05-22  
+**Versão**: 1.1  
+**Status**: Planning — Roadmap aligned before implementation
 
 ---
 
@@ -18,29 +19,59 @@ Atingir **95%+ de paridade** com Cursor/Claude Code em tools essenciais, focando
 
 | Dimensão | Atual | Alvo | Delta |
 |----------|-------|------|-------|
-| **Tools Registradas** | 19 | 27 | +8 |
+| **Tools Registradas** | 20 | 27 | +7 |
 | **Core Filesystem** | 90% | 100% | +10% |
 | **Terminal** | 70% | 95% | +25% |
 | **Orchestration** | 0% | 90% | +90% |
 | **Search** | 120% | 120% | - (já superior) |
 | **Score Geral** | 65% | 95% | +30% |
 
-### Timeline
+### Timeline Revisada
 
-- **Sprint 1 (Semana 1-2)**: P0 — Critical Gap Fixes (60h)
-- **Sprint 2 (Semana 3-4)**: P1 — Advanced Features (40h)
-- **Sprint 3 (Semana 5-8)**: P0 — Subagents System (80h)
-- **Sprint 4 (Semana 9+)**: P2 — Nice to Have (backlog)
+- **Sprint 0 (pré-implementação)**: Roadmap Alignment (docs + escopo TDD)
+- **Sprint 1 (Semana 1-2)**: P0 — DeleteFile + Await/background terminal (24h)
+- **Sprint 2 (Semana 3-4)**: P0 — Task/Subagent explore MVP (32h)
+- **Sprint 3 (Semana 5-6)**: P1 — ReadFile image metadata + Glob (28h)
+- **Sprint 4 (Semana 7+)**: P2 — WebFetch + Subagents avançados + TodoWrite decision (backlog)
 
-**Total estimado**: 180 horas (~4-5 semanas fulltime)
+**Total estimado do ciclo executável inicial**: 84 horas (~2-3 semanas fulltime)
+
+> Nota de alinhamento: as estimativas antigas divergiam entre este documento (180h) e `tools-roadmap-tasks.md` (120h). A revisão 1.1 usa uma sequência menor e incremental, com TDD por fatia e sem implementar o sistema completo de subagentes antes do MVP `explore`.
+
+---
+
+## 🧭 Fase 0: Roadmap Alignment (pré-implementação)
+
+**Status**: ✅ Executada como etapa documental antes da primeira implementação  
+**Objetivo**: Corrigir premissas do roadmap, travar ordem de entrega e evitar começar por uma arquitetura grande demais.
+
+### Decisões Travadas
+
+- O projeto registra atualmente **20 tools** em `src/tools/index.ts`.
+- A primeira implementação será **DeleteFile**, mas somente depois deste alinhamento documental.
+- O fluxo de execução deve seguir **TDD**: Red tests → Green implementation → Refactor/verification.
+- `DeleteFile` não terá auto-approval por `force` na primeira versão.
+- Validação de workspace deve usar `path.resolve` + `path.relative`, não `startsWith`.
+- `TodoWrite` fica fora da primeira sequência até haver decisão clara de produto/runtime.
+- `Task/Subagents` começa com MVP `explore` read-only, não com 5 tipos de subagentes.
+- `SearchFiles` deve coexistir com `Glob`; não será removida/deprecada no primeiro corte.
+- `WebFetch` é P2 por risco de rede/segurança.
+
+### Próxima Parada
+
+Parar aqui antes da primeira implementação de código. A próxima etapa é abrir a fatia SDD/TDD para `DeleteFile`.
+
+### Nota Sobre Seções Posteriores
+
+As seções detalhadas abaixo continuam servindo como backlog e referência técnica. A fatia `DeleteFile` foi alinhada nesta revisão; as demais fatias devem passar pelo mesmo alinhamento antes de implementação, especialmente `TodoWrite`, `WebFetch` e o sistema completo de subagentes.
 
 ---
 
 ## 🚀 Fase 1: Critical Gap Fixes (P0)
 
 **Duração**: 2 semanas  
-**Esforço**: 60 horas  
-**Objetivo**: Eliminar blockers críticos
+**Esforço**: 24 horas  
+**Objetivo**: Entregar tools locais críticas com segurança e sem tocar em subagents completos.
 
 ---
 
@@ -67,7 +98,6 @@ import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
 const DeleteFileSchema = z.object({
   path: z.string().describe("Absolute or relative path to file/directory"),
   recursive: z.boolean().optional().describe("Delete directory recursively"),
-  force: z.boolean().optional().describe("Force delete without confirmation"),
 });
 
 type DeleteFileInput = z.infer<typeof DeleteFileSchema>;
@@ -88,11 +118,7 @@ export const DeleteFileTool: Tool<DeleteFileInput, void> = {
     return mode === "agent"; // Only in agent mode
   },
 
-  requiresApproval(input: DeleteFileInput, context: ToolContext): boolean {
-    // Always require approval unless force=true AND file is in temp/cache
-    if (input.force && isSafePath(input.path)) {
-      return false;
-    }
+  requiresApproval(_input: DeleteFileInput, _context: ToolContext): boolean {
     return true;
   },
 
@@ -102,12 +128,12 @@ export const DeleteFileTool: Tool<DeleteFileInput, void> = {
   ): Promise<ToolResult<void>> {
     try {
       // Normalize path
-      const absolutePath = path.isAbsolute(input.path)
-        ? input.path
-        : path.join(context.workspaceRoot, input.path);
+      const workspaceRoot = path.resolve(context.workspaceRoot);
+      const absolutePath = path.resolve(workspaceRoot, input.path);
+      const relativePath = path.relative(workspaceRoot, absolutePath);
 
       // Security: Validate path is within workspace
-      if (!absolutePath.startsWith(context.workspaceRoot)) {
+      if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
         return {
           success: false,
           error: "Cannot delete files outside workspace",
@@ -177,20 +203,6 @@ export const DeleteFileTool: Tool<DeleteFileInput, void> = {
 };
 
 /**
- * Check if path is safe for auto-approval
- */
-function isSafePath(filePath: string): boolean {
-  const safePaths = [
-    /\/\.cache\//,
-    /\/tmp\//,
-    /\/temp\//,
-    /\.tmp$/,
-    /\.log$/,
-  ];
-  return safePaths.some((regex) => regex.test(filePath));
-}
-
-/**
  * Check if path is critical (never delete)
  */
 function isCriticalPath(absolutePath: string, workspaceRoot: string): boolean {
@@ -203,7 +215,10 @@ function isCriticalPath(absolutePath: string, workspaceRoot: string): boolean {
     path.join(workspaceRoot, "pnpm-lock.yaml"),
   ];
 
-  return criticalPaths.some((critical) => absolutePath.startsWith(critical));
+  return criticalPaths.some((critical) => {
+    const relativePath = path.relative(critical, absolutePath);
+    return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
+  });
 }
 ```
 
@@ -253,9 +268,9 @@ describe("DeleteFileTool", () => {
     expect(DeleteFileTool.requiresApproval?.(input, context)).toBe(true);
   });
 
-  it("should not require approval for temp files with force", () => {
-    const input = { path: "tmp/cache.tmp", force: true };
-    expect(DeleteFileTool.requiresApproval?.(input, context)).toBe(false);
+  it("should require approval even for temp files", () => {
+    const input = { path: "tmp/cache.tmp" };
+    expect(DeleteFileTool.requiresApproval?.(input, context)).toBe(true);
   });
 
   it("should use trash for safety", async () => {
@@ -273,7 +288,9 @@ describe("DeleteFileTool", () => {
 #### Checklist de Implementação
 
 - [ ] Criar `src/tools/filesystem/deleteFile.ts`
+- [ ] Criar primeiro os testes Red de segurança e permissões
 - [ ] Implementar validação de segurança (workspace bounds, critical paths)
+- [ ] Usar `path.resolve` + `path.relative` para workspace bounds
 - [ ] Adicionar suporte a `useTrash` (VSCode API)
 - [ ] Implementar `isCriticalPath()` com lista de arquivos protegidos
 - [ ] Criar testes unitários (6+ cenários)
@@ -1744,17 +1761,20 @@ describe("SubagentRunner", () => {
 
 | Sprint | Items | Horas Planejadas | Horas Reais | Status |
 |--------|-------|------------------|-------------|--------|
-| Sprint 1 | DeleteFile, TodoWrite, ReadFile+Images | 12h | TBD | 🟡 Planejado |
-| Sprint 2 | Await, Glob, WebFetch | 28h | TBD | 🟡 Planejado |
-| Sprint 3-4 | Task/Subagents | 80h | TBD | 🟡 Planejado |
+| Sprint 0 | Roadmap Alignment | 2h | TBD | ✅ Alinhado |
+| Sprint 1 | DeleteFile, Await/background terminal | 24h | TBD | 🟡 Planejado |
+| Sprint 2 | Task/Subagent explore MVP | 32h | TBD | 🟡 Planejado |
+| Sprint 3 | ReadFile image metadata, Glob | 28h | TBD | 🟡 Planejado |
+| Sprint 4+ | WebFetch, TodoWrite decision, subagents avançados | TBD | TBD | ⚪ Backlog |
 
 ### Milestones
 
-- [ ] **M1**: Core tools completas (DeleteFile, TodoWrite) — Semana 1
-- [ ] **M2**: Advanced features (Await, Glob) — Semana 3
-- [ ] **M3**: Subagent MVP (explore, shell) — Semana 6
-- [ ] **M4**: Full subagent system (todos os tipos) — Semana 8
-- [ ] **M5**: Parity 95% com Cursor — Semana 9
+- [x] **M0**: Roadmap alinhado antes da implementação — Semana 0
+- [ ] **M1**: DeleteFile seguro + Await/background — Semana 2
+- [ ] **M2**: Subagent MVP (`explore`) — Semana 4
+- [ ] **M3**: ReadFile image metadata + Glob coexistente — Semana 6
+- [ ] **M4**: Decisão TodoWrite/WebFetch/subagents avançados — Semana 7+
+- [ ] **M5**: Parity 95% com Cursor — após validação de uso real
 
 ---
 
@@ -1775,27 +1795,23 @@ describe("SubagentRunner", () => {
 
 ### Fase 1 (P0)
 - [ ] DeleteFile implementado e testado (6+ testes)
-- [ ] TodoWrite registrado como tool
-- [ ] ReadFile suporta imagens (png, jpeg, gif)
+- [ ] Await funciona com background commands
 - [ ] Zero regressões em tools existentes
 
 ### Fase 2 (P1)
-- [ ] Await funciona com background commands
-- [ ] Glob substitui SearchFiles completamente
-- [ ] WebFetch converte HTML→Markdown corretamente
-- [ ] Performance: Glob < 500ms para 1000 arquivos
+- [ ] Task/Subagent `explore` read-only funcional
+- [ ] Isolamento de registry validado
+- [ ] Timeout e error handling no MVP
 
 ### Fase 3 (P0)
-- [ ] 5 tipos de subagents funcionais
-- [ ] Isolamento de contexto validado
-- [ ] Timeout e error handling robustos
-- [ ] Métricas de performance coletadas
-- [ ] Docs completos para cada subagent type
+- [ ] ReadFile suporta metadata de imagens (png, jpeg, gif)
+- [ ] Glob coexiste com SearchFiles
+- [ ] Performance: Glob < 500ms para 1000 arquivos
 
 ### Overall
 - [ ] Score de completude: **65% → 95%**
-- [ ] Tools registradas: **19 → 27**
-- [ ] Testes passando: **83 → 150+**
+- [ ] Tools registradas: **20 → 27**
+- [ ] Testes passando: baseline atual + testes das novas tools
 - [ ] Zero tools deprecated sem replacement
 
 ---
