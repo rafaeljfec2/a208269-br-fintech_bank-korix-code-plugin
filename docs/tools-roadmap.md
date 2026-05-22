@@ -75,7 +75,7 @@ Entregas concluídas desde a versão 1.1:
 
 **Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
 
-**Status atual**: `5.1 Resource Limits Contract` implementado. Próximo corte recomendado: `5.2 Cancellation Propagation Audit`.
+**Status atual**: `5.1 Resource Limits Contract` e `5.2 Cancellation Propagation Audit` implementados. Próximo corte recomendado: `5.3 Provider Abort Propagation`.
 
 #### Escopo
 

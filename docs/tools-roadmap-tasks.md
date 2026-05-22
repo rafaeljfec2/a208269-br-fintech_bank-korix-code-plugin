@@ -121,12 +121,36 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Mapear onde `CancellationManager.cancel()` é chamado.
-- [ ] Mapear quais tools/providers observam cancelamento.
-- [ ] Criar relatório curto em `.sdd/subagent-cancellation-audit/`.
-- [ ] Definir se a próxima implementação deve ser provider abort, tool abort ou apenas metadata/eventos.
+- [x] Mapear onde `CancellationManager.cancel()` é chamado.
+- [x] Mapear quais tools/providers observam cancelamento.
+- [x] Criar relatório curto em `.sdd/subagent-cancellation-audit/`.
+- [x] Definir se a próxima implementação deve ser provider abort, tool abort ou apenas metadata/eventos.
+
+**Status**: ✅ Implementado em `docs/subagent-cancellation-propagation-audit.md`.
+
+**Decisão**: próxima implementação deve ser `5.3 Provider Abort Propagation`.
 
 **Critério de aceitação**: decisão técnica documentada antes de qualquer refactor de cancellation.
+
+## 5.3 Provider Abort Propagation
+
+**Prioridade**: 🔴 P0
+
+**Dependências**: 5.2.
+
+### Subtasks
+
+- [ ] Criar `.sdd/provider-abort-propagation/intake.md`.
+- [ ] Criar `.sdd/provider-abort-propagation/spec.md`.
+- [ ] Red test: provider recebe `RequestContext.signal`.
+- [ ] Red test: signal fica `aborted` quando `AgentLoop` timeout dispara.
+- [ ] Passar `CancellationManager.getSignal()` para `RequestContext.signal`.
+- [ ] Rodar testes focados de runtime/provider.
+- [ ] Rodar `pnpm run lint`.
+- [ ] Rodar `pnpm run test`.
+- [ ] Rodar `git diff --check`.
+
+**Critério de aceitação**: requests de provider observam cancelamento do runtime sem alterar contratos de tools.
 
 ---
 
