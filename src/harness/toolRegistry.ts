@@ -385,6 +385,7 @@ export class ToolRegistry {
       "WriteFile",
       "EditFile",
       "RunCommand",
+      "Await",
       "DeleteFile",
       "OpenFile",
     ];

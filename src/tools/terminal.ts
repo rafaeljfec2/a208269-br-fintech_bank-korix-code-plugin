@@ -16,11 +16,24 @@ const RunCommandInputSchema = z.object({
     .optional()
     .describe("Timeout in milliseconds (default: 30000)"),
   cwd: z.string().optional().describe("Working directory (optional)"),
+  background: z
+    .boolean()
+    .optional()
+    .describe("Run in background and return a sessionId immediately"),
 });
 
 type RunCommandInput = z.infer<typeof RunCommandInputSchema>;
 
-export const RunCommandTool: Tool<RunCommandInput, string> = {
+interface RunCommandOutput {
+  readonly stdout: string;
+  readonly stderr?: string;
+  readonly exitCode?: number | null;
+  readonly timedOut?: boolean;
+  readonly sessionId?: string;
+  readonly background?: boolean;
+}
+
+export const RunCommandTool: Tool<RunCommandInput, RunCommandOutput> = {
   name: "RunCommand",
   description: `Execute a shell command in a persistent terminal session.
 
@@ -28,6 +41,7 @@ Security:
 - Commands matching denylist patterns will be blocked
 - Destructive commands require approval
 - Commands timeout after specified duration (default: 30s, max: 5min)
+- Background mode returns a sessionId immediately for long-running commands
 
 Examples:
 - npm install
@@ -40,7 +54,7 @@ Examples:
   async execute(
     input: RunCommandInput,
     _context: ToolContext,
-  ): Promise<ToolResult<string>> {
+  ): Promise<ToolResult<RunCommandOutput>> {
     const container = getGlobalContainer();
     const commandRunner = container.get<CommandRunner>(TOKENS.CommandRunner);
 
@@ -58,19 +72,29 @@ Examples:
         sessionId: input.sessionId,
         timeout: input.timeout,
         cwd: input.cwd,
+        background: input.background,
       });
+
+      const output: RunCommandOutput = {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        timedOut: result.timedOut,
+        sessionId: result.sessionId,
+        background: result.background,
+      };
 
       if (result.timedOut) {
         return {
           success: false,
           error: `Command timed out after ${result.duration}ms`,
-          data: result.stdout,
+          data: output,
         };
       }
 
       return {
         success: true,
-        data: result.stdout,
+        data: output,
         metadata: {
           duration: result.duration,
           approved: true,

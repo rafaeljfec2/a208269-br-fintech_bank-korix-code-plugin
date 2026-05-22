@@ -15,6 +15,15 @@ export interface CommandResult {
   exitCode: number | null;
   timedOut: boolean;
   duration: number;
+  sessionId?: string;
+  background?: boolean;
+}
+
+export interface BackgroundSessionStatus {
+  readonly sessionId: string;
+  readonly output: string;
+  readonly exited: boolean;
+  readonly exitCode?: number | null;
 }
 
 export interface TerminalSession {
