@@ -25,11 +25,22 @@ import { CancellationManager } from "./cancellation";
 import { RuntimeMetrics } from "./runtimeMetrics";
 import { RuntimeEventEmitter } from "./runtimeEvents";
 import { RuntimeState } from "./runtimeState";
-import type { AgentLoopResult, AgentLoopRunOptions } from "./runtimeTypes";
+import type {
+  AgentLoopResult,
+  AgentLoopRunOptions,
+  StepResult,
+} from "./runtimeTypes";
 import type { RuntimeEvent } from "./runtimeEvents";
 import type { ToolUsePolicy } from "./thinking/types";
 
 const MAX_REQUIRED_TOOL_RETRIES = 1;
+
+class AgentLoopTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Execution timed out after ${timeoutMs}ms`);
+    this.name = "AgentLoopTimeoutError";
+  }
+}
 
 export class AgentLoop {
   constructor(
@@ -53,6 +64,7 @@ export class AgentLoop {
     options: AgentLoopRunOptions = {},
   ): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
     const state = new RuntimeState(context, options.maxIterations ?? 25);
+    const runStartTime = Date.now();
 
     // Add previous messages for conversation history
     if (previousMessages && previousMessages.length > 0) {
@@ -112,13 +124,20 @@ export class AgentLoop {
             options.toolUsePolicy,
             requiredToolSatisfiedForRun,
           );
-          stepResult = await this.engine.step(state, {
+          stepResult = await this.runStepWithTimeout(
+            state,
             toolUsePolicy,
-          });
+            options.timeoutMs,
+            runStartTime,
+          );
           this.recoveryManager.resetAttempts(
             `iteration_${execution.currentIteration}`,
           );
         } catch (error) {
+          if (error instanceof AgentLoopTimeoutError) {
+            throw error;
+          }
+
           // Handle error via recovery
           const recoveryAction = this.recoveryManager.handleError(
             error as Error,
@@ -309,5 +328,50 @@ export class AgentLoop {
       ...policy,
       mode: "auto",
     };
+  }
+
+  private async runStepWithTimeout(
+    state: RuntimeState,
+    toolUsePolicy: ToolUsePolicy | undefined,
+    timeoutMs: number | undefined,
+    runStartTime: number,
+  ): Promise<StepResult> {
+    if (timeoutMs === undefined) {
+      return this.engine.step(state, {
+        toolUsePolicy,
+      });
+    }
+
+    const remainingMs = timeoutMs - (Date.now() - runStartTime);
+    if (remainingMs <= 0) {
+      await this.cancellationManager.cancel(
+        `Execution timed out after ${timeoutMs}ms`,
+        state.getExecution().currentIteration,
+      );
+      throw new AgentLoopTimeoutError(timeoutMs);
+    }
+
+    const step = this.engine.step(state, {
+      toolUsePolicy,
+    });
+
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timeoutHandle = setTimeout(() => {
+        void this.cancellationManager.cancel(
+          `Execution timed out after ${timeoutMs}ms`,
+          state.getExecution().currentIteration,
+        );
+        reject(new AgentLoopTimeoutError(timeoutMs));
+      }, remainingMs);
+    });
+
+    try {
+      return await Promise.race([step, timeout]);
+    } finally {
+      if (timeoutHandle !== undefined) {
+        clearTimeout(timeoutHandle);
+      }
+    }
   }
 }

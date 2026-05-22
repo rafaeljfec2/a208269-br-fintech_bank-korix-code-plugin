@@ -76,6 +76,7 @@ export class SubagentRunner {
         undefined,
         {
           maxIterations: config.maxIterations,
+          timeoutMs: config.timeout,
           toolUsePolicy: {
             mode: "auto",
             allowedTools: config.allowedTools,

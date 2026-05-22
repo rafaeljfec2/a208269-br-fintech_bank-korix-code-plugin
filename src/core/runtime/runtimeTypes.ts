@@ -47,6 +47,7 @@ export interface StepResult {
 export interface AgentLoopRunOptions {
   readonly toolUsePolicy?: ToolUsePolicy;
   readonly maxIterations?: number;
+  readonly timeoutMs?: number;
 }
 
 export type TodoStatus = "pending" | "in_progress" | "completed";

@@ -61,4 +61,54 @@ describe("AgentLoop run options", () => {
     expect(step).toHaveBeenCalledTimes(1);
     expect(observedMaxIterations).toBe(7);
   });
+
+  it("should fail the run when custom timeout is exceeded", async () => {
+    const context: ExecutionContext = {
+      mode: "agent",
+      workspaceRoot: "/workspace",
+      openFiles: [],
+    };
+    const finalStep: StepResult = {
+      hadToolCalls: false,
+      hadInteractiveToolCalls: false,
+      hadThinking: false,
+      tokenCount: 0,
+      stopReason: "end_turn",
+      recoverable: true,
+    };
+    const step = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return finalStep;
+    });
+    const engine = { step } as unknown as ExecutionEngine;
+    const logger = new Logger({ level: "error" });
+    const eventEmitter = new RuntimeEventEmitter();
+    const checkpointManager = new CheckpointManager(logger);
+    const loop = new AgentLoop(
+      engine,
+      checkpointManager,
+      new RecoveryManager(logger, checkpointManager, eventEmitter),
+      new IterationGuard(logger, eventEmitter),
+      new CancellationManager(logger, eventEmitter),
+      new RuntimeMetrics(logger),
+      eventEmitter,
+      logger,
+    );
+
+    const generator = loop.run("run once", context, undefined, {
+      timeoutMs: 5,
+    });
+
+    let result;
+    while (true) {
+      const next = await generator.next();
+      if (next.done) {
+        result = next.value;
+        break;
+      }
+    }
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("timed out");
+  });
 });
