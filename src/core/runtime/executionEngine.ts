@@ -11,18 +11,25 @@ import type {
   ProviderEvent,
   RequestContext,
 } from "../providers/types";
-import type { ToolContext, ToolRegistry } from "../../harness/toolRegistry";
+import {
+  ToolRegistry,
+  type ToolContext,
+  type ToolRegistry as ToolRegistryType,
+} from "../../harness/toolRegistry";
 import type { PermissionManager } from "../../harness/permissions";
 import type { Logger } from "../../telemetry/logger";
 import { RuntimeEventEmitter } from "./runtimeEvents";
 import { CheckpointManager } from "./checkpoints";
+import { AgentLoop } from "./agentLoop";
 import { RuntimeMetrics } from "./runtimeMetrics";
 import { IterationGuard } from "./iterationGuard";
 import { CancellationManager } from "./cancellation";
+import { RecoveryManager } from "./recovery";
 import { RuntimeState } from "./runtimeState";
 import type { StepResult } from "./runtimeTypes";
 import { ObservationEngine } from "./thinking/ObservationEngine";
 import type { ToolUsePolicy } from "./thinking/types";
+import { SubagentRunner } from "../subagent/subagentRunner";
 
 interface PendingToolCall {
   id: string;
@@ -55,10 +62,9 @@ export class ExecutionEngine {
 
   constructor(
     private readonly provider: AIProvider,
-    private readonly toolRegistry: ToolRegistry,
+    private readonly toolRegistry: ToolRegistryType,
     private readonly permissionManager: PermissionManager,
     private readonly eventEmitter: RuntimeEventEmitter,
-    // @ts-expect-error - Reserved for future use
     private readonly __checkpointManager: CheckpointManager,
     private readonly metrics: RuntimeMetrics,
     private readonly iterationGuard: IterationGuard,
@@ -627,6 +633,54 @@ export class ExecutionEngine {
         ...(workspace.selection ? { selection: workspace.selection } : {}),
       },
       workspaceRoot: workspace.root,
+      runSubagent: (request) => {
+        const runner = new SubagentRunner({
+          parentRegistry: this.toolRegistry,
+          createRegistry: () => new ToolRegistry(),
+          createAgentLoop: (registry, systemPrompt) => {
+            const metrics = new RuntimeMetrics(this.logger);
+            const iterationGuard = new IterationGuard(
+              this.logger,
+              this.eventEmitter,
+            );
+            const cancellationManager = new CancellationManager(
+              this.logger,
+              this.eventEmitter,
+            );
+            const recoveryManager = new RecoveryManager(
+              this.logger,
+              this.__checkpointManager,
+              this.eventEmitter,
+            );
+            const engine = new ExecutionEngine(
+              this.provider,
+              registry,
+              this.permissionManager,
+              this.eventEmitter,
+              this.__checkpointManager,
+              metrics,
+              iterationGuard,
+              cancellationManager,
+              this.logger,
+              systemPrompt,
+              this.options,
+            );
+
+            return new AgentLoop(
+              engine,
+              this.__checkpointManager,
+              recoveryManager,
+              iterationGuard,
+              cancellationManager,
+              metrics,
+              this.eventEmitter,
+              this.logger,
+            );
+          },
+        });
+
+        return runner.run(request);
+      },
     };
   }
 

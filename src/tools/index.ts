@@ -6,6 +6,7 @@ import { globalToolRegistry, type Tool } from "../harness/toolRegistry";
 import { ReadFileTool, WriteFileTool, ListDirectoryTool } from "./filesystem";
 import { RunCommandTool } from "./terminal";
 import { AwaitTool } from "./terminalAwait";
+import { TaskTool } from "./task";
 import { EditFileTool } from "./edit";
 import { GitStatusTool } from "./git/gitStatus";
 import { GitDiffTool } from "./git/gitDiff";
@@ -41,6 +42,7 @@ export function registerAllTools(): void {
     // Terminal tools
     RunCommandTool,
     AwaitTool,
+    TaskTool,
     // Edit tools
     EditFileTool,
     // Git tools

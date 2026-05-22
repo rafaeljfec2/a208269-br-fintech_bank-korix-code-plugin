@@ -4,6 +4,10 @@
 
 import { z } from "zod";
 import type { ExecutionContext } from "../core/types";
+import type {
+  SubagentRequest,
+  SubagentResult,
+} from "../core/subagent/subagentTypes";
 import type { ToolDefinition } from "../providers/types";
 import { ToolCache } from "../tools/registry/ToolCache";
 import { ToolMetrics } from "../tools/registry/ToolMetrics";
@@ -13,6 +17,7 @@ export interface ToolContext {
   execution: ExecutionContext;
   workspaceRoot: string;
   userId?: string;
+  runSubagent?: (request: SubagentRequest) => Promise<SubagentResult>;
 }
 
 export interface ToolResult<T = unknown> {
@@ -388,6 +393,7 @@ export class ToolRegistry {
       "Await",
       "DeleteFile",
       "OpenFile",
+      "Task",
     ];
     return writeTools.includes(name);
   }
