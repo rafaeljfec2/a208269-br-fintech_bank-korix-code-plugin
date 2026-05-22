@@ -49,6 +49,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] propagação de `AbortSignal` do runtime para tools via `ToolContext`.
 - [x] adoção cooperativa de `ToolContext.signal` em `WebFetch` e `Await`.
 - [x] auditoria de cleanup de terminal/background sessions.
+- [x] `TerminateSession` explícita e approval-aware para sessões de terminal.
 - [x] micro-deliberação do modelo para perguntar mudança de modo antes do fluxo principal no webview.
 
 ### Commits de Referência
@@ -257,20 +258,49 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Criar `.sdd/terminal-session-termination/intake.md`.
-- [ ] Criar `.sdd/terminal-session-termination/spec.md`.
-- [ ] Red test: terminar sessão existente chama `TerminalSessionManager.killSession`.
-- [ ] Red test: sessão desconhecida retorna falha estruturada.
-- [ ] Red test: tool só fica disponível em `agent`.
-- [ ] Red test: tool exige aprovação.
-- [ ] Implementar tool explícita, tentativamente `TerminateSession`.
-- [ ] Registrar tool em `src/tools/index.ts`.
+- [x] Criar `.sdd/terminal-session-termination/intake.md`.
+- [x] Criar `.sdd/terminal-session-termination/spec.md`.
+- [x] Red test: terminar sessão existente chama `TerminalSessionManager.killSession`.
+- [x] Red test: sessão desconhecida retorna falha estruturada.
+- [x] Red test: tool só fica disponível em `agent`.
+- [x] Red test: tool exige aprovação.
+- [x] Implementar tool explícita `TerminateSession`.
+- [x] Registrar tool em `src/tools/index.ts`.
+- [x] Rodar testes focados.
+- [x] Rodar `pnpm run lint`.
+- [x] Rodar `pnpm run test`.
+- [x] Atualizar roadmap ao final da fase.
+
+**Critério de aceitação**: Korix consegue encerrar uma sessão/background work de forma explícita e auditável, sem cleanup implícito em cancelamentos.
+
+**Status**: ✅ Implementado.
+
+**Evidência**:
+
+- `src/tools/terminalTerminate.ts`
+- `src/tools/terminalTerminate.test.ts`
+- `src/terminal/commandRunner.ts`
+- `src/terminal/commandRunner.test.ts`
+
+## 5.8 Parent-to-Subagent Cancellation Link
+
+**Prioridade**: 🟡 P1
+
+**Dependências**: 5.7.
+
+### Subtasks
+
+- [ ] Criar `.sdd/parent-subagent-cancellation-link/intake.md`.
+- [ ] Mapear onde subagents criam `AgentLoop`/`CancellationManager` próprios.
+- [ ] Red test: cancelamento do parent cancela subagent em execução.
+- [ ] Implementar propagação sem compartilhar estado mutável indevido.
+- [ ] Registrar metadata de cancelamento no `SubagentResult`.
 - [ ] Rodar testes focados.
 - [ ] Rodar `pnpm run lint`.
 - [ ] Rodar `pnpm run test`.
-- [ ] Atualizar roadmap ao final da fase.
+- [ ] Atualizar roadmap.
 
-**Critério de aceitação**: Korix consegue encerrar uma sessão/background work de forma explícita e auditável, sem cleanup implícito em cancelamentos.
+**Critério de aceitação**: cancelamento do agente pai interrompe subagents filhos de forma explícita e rastreável, sem afetar sessões de terminal por efeito colateral.
 
 ## UX Guardrail: Model-Based Mode Switch Prompt
 

@@ -22,7 +22,7 @@ O ciclo inicial de paridade com Cursor/Claude Code foi implementado em fatias SD
 
 ### Estado Atual Implementado
 
-O repositório registra atualmente **26 tools** em `src/tools/index.ts`.
+O repositório registra atualmente **27 tools** em `src/tools/index.ts`.
 
 Entregas concluídas desde a versão 1.1:
 
@@ -39,12 +39,13 @@ Entregas concluídas desde a versão 1.1:
 - propagação de `AbortSignal` do runtime para providers.
 - propagação de `AbortSignal` do runtime para tools via `ToolContext`.
 - micro-deliberação do modelo para perguntar mudança de modo antes do fluxo principal no webview.
+- `TerminateSession` explícita e approval-aware para encerrar sessões de terminal.
 
 ### Métricas Alvo
 
 | Dimensão | Atual | Alvo | Delta |
 |----------|-------|------|-------|
-| **Tools Registradas** | 26 | 27 | +1 |
+| **Tools Registradas** | 27 | 27 | 0 |
 | **Core Filesystem** | 100% | 100% | 0 |
 | **Terminal** | 95% | 95% | 0 |
 | **Orchestration** | 85% | 90% | +5% |
@@ -58,7 +59,7 @@ Entregas concluídas desde a versão 1.1:
 - **Sprint 2**: Task/Subagent MVP — ✅ expandido e concluído para 5 tipos.
 - **Sprint 3**: ReadFile image metadata + Glob — ✅ concluído.
 - **Sprint 4**: WebFetch + TodoWrite + subagent hardening inicial — ✅ concluído.
-- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1` até `5.6` concluídos).
+- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1` até `5.7` concluídos).
 
 **Próximo objetivo**: sair de "features presentes" para "features confiáveis sob falha, timeout, cancelamento e uso real".
 
@@ -78,7 +79,7 @@ Entregas concluídas desde a versão 1.1:
 
 **Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
 
-**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit`, `5.3 Provider Abort Propagation`, `5.4 Tool Context Signal Propagation`, `5.5 Signal-Aware Tool Adoption` e `5.6 Terminal Session Cleanup Audit` implementados. Próximo corte recomendado: `5.7 Explicit Terminal Session Termination`.
+**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit`, `5.3 Provider Abort Propagation`, `5.4 Tool Context Signal Propagation`, `5.5 Signal-Aware Tool Adoption`, `5.6 Terminal Session Cleanup Audit` e `5.7 Explicit Terminal Session Termination` implementados. Próximo corte recomendado: `5.8 Parent-to-Subagent Cancellation Link`.
 
 #### Escopo
 
@@ -111,6 +112,7 @@ Entregas concluídas desde a versão 1.1:
 - Providers recebem `RequestContext.signal` e observam timeout do runtime.
 - Tools recebem `ToolContext.signal` e podem observar timeout do runtime.
 - `WebFetch` e `Await` observam `ToolContext.signal` de forma cooperativa.
+- Sessões de terminal podem ser encerradas explicitamente por tool approval-aware.
 - Quando um pedido exige outro modo, Korix faz uma deliberação curta do modelo e pergunta antes do fluxo principal.
 - Arquivos novos/tocados permanecem abaixo de 500 linhas.
 

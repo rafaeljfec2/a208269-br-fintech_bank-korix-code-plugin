@@ -143,4 +143,27 @@ describe("CommandRunner background sessions", () => {
     );
     expect(sessionManager.createSession).not.toHaveBeenCalled();
   });
+
+  it("should terminate an existing terminal session explicitly", () => {
+    const fakePty = new FakePty();
+    const sessionManager = createSessionManager(fakePty);
+    const runner = new CommandRunner(sessionManager, createLogger());
+
+    const terminated = runner.terminateSession("session-test");
+
+    expect(terminated).toBe(true);
+    expect(sessionManager.killSession).toHaveBeenCalledWith("session-test");
+  });
+
+  it("should not terminate an unknown terminal session", () => {
+    const fakePty = new FakePty();
+    const sessionManager = createSessionManager(fakePty);
+    vi.mocked(sessionManager.hasSession).mockReturnValue(false);
+    const runner = new CommandRunner(sessionManager, createLogger());
+
+    const terminated = runner.terminateSession("missing");
+
+    expect(terminated).toBe(false);
+    expect(sessionManager.killSession).not.toHaveBeenCalled();
+  });
 });

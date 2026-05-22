@@ -6,6 +6,7 @@ import { globalToolRegistry, type Tool } from "../harness/toolRegistry";
 import { ReadFileTool, WriteFileTool, ListDirectoryTool } from "./filesystem";
 import { RunCommandTool } from "./terminal";
 import { AwaitTool } from "./terminalAwait";
+import { TerminateSessionTool } from "./terminalTerminate";
 import { TaskTool } from "./task";
 import { TodoWriteTool } from "./todoWrite";
 import { GlobTool } from "./filesystem/glob";
@@ -47,6 +48,7 @@ export function registerAllTools(): void {
     // Terminal tools
     RunCommandTool,
     AwaitTool,
+    TerminateSessionTool,
     TaskTool,
     TodoWriteTool,
     // Edit tools

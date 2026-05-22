@@ -120,6 +120,20 @@ export class CommandRunner {
     });
   }
 
+  terminateSession(sessionId: string): boolean {
+    if (!this.sessionManager.hasSession(sessionId)) {
+      return false;
+    }
+
+    const session = this.backgroundSessions.get(sessionId);
+    if (session?.timeoutId) {
+      clearTimeout(session.timeoutId);
+    }
+    this.backgroundSessions.delete(sessionId);
+    this.sessionManager.killSession(sessionId);
+    return true;
+  }
+
   private runInBackground(
     command: string,
     options: {
