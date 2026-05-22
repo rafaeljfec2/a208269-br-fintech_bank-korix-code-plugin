@@ -36,6 +36,7 @@ Entregas concluídas desde a versão 1.1:
 - métricas básicas de `SubagentRunner`.
 - documentação de subagents.
 - enforcement de `maxIterations` e `timeout` por tipo de subagent.
+- propagação de `AbortSignal` do runtime para providers.
 
 ### Métricas Alvo
 
@@ -55,7 +56,7 @@ Entregas concluídas desde a versão 1.1:
 - **Sprint 2**: Task/Subagent MVP — ✅ expandido e concluído para 5 tipos.
 - **Sprint 3**: ReadFile image metadata + Glob — ✅ concluído.
 - **Sprint 4**: WebFetch + TodoWrite + subagent hardening inicial — ✅ concluído.
-- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento.
+- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1`, `5.2` e `5.3` concluídos).
 
 **Próximo objetivo**: sair de "features presentes" para "features confiáveis sob falha, timeout, cancelamento e uso real".
 
@@ -75,7 +76,7 @@ Entregas concluídas desde a versão 1.1:
 
 **Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
 
-**Status atual**: `5.1 Resource Limits Contract` e `5.2 Cancellation Propagation Audit` implementados. Próximo corte recomendado: `5.3 Provider Abort Propagation`.
+**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit` e `5.3 Provider Abort Propagation` implementados. Próximo corte recomendado: `5.4 Tool Context Signal Propagation`.
 
 #### Escopo
 
@@ -86,6 +87,7 @@ Entregas concluídas desde a versão 1.1:
   - deadline/cancel reason preservado no resultado.
 - Melhorar propagação de cancelamento do `AgentLoop` para execução cooperativa.
 - Registrar nos metadados do `SubagentResult` quando a execução parou por limite.
+- Propagar cancellation signal primeiro para providers e depois para tools.
 - Cobrir com Red tests antes de produção.
 
 #### Fora do Escopo
@@ -95,6 +97,7 @@ Entregas concluídas desde a versão 1.1:
 - streaming de progresso de subagents.
 - retry automático sofisticado.
 - refactor grande de `ExecutionEngine`.
+- cleanup agressivo de terminal/session antes do contrato de signal em tools.
 
 #### Critérios de Aceitação
 
@@ -102,6 +105,7 @@ Entregas concluídas desde a versão 1.1:
 - Subagent retorna falha estruturada quando excede limite de output.
 - Timeout mantém erro claro e metadata de cancelamento.
 - Testes provam que limites não afetam runs normais.
+- Providers recebem `RequestContext.signal` e observam timeout do runtime.
 - Arquivos novos/tocados permanecem abaixo de 500 linhas.
 
 ---
@@ -126,7 +130,7 @@ Entregas concluídas desde a versão 1.1:
 
 ### Próxima Parada
 
-Concluída. A próxima etapa executável agora é a Fase 5 de hardening de subagents.
+Concluída. A próxima etapa executável agora é a Fase 5.4 de hardening de cancellation em tools.
 
 ### Nota Sobre Seções Posteriores
 

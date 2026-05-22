@@ -45,6 +45,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] documentação de subagents.
 - [x] enforcement de `SubagentConfig.maxIterations`.
 - [x] enforcement de `SubagentConfig.timeout`.
+- [x] propagação de `AbortSignal` do runtime para providers.
 
 ### Commits de Referência
 
@@ -140,17 +141,48 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Criar `.sdd/provider-abort-propagation/intake.md`.
-- [ ] Criar `.sdd/provider-abort-propagation/spec.md`.
-- [ ] Red test: provider recebe `RequestContext.signal`.
-- [ ] Red test: signal fica `aborted` quando `AgentLoop` timeout dispara.
-- [ ] Passar `CancellationManager.getSignal()` para `RequestContext.signal`.
-- [ ] Rodar testes focados de runtime/provider.
+- [x] Criar `.sdd/provider-abort-propagation/intake.md`.
+- [x] Criar `.sdd/provider-abort-propagation/spec.md`.
+- [x] Red test: provider recebe `RequestContext.signal`.
+- [x] Red test: signal fica `aborted` quando `AgentLoop` timeout dispara.
+- [x] Passar `CancellationManager.getSignal()` para `RequestContext.signal`.
+- [x] Rodar testes focados de runtime/provider.
+- [x] Rodar `pnpm run lint`.
+- [x] Rodar `pnpm run test`.
+- [x] Rodar `git diff --check`.
+- [x] Rodar architecture gate e registrar violações preexistentes.
+
+**Critério de aceitação**: requests de provider observam cancelamento do runtime sem alterar contratos de tools.
+
+**Status**: ✅ Implementado.
+
+**Evidência**:
+
+- `src/core/runtime/executionEngine.cancellation.test.ts`
+- `src/core/runtime/executionEngine.ts`
+- `.sdd/provider-abort-propagation/ac-coverage.md`
+
+## 5.4 Tool Context Signal Propagation
+
+**Prioridade**: 🔴 P0
+
+**Dependências**: 5.3.
+
+### Subtasks
+
+- [ ] Criar `.sdd/tool-context-signal-propagation/intake.md`.
+- [ ] Criar `.sdd/tool-context-signal-propagation/spec.md`.
+- [ ] Red test: runtime/scheduler passa um `AbortSignal` para tool execution context.
+- [ ] Red test: signal fica `aborted` quando `AgentLoop` timeout dispara durante execução de tool.
+- [ ] Estender `ToolContext` com `readonly signal?: AbortSignal` mantendo compatibilidade.
+- [ ] Propagar o signal no executor usado por `ToolScheduler`.
+- [ ] Rodar testes focados de runtime/tool scheduler.
 - [ ] Rodar `pnpm run lint`.
 - [ ] Rodar `pnpm run test`.
 - [ ] Rodar `git diff --check`.
+- [ ] Rodar architecture gate e registrar violações preexistentes.
 
-**Critério de aceitação**: requests de provider observam cancelamento do runtime sem alterar contratos de tools.
+**Critério de aceitação**: tools passam a poder observar cancelamento do runtime sem exigir alteração imediata em cada tool individual.
 
 ---
 

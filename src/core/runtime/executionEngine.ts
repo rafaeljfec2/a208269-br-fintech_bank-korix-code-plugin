@@ -114,6 +114,7 @@ export class ExecutionEngine {
         sessionId: crypto.randomUUID(), // TODO: Get from DI container session manager
         agentRunId: crypto.randomUUID(),
         iterationId: state.getExecution().currentIteration,
+        signal: this.cancellationManager.getSignal(),
       };
       const providerStartedAt = Date.now();
       let firstProviderOutputEmitted = false;
