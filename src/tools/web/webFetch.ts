@@ -34,16 +34,28 @@ Supports HTML, JSON and plain text. Blocks local/private hosts and limits respon
 
   async execute(
     input: WebFetchInput,
-    _context: ToolContext,
+    context: ToolContext,
   ): Promise<ToolResult<WebFetchOutput>> {
     const startTime = Date.now();
     const timeout = input.timeout ?? DEFAULT_TIMEOUT_MS;
     const maxBytes = input.maxBytes ?? DEFAULT_MAX_BYTES;
+    let timedOut = false;
 
     try {
       const initialUrl = validatePublicHttpUrl(input.url);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      const abortFromContext = () => controller.abort();
+      if (context.signal?.aborted) {
+        abortFromContext();
+      } else {
+        context.signal?.addEventListener("abort", abortFromContext, {
+          once: true,
+        });
+      }
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, timeout);
 
       try {
         const response = await fetchWithRedirects({
@@ -73,9 +85,13 @@ Supports HTML, JSON and plain text. Blocks local/private hosts and limits respon
         };
       } finally {
         clearTimeout(timeoutId);
+        context.signal?.removeEventListener("abort", abortFromContext);
       }
     } catch (error) {
-      const message = normalizeErrorMessage(error);
+      const message = normalizeErrorMessage(
+        error,
+        context.signal?.aborted === true && !timedOut,
+      );
       return {
         success: false,
         error: `WebFetch failed: ${message}`,
@@ -266,9 +282,9 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&#39;/g, "'");
 }
 
-function normalizeErrorMessage(error: unknown): string {
+function normalizeErrorMessage(error: unknown, abortedByContext: boolean): string {
   if (isNamedError(error, "AbortError")) {
-    return "request timed out";
+    return abortedByContext ? "request aborted" : "request timed out";
   }
 
   if (error instanceof Error) {

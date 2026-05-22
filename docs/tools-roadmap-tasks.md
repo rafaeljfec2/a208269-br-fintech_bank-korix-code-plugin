@@ -47,6 +47,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] enforcement de `SubagentConfig.timeout`.
 - [x] propagação de `AbortSignal` do runtime para providers.
 - [x] propagação de `AbortSignal` do runtime para tools via `ToolContext`.
+- [x] adoção cooperativa de `ToolContext.signal` em `WebFetch` e `Await`.
 - [x] micro-deliberação do modelo para perguntar mudança de modo antes do fluxo principal no webview.
 
 ### Commits de Referência
@@ -203,20 +204,45 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Criar `.sdd/signal-aware-tool-adoption/intake.md`.
-- [ ] Criar `.sdd/signal-aware-tool-adoption/spec.md`.
-- [ ] Red test: `WebFetch` aborta quando `context.signal` aborta.
-- [ ] Red test: polling/await-style tool para de aguardar quando `context.signal` aborta.
-- [ ] Implementar merge entre timeout local e `context.signal` em `WebFetch`.
-- [ ] Implementar observação de `context.signal` em `Await`/polling sem quebrar timeout atual.
-- [ ] Manter terminal process cleanup fora desta fatia, salvo se o spec reduzir para caso seguro.
-- [ ] Rodar testes focados de tools.
-- [ ] Rodar `pnpm run lint`.
-- [ ] Rodar `pnpm run test`.
-- [ ] Rodar `git diff --check`.
-- [ ] Rodar architecture gate e registrar violações preexistentes.
+- [x] Criar `.sdd/signal-aware-tool-adoption/intake.md`.
+- [x] Criar `.sdd/signal-aware-tool-adoption/spec.md`.
+- [x] Red test: `WebFetch` aborta quando `context.signal` aborta.
+- [x] Red test: polling/await-style tool para de aguardar quando `context.signal` aborta.
+- [x] Implementar merge entre timeout local e `context.signal` em `WebFetch`.
+- [x] Implementar observação de `context.signal` em `Await`/polling sem quebrar timeout atual.
+- [x] Manter terminal process cleanup fora desta fatia.
+- [x] Rodar testes focados de tools.
+- [x] Rodar `pnpm run lint`.
+- [x] Rodar `pnpm run test`.
+- [x] Rodar `git diff --check`.
+- [x] Rodar architecture gate e registrar violações preexistentes.
 
 **Critério de aceitação**: pelo menos as tools long-running de menor risco consomem `ToolContext.signal` de forma cooperativa e preservam seus timeouts próprios.
+
+**Status**: ✅ Implementado.
+
+**Evidência**:
+
+- `src/tools/web/webFetch.test.ts`
+- `src/tools/terminalAwait.test.ts`
+- `src/tools/web/webFetch.ts`
+- `src/tools/terminalAwait.ts`
+
+## 5.6 Terminal Session Cleanup Audit
+
+**Prioridade**: 🟡 P1
+
+**Dependências**: 5.5.
+
+### Subtasks
+
+- [ ] Criar `.sdd/terminal-session-cleanup-audit/intake.md`.
+- [ ] Mapear ciclo de vida de background sessions no `CommandRunner`.
+- [ ] Verificar se timeout/cancelamento deve apenas parar polling ou também encerrar processo.
+- [ ] Definir riscos de kill automático para comandos de usuário.
+- [ ] Produzir decisão técnica antes de qualquer implementação de cleanup agressivo.
+
+**Critério de aceitação**: decisão documentada sobre cleanup de sessões de terminal antes de alterar comportamento destrutivo ou encerrar processos automaticamente.
 
 ## UX Guardrail: Model-Based Mode Switch Prompt
 

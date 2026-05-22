@@ -136,6 +136,20 @@ describe("AwaitTool", () => {
     });
   });
 
+  it("should abort when the tool context signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await AwaitTool.execute(
+      { sessionId: "session-1", timeout: 5, pollInterval: 1 },
+      createMockToolContext({ signal: controller.signal }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("aborted");
+    expect(commandRunnerMock.getSessionStatus).not.toHaveBeenCalled();
+  });
+
   it("should only be available in agent mode", () => {
     expect(AwaitTool.allowedInMode?.("ask")).toBe(false);
     expect(AwaitTool.allowedInMode?.("plan")).toBe(false);

@@ -43,8 +43,33 @@ function createMetadata(startTime: number): ToolResult["metadata"] {
   };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<"slept" | "aborted"> {
+  if (signal?.aborted) {
+    return Promise.resolve("aborted");
+  }
+
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve("slept");
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeoutId);
+      resolve("aborted");
+    };
+
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+}
+
+function createAbortResult(
+  startTime: number,
+): ToolResult<AwaitOutput> {
+  return {
+    success: false,
+    error: "Await aborted",
+    metadata: createMetadata(startTime),
+  };
 }
 
 export const AwaitTool: Tool<AwaitInput, AwaitOutput> = {
@@ -68,7 +93,7 @@ Returns when the pattern matches, the command exits, or the timeout is reached.`
 
   async execute(
     input: AwaitInput,
-    _context: ToolContext,
+    context: ToolContext,
   ): Promise<ToolResult<AwaitOutput>> {
     const startTime = Date.now();
     const timeout = input.timeout ?? 60000;
@@ -77,6 +102,10 @@ Returns when the pattern matches, the command exits, or the timeout is reached.`
     let latestExitCode: number | null = null;
     let latestExited = false;
     let pattern: RegExp | undefined;
+
+    if (context.signal?.aborted) {
+      return createAbortResult(startTime);
+    }
 
     if (input.pattern) {
       try {
@@ -96,6 +125,10 @@ Returns when the pattern matches, the command exits, or the timeout is reached.`
     const commandRunner = container.get<CommandRunner>(TOKENS.CommandRunner);
 
     while (Date.now() - startTime < timeout) {
+      if (context.signal?.aborted) {
+        return createAbortResult(startTime);
+      }
+
       const status = await commandRunner.getSessionStatus(input.sessionId);
 
       if (!status) {
@@ -139,7 +172,13 @@ Returns when the pattern matches, the command exits, or the timeout is reached.`
       }
 
       const remaining = timeout - (Date.now() - startTime);
-      await sleep(Math.min(pollInterval, Math.max(1, remaining)));
+      const sleepResult = await sleep(
+        Math.min(pollInterval, Math.max(1, remaining)),
+        context.signal,
+      );
+      if (sleepResult === "aborted") {
+        return createAbortResult(startTime);
+      }
     }
 
     return {

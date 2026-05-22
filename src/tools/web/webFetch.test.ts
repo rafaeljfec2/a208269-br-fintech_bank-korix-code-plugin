@@ -202,6 +202,33 @@ describe("WebFetchTool", () => {
     expect(result.error).toContain("timed out");
   });
 
+  it("should abort when the tool context signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
+      return new MockResponse();
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await WebFetchTool.execute(
+      { url: "https://example.com/slow" },
+      createMockToolContext({ signal: controller.signal }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("aborted");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.com/slow",
+      expect.objectContaining({
+        signal: expect.objectContaining({ aborted: true }),
+      }),
+    );
+  });
+
   it("should handle fetch errors gracefully", async () => {
     vi.stubGlobal(
       "fetch",

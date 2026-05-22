@@ -58,7 +58,7 @@ Entregas concluídas desde a versão 1.1:
 - **Sprint 2**: Task/Subagent MVP — ✅ expandido e concluído para 5 tipos.
 - **Sprint 3**: ReadFile image metadata + Glob — ✅ concluído.
 - **Sprint 4**: WebFetch + TodoWrite + subagent hardening inicial — ✅ concluído.
-- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1`, `5.2`, `5.3` e `5.4` concluídos).
+- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1` até `5.5` concluídos).
 
 **Próximo objetivo**: sair de "features presentes" para "features confiáveis sob falha, timeout, cancelamento e uso real".
 
@@ -78,7 +78,7 @@ Entregas concluídas desde a versão 1.1:
 
 **Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
 
-**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit`, `5.3 Provider Abort Propagation` e `5.4 Tool Context Signal Propagation` implementados. Próximo corte recomendado: `5.5 Signal-Aware Tool Adoption`.
+**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit`, `5.3 Provider Abort Propagation`, `5.4 Tool Context Signal Propagation` e `5.5 Signal-Aware Tool Adoption` implementados. Próximo corte recomendado: `5.6 Terminal Session Cleanup Audit`.
 
 #### Escopo
 
@@ -110,6 +110,7 @@ Entregas concluídas desde a versão 1.1:
 - Testes provam que limites não afetam runs normais.
 - Providers recebem `RequestContext.signal` e observam timeout do runtime.
 - Tools recebem `ToolContext.signal` e podem observar timeout do runtime.
+- `WebFetch` e `Await` observam `ToolContext.signal` de forma cooperativa.
 - Quando um pedido exige outro modo, Korix faz uma deliberação curta do modelo e pergunta antes do fluxo principal.
 - Arquivos novos/tocados permanecem abaixo de 500 linhas.
 
