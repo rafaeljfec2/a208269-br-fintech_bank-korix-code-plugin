@@ -47,6 +47,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] enforcement de `SubagentConfig.timeout`.
 - [x] propagação de `AbortSignal` do runtime para providers.
 - [x] propagação de `AbortSignal` do runtime para tools via `ToolContext`.
+- [x] pergunta estruturada de mudança de modo antes de chamadas ao modelo no webview.
 
 ### Commits de Referência
 
@@ -216,6 +217,24 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [ ] Rodar architecture gate e registrar violações preexistentes.
 
 **Critério de aceitação**: pelo menos as tools long-running de menor risco consomem `ToolContext.signal` de forma cooperativa e preservam seus timeouts próprios.
+
+## UX Guardrail: Mode Switch Prompt
+
+**Prioridade**: 🔴 P0
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Detectar deterministicamente quando ASK precisa de PLAN ou AGENT.
+- [x] Recomendar PLAN para análise/read-only.
+- [x] Recomendar AGENT para implementação/execução.
+- [x] Perguntar antes de chamar o provider.
+- [x] Atualizar o modo visual do webview quando o usuário aceita.
+- [x] Recalcular contexto, perfil, policy e execution path depois da troca.
+- [x] Não chamar provider/tools quando o usuário decide permanecer no modo atual.
+
+**Critério de aceitação**: Korix pede confirmação de mudança de modo antes de gastar tokens ou tentar tools incompatíveis com o modo atual.
 
 ---
 

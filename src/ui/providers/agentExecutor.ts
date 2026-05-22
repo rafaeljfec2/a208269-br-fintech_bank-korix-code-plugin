@@ -13,6 +13,7 @@ import type { ToolRegistry } from "../../harness/toolRegistry";
 import type { RuntimeEventEmitter } from "../../core/runtime/runtimeEvents";
 import type { ContextEngine } from "../../context/contextEngine";
 import {
+  ModeSwitchAdvisor,
   TaskAnalyzer,
   ThinkingOrchestrator,
   InteractionContextCompiler,
@@ -21,15 +22,36 @@ import {
   WorkspaceEvidenceCollector,
 } from "../../core/runtime/thinking";
 import { DirectLlmExecutor } from "../../core/runtime/DirectLlmExecutor";
+import { RuntimeMetrics } from "../../core/runtime/runtimeMetrics";
+import { askSingleChoice } from "../../core/runtime/userQuestion";
 import type {
   EvidencePack,
   EvidenceRequest,
 } from "../../core/runtime/thinking";
-import type { ExecutionContext } from "../../core/types";
+import type { ExecutionContext, Mode } from "../../core/types";
+import type { ChatHistoryMessage } from "../../core/runtime/thinking/InteractionContextCompiler";
+import type {
+  RuntimeExecutionPlan,
+  ThinkingRunProfile,
+  ToolUsePolicy,
+  ModeSwitchRecommendation,
+} from "../../core/runtime/thinking";
+
+interface PlannedInteraction {
+  readonly compiledInteraction: {
+    readonly previousMessages: readonly ChatHistoryMessage[];
+  };
+  readonly effectiveContent: string;
+  readonly context: ExecutionContext;
+  readonly taskProfile: ThinkingRunProfile;
+  readonly toolUsePolicy: ToolUsePolicy;
+  readonly executionPlan: RuntimeExecutionPlan;
+}
 
 export class AgentExecutor {
   private readonly interactionContextCompiler =
     new InteractionContextCompiler();
+  private readonly modeSwitchAdvisor = new ModeSwitchAdvisor();
 
   constructor(
     private readonly logger: Logger,
@@ -39,6 +61,7 @@ export class AgentExecutor {
     private readonly toolRegistry: ToolRegistry,
     private readonly eventEmitter: RuntimeEventEmitter,
     private readonly contextEngine: ContextEngine,
+    private readonly onModeSelected?: (mode: Mode) => void,
   ) {}
 
   /**
@@ -50,7 +73,7 @@ export class AgentExecutor {
       role: "user" | "assistant" | "system";
       content: string;
     }[],
-    interactionMode: "ask" | "plan" | "agent",
+    interactionMode: Mode,
   ): Promise<void> {
     this.logger.info("User message received", {
       length: content.length,
@@ -67,34 +90,31 @@ export class AgentExecutor {
           "anthropic" | "openai" | "ollama" | "openrouter" | "litellm"
         >("provider", "anthropic");
 
-      const providerConfigPromise = this.configManager.getConfig(providerType);
-
       // Capture the interaction mode once at send time. A mode change during
       // execution applies to the next user message, not this run.
-      const mode = interactionMode;
-      const compiledInteraction = this.interactionContextCompiler.compile({
-        message: content,
-        previousMessages,
-        mode,
-      });
-      const effectiveContent = compiledInteraction.effectiveMessage;
-
-      // Prepare execution context before choosing the runtime path.
-      const context = this.buildExecutionContext(mode);
-      const taskProfile = new TaskAnalyzer().analyze(effectiveContent, context);
-      const toolUsePolicy = new ToolUsePolicyResolver().resolve(
-        effectiveContent,
-        taskProfile,
-        context,
-      );
-      const executionPlan = new RuntimeExecutionPathResolver().resolve({
-        message: effectiveContent,
-        profile: taskProfile,
-        context,
-        toolUsePolicy,
+      let mode = interactionMode;
+      let planned = this.planInteraction(content, previousMessages, mode);
+      const modeSwitch = this.modeSwitchAdvisor.resolve({
+        message: planned.effectiveContent,
+        profile: planned.taskProfile,
+        context: planned.context,
+        executionPlan: planned.executionPlan,
       });
 
-      const providerConfig = await providerConfigPromise;
+      if (modeSwitch) {
+        const selectedMode = await this.askModeSwitch(modeSwitch);
+        if (selectedMode === modeSwitch.currentMode) {
+          this.emitModeSwitchDeclined(modeSwitch);
+          return;
+        }
+
+        mode = selectedMode;
+        this.stateManager.setMode(mode);
+        this.onModeSelected?.(mode);
+        planned = this.planInteraction(content, previousMessages, mode);
+      }
+
+      const providerConfig = await this.configManager.getConfig(providerType);
       if (!providerConfig) {
         vscode.window.showErrorMessage(
           `Provider ${providerType} not configured. Please set API key.`,
@@ -112,26 +132,26 @@ export class AgentExecutor {
       );
 
       try {
-        if (executionPlan.path === "direct_llm") {
+        if (planned.executionPlan.path === "direct_llm") {
           const directInteraction = this.interactionContextCompiler.compile({
             message: content,
             previousMessages,
             mode,
-            maxPreviousMessages: executionPlan.maxHistoryMessages,
-            maxPreviousChars: executionPlan.maxHistoryChars,
+            maxPreviousMessages: planned.executionPlan.maxHistoryMessages,
+            maxPreviousChars: planned.executionPlan.maxHistoryChars,
           });
           const systemPrompt = contextBuilder.buildDirectAnswer({
             mode,
             providerType,
             model: providerConfig.model,
-            profile: executionPlan.profile,
+            profile: planned.executionPlan.profile,
           });
           const maxTokens = Math.min(
-            providerConfig.maxTokens ?? executionPlan.maxTokens ?? 1536,
-            executionPlan.maxTokens ?? 1536,
+            providerConfig.maxTokens ?? planned.executionPlan.maxTokens ?? 1536,
+            planned.executionPlan.maxTokens ?? 1536,
           );
 
-          this.stateManager.prepareInteraction(context);
+          this.stateManager.prepareInteraction(planned.context);
           this.stateManager.startExecution();
 
           try {
@@ -142,7 +162,7 @@ export class AgentExecutor {
             ).run({
               initialMessage: directInteraction.effectiveMessage,
               previousMessages: directInteraction.previousMessages,
-              context,
+              context: planned.context,
               systemPrompt,
               maxTokens,
             });
@@ -151,7 +171,7 @@ export class AgentExecutor {
           }
 
           this.logger.info("Direct LLM execution completed successfully", {
-            reason: executionPlan.reason,
+            reason: planned.executionPlan.reason,
           });
           return;
         }
@@ -168,7 +188,7 @@ export class AgentExecutor {
           maxTokens: providerConfig.maxTokens,
         });
 
-        this.stateManager.prepareInteraction(context);
+        this.stateManager.prepareInteraction(planned.context);
 
         // Mark as executing
         this.stateManager.startExecution();
@@ -184,9 +204,9 @@ export class AgentExecutor {
 
         // Run thinking orchestrator with history and process events
         const generator = orchestrator.run({
-          initialMessage: effectiveContent,
-          context,
-          previousMessages: compiledInteraction.previousMessages,
+          initialMessage: planned.effectiveContent,
+          context: planned.context,
+          previousMessages: planned.compiledInteraction.previousMessages,
         });
 
         try {
@@ -228,7 +248,7 @@ export class AgentExecutor {
   }
 
   private buildExecutionContext(
-    mode: "ask" | "plan" | "agent",
+    mode: Mode,
   ): ExecutionContext {
     const activeEditor = vscode.window.activeTextEditor;
     const workspaceRoot =
@@ -262,6 +282,94 @@ export class AgentExecutor {
           : undefined,
       openFiles,
     };
+  }
+
+  private planInteraction(
+    content: string,
+    previousMessages: readonly ChatHistoryMessage[],
+    mode: Mode,
+  ): PlannedInteraction {
+    const compiledInteraction = this.interactionContextCompiler.compile({
+      message: content,
+      previousMessages,
+      mode,
+    });
+    const effectiveContent = compiledInteraction.effectiveMessage;
+    const context = this.buildExecutionContext(mode);
+    const taskProfile = new TaskAnalyzer().analyze(effectiveContent, context);
+    const toolUsePolicy = new ToolUsePolicyResolver().resolve(
+      effectiveContent,
+      taskProfile,
+      context,
+    );
+    const executionPlan = new RuntimeExecutionPathResolver().resolve({
+      message: effectiveContent,
+      profile: taskProfile,
+      context,
+      toolUsePolicy,
+    });
+
+    return {
+      compiledInteraction,
+      effectiveContent,
+      context,
+      taskProfile,
+      toolUsePolicy,
+      executionPlan,
+    };
+  }
+
+  private async askModeSwitch(
+    recommendation: ModeSwitchRecommendation,
+  ): Promise<Mode> {
+    const answer = await askSingleChoice(
+      this.eventEmitter,
+      recommendation.title,
+      recommendation.question,
+      recommendation.options.map((option) => ({
+        value: option.mode,
+        label: option.label,
+        description: option.description,
+      })),
+      60000,
+    );
+
+    return this.isMode(answer) ? answer : recommendation.recommendedMode;
+  }
+
+  private emitModeSwitchDeclined(
+    recommendation: ModeSwitchRecommendation,
+  ): void {
+    const metrics = new RuntimeMetrics(this.logger);
+    const context = this.buildExecutionContext(recommendation.currentMode);
+    this.stateManager.prepareInteraction(context);
+    this.stateManager.startExecution();
+
+    try {
+      this.eventEmitter.emitEvent({
+        type: "token",
+        content: `Mantive o modo ${recommendation.currentMode.toUpperCase()}. Para esse pedido, mude para ${recommendation.recommendedMode.toUpperCase()} quando quiser que eu continue.`,
+        timestamp: Date.now(),
+      });
+      this.eventEmitter.emitEvent({
+        type: "done",
+        stopReason: "mode_switch_declined",
+        timestamp: Date.now(),
+      });
+      this.eventEmitter.emitEvent({
+        type: "execution_complete",
+        success: true,
+        iterations: 0,
+        metrics: metrics.finalize(),
+        timestamp: Date.now(),
+      });
+    } finally {
+      this.stateManager.stopExecution();
+    }
+  }
+
+  private isMode(value: string): value is Mode {
+    return value === "ask" || value === "plan" || value === "agent";
   }
 
   private async buildEvidencePack(

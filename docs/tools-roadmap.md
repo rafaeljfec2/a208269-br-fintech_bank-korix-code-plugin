@@ -38,6 +38,7 @@ Entregas concluídas desde a versão 1.1:
 - enforcement de `maxIterations` e `timeout` por tipo de subagent.
 - propagação de `AbortSignal` do runtime para providers.
 - propagação de `AbortSignal` do runtime para tools via `ToolContext`.
+- pergunta estruturada para mudança de modo antes de chamadas ao modelo no webview.
 
 ### Métricas Alvo
 
@@ -109,6 +110,7 @@ Entregas concluídas desde a versão 1.1:
 - Testes provam que limites não afetam runs normais.
 - Providers recebem `RequestContext.signal` e observam timeout do runtime.
 - Tools recebem `ToolContext.signal` e podem observar timeout do runtime.
+- Quando um pedido exige outro modo, Korix pergunta antes de chamar o provider.
 - Arquivos novos/tocados permanecem abaixo de 500 linhas.
 
 ---

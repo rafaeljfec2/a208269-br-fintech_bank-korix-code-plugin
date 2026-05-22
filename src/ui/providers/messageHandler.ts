@@ -108,6 +108,7 @@ export class MessageHandler {
       this.toolRegistry,
       this.eventEmitter,
       this.contextEngine,
+      (mode) => this.postModeChanged(mode),
     );
     this.settingsHandler = new SettingsHandler(
       webview,
@@ -304,14 +305,17 @@ export class MessageHandler {
     // Update mode in RuntimeStateManager
     this.stateManager.setMode(mode);
 
-    // Notify webview of mode change via event
+    this.postModeChanged(mode);
+    this.logger.info("Mode changed successfully", { mode });
+  }
+
+  private postModeChanged(mode: "ask" | "plan" | "agent"): void {
     const message: ExtensionToWebviewMessage = {
       type: "mode_changed",
       payload: { mode },
     };
 
     void this.webview.postMessage(message);
-    this.logger.info("Mode changed successfully", { mode });
   }
 
   /**
