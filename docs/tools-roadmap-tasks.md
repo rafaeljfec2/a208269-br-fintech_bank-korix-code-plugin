@@ -48,6 +48,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] propagação de `AbortSignal` do runtime para providers.
 - [x] propagação de `AbortSignal` do runtime para tools via `ToolContext`.
 - [x] adoção cooperativa de `ToolContext.signal` em `WebFetch` e `Await`.
+- [x] auditoria de cleanup de terminal/background sessions.
 - [x] micro-deliberação do modelo para perguntar mudança de modo antes do fluxo principal no webview.
 
 ### Commits de Referência
@@ -236,13 +237,40 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Criar `.sdd/terminal-session-cleanup-audit/intake.md`.
-- [ ] Mapear ciclo de vida de background sessions no `CommandRunner`.
-- [ ] Verificar se timeout/cancelamento deve apenas parar polling ou também encerrar processo.
-- [ ] Definir riscos de kill automático para comandos de usuário.
-- [ ] Produzir decisão técnica antes de qualquer implementação de cleanup agressivo.
+- [x] Criar `.sdd/terminal-session-cleanup-audit/intake.md`.
+- [x] Mapear ciclo de vida de background sessions no `CommandRunner`.
+- [x] Verificar se timeout/cancelamento deve apenas parar polling ou também encerrar processo.
+- [x] Definir riscos de kill automático para comandos de usuário.
+- [x] Produzir decisão técnica antes de qualquer implementação de cleanup agressivo.
 
 **Critério de aceitação**: decisão documentada sobre cleanup de sessões de terminal antes de alterar comportamento destrutivo ou encerrar processos automaticamente.
+
+**Status**: ✅ Implementado em `docs/terminal-session-cleanup-audit.md`.
+
+**Decisão**: não matar sessões automaticamente quando `Await` ou o agente forem cancelados. A próxima implementação deve ser uma terminação explícita, approval-aware e limitada ao modo `agent`.
+
+## 5.7 Explicit Terminal Session Termination
+
+**Prioridade**: 🟡 P1
+
+**Dependências**: 5.6.
+
+### Subtasks
+
+- [ ] Criar `.sdd/terminal-session-termination/intake.md`.
+- [ ] Criar `.sdd/terminal-session-termination/spec.md`.
+- [ ] Red test: terminar sessão existente chama `TerminalSessionManager.killSession`.
+- [ ] Red test: sessão desconhecida retorna falha estruturada.
+- [ ] Red test: tool só fica disponível em `agent`.
+- [ ] Red test: tool exige aprovação.
+- [ ] Implementar tool explícita, tentativamente `TerminateSession`.
+- [ ] Registrar tool em `src/tools/index.ts`.
+- [ ] Rodar testes focados.
+- [ ] Rodar `pnpm run lint`.
+- [ ] Rodar `pnpm run test`.
+- [ ] Atualizar roadmap ao final da fase.
+
+**Critério de aceitação**: Korix consegue encerrar uma sessão/background work de forma explícita e auditável, sem cleanup implícito em cancelamentos.
 
 ## UX Guardrail: Model-Based Mode Switch Prompt
 

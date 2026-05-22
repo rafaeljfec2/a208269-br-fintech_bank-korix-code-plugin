@@ -58,7 +58,7 @@ Entregas concluídas desde a versão 1.1:
 - **Sprint 2**: Task/Subagent MVP — ✅ expandido e concluído para 5 tipos.
 - **Sprint 3**: ReadFile image metadata + Glob — ✅ concluído.
 - **Sprint 4**: WebFetch + TodoWrite + subagent hardening inicial — ✅ concluído.
-- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1` até `5.5` concluídos).
+- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento (`5.1` até `5.6` concluídos).
 
 **Próximo objetivo**: sair de "features presentes" para "features confiáveis sob falha, timeout, cancelamento e uso real".
 
@@ -78,7 +78,7 @@ Entregas concluídas desde a versão 1.1:
 
 **Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
 
-**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit`, `5.3 Provider Abort Propagation`, `5.4 Tool Context Signal Propagation` e `5.5 Signal-Aware Tool Adoption` implementados. Próximo corte recomendado: `5.6 Terminal Session Cleanup Audit`.
+**Status atual**: `5.1 Resource Limits Contract`, `5.2 Cancellation Propagation Audit`, `5.3 Provider Abort Propagation`, `5.4 Tool Context Signal Propagation`, `5.5 Signal-Aware Tool Adoption` e `5.6 Terminal Session Cleanup Audit` implementados. Próximo corte recomendado: `5.7 Explicit Terminal Session Termination`.
 
 #### Escopo
 
