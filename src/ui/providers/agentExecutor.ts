@@ -13,29 +13,25 @@ import type { ToolRegistry } from "../../harness/toolRegistry";
 import type { RuntimeEventEmitter } from "../../core/runtime/runtimeEvents";
 import type { ContextEngine } from "../../context/contextEngine";
 import {
+  type EvidencePack,
+  type EvidenceRequest,
   ModeSwitchAdvisor,
+  type ModeSwitchRecommendation,
+  type RuntimeExecutionPlan,
   TaskAnalyzer,
+  type ThinkingRunProfile,
   ThinkingOrchestrator,
   InteractionContextCompiler,
   RuntimeExecutionPathResolver,
+  type ToolUsePolicy,
   ToolUsePolicyResolver,
   WorkspaceEvidenceCollector,
 } from "../../core/runtime/thinking";
 import { DirectLlmExecutor } from "../../core/runtime/DirectLlmExecutor";
 import { RuntimeMetrics } from "../../core/runtime/runtimeMetrics";
 import { askSingleChoice } from "../../core/runtime/userQuestion";
-import type {
-  EvidencePack,
-  EvidenceRequest,
-} from "../../core/runtime/thinking";
 import type { ExecutionContext, Mode } from "../../core/types";
 import type { ChatHistoryMessage } from "../../core/runtime/thinking/InteractionContextCompiler";
-import type {
-  RuntimeExecutionPlan,
-  ThinkingRunProfile,
-  ToolUsePolicy,
-  ModeSwitchRecommendation,
-} from "../../core/runtime/thinking";
 
 interface PlannedInteraction {
   readonly compiledInteraction: {
@@ -75,12 +71,12 @@ export class AgentExecutor {
     }[],
     interactionMode: Mode,
   ): Promise<void> {
-    this.logger.info("User message received", {
-      length: content.length,
-      historyLength: previousMessages.length,
-      lastHistoryRole: previousMessages[previousMessages.length - 1]?.role,
-      mode: interactionMode,
-    });
+      this.logger.info("User message received", {
+        length: content.length,
+        historyLength: previousMessages.length,
+      lastHistoryRole: previousMessages.at(-1)?.role,
+        mode: interactionMode,
+      });
 
     try {
       // Get provider config
@@ -94,26 +90,6 @@ export class AgentExecutor {
       // execution applies to the next user message, not this run.
       let mode = interactionMode;
       let planned = this.planInteraction(content, previousMessages, mode);
-      const modeSwitch = this.modeSwitchAdvisor.resolve({
-        message: planned.effectiveContent,
-        profile: planned.taskProfile,
-        context: planned.context,
-        executionPlan: planned.executionPlan,
-      });
-
-      if (modeSwitch) {
-        const selectedMode = await this.askModeSwitch(modeSwitch);
-        if (selectedMode === modeSwitch.currentMode) {
-          this.emitModeSwitchDeclined(modeSwitch);
-          return;
-        }
-
-        mode = selectedMode;
-        this.stateManager.setMode(mode);
-        this.onModeSelected?.(mode);
-        planned = this.planInteraction(content, previousMessages, mode);
-      }
-
       const providerConfig = await this.configManager.getConfig(providerType);
       if (!providerConfig) {
         vscode.window.showErrorMessage(
@@ -125,13 +101,34 @@ export class AgentExecutor {
       // Create provider instance
       const provider = this.agentLoopFactory.createProvider(providerConfig);
 
-      // Build unified system prompt
-      const contextBuilder = new PluginContextBuilder(
-        this.toolRegistry,
-        this.logger,
-      );
-
       try {
+        const modeSwitch = await this.modeSwitchAdvisor.resolve({
+          message: planned.effectiveContent,
+          profile: planned.taskProfile,
+          context: planned.context,
+          executionPlan: planned.executionPlan,
+          provider,
+        });
+
+        if (modeSwitch) {
+          const selectedMode = await this.askModeSwitch(modeSwitch);
+          if (selectedMode === modeSwitch.currentMode) {
+            this.emitModeSwitchDeclined(modeSwitch);
+            return;
+          }
+
+          mode = selectedMode;
+          this.stateManager.setMode(mode);
+          this.onModeSelected?.(mode);
+          planned = this.planInteraction(content, previousMessages, mode);
+        }
+
+        // Build unified system prompt
+        const contextBuilder = new PluginContextBuilder(
+          this.toolRegistry,
+          this.logger,
+        );
+
         if (planned.executionPlan.path === "direct_llm") {
           const directInteraction = this.interactionContextCompiler.compile({
             message: content,

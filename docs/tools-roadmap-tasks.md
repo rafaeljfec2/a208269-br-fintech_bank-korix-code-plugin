@@ -47,7 +47,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - [x] enforcement de `SubagentConfig.timeout`.
 - [x] propagação de `AbortSignal` do runtime para providers.
 - [x] propagação de `AbortSignal` do runtime para tools via `ToolContext`.
-- [x] pergunta estruturada de mudança de modo antes de chamadas ao modelo no webview.
+- [x] micro-deliberação do modelo para perguntar mudança de modo antes do fluxo principal no webview.
 
 ### Commits de Referência
 
@@ -218,23 +218,24 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 **Critério de aceitação**: pelo menos as tools long-running de menor risco consomem `ToolContext.signal` de forma cooperativa e preservam seus timeouts próprios.
 
-## UX Guardrail: Mode Switch Prompt
+## UX Guardrail: Model-Based Mode Switch Prompt
 
 **Prioridade**: 🔴 P0
 
-**Status**: ✅ Implementado.
+**Status**: ✅ Implementado; revisado para deliberação do modelo.
 
 ### Subtasks
 
-- [x] Detectar deterministicamente quando ASK precisa de PLAN ou AGENT.
+- [x] Consultar o modelo com um prompt curto antes do fluxo principal em ASK/PLAN.
+- [x] Usar sinais determinísticos apenas como contexto/fallback de segurança.
 - [x] Recomendar PLAN para análise/read-only.
 - [x] Recomendar AGENT para implementação/execução.
-- [x] Perguntar antes de chamar o provider.
+- [x] Perguntar antes de chamar o executor principal.
 - [x] Atualizar o modo visual do webview quando o usuário aceita.
 - [x] Recalcular contexto, perfil, policy e execution path depois da troca.
-- [x] Não chamar provider/tools quando o usuário decide permanecer no modo atual.
+- [x] Não chamar o executor principal/tools quando o usuário decide permanecer no modo atual.
 
-**Critério de aceitação**: Korix pede confirmação de mudança de modo antes de gastar tokens ou tentar tools incompatíveis com o modo atual.
+**Critério de aceitação**: Korix usa uma deliberação compacta do próprio modelo para decidir se precisa trocar para PLAN/AGENT, pede confirmação ao usuário e só então entra no fluxo principal.
 
 ---
 
