@@ -7,6 +7,7 @@ import { ReadFileTool, WriteFileTool, ListDirectoryTool } from "./filesystem";
 import { RunCommandTool } from "./terminal";
 import { AwaitTool } from "./terminalAwait";
 import { TaskTool } from "./task";
+import { GlobTool } from "./filesystem/glob";
 import { EditFileTool } from "./edit";
 import { GitStatusTool } from "./git/gitStatus";
 import { GitDiffTool } from "./git/gitDiff";
@@ -38,6 +39,7 @@ export function registerAllTools(): void {
     ListDirectoryTool,
     FileChunksTool,
     SearchFilesTool,
+    GlobTool,
     DeleteFileTool,
     // Terminal tools
     RunCommandTool,
