@@ -7,7 +7,13 @@ export interface SubagentConfig {
   readonly allowedTools: readonly string[];
   readonly maxIterations: number;
   readonly timeout: number;
+  readonly resourceLimits: SubagentResourceLimits;
   readonly isolated: boolean;
+}
+
+export interface SubagentResourceLimits {
+  readonly maxToolCalls: number;
+  readonly maxOutputBytes: number;
 }
 
 export interface SubagentRequest {
@@ -25,6 +31,15 @@ export interface SubagentResult {
   readonly error?: string;
   readonly metadata: {
     readonly toolsCalled: readonly string[];
+    readonly toolCallCount?: number;
+    readonly outputBytes?: number;
+    readonly stopReason?:
+      | "completed"
+      | "runtime_error"
+      | "timeout"
+      | "tool_calls"
+      | "output_bytes";
+    readonly limitExceeded?: "tool_calls" | "output_bytes";
   };
 }
 
@@ -49,6 +64,10 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     ],
     maxIterations: 10,
     timeout: 60_000,
+    resourceLimits: {
+      maxToolCalls: 25,
+      maxOutputBytes: 64_000,
+    },
     isolated: true,
   },
   plan: {
@@ -71,6 +90,10 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     ],
     maxIterations: 12,
     timeout: 120_000,
+    resourceLimits: {
+      maxToolCalls: 30,
+      maxOutputBytes: 96_000,
+    },
     isolated: true,
   },
   review: {
@@ -91,6 +114,10 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     ],
     maxIterations: 12,
     timeout: 120_000,
+    resourceLimits: {
+      maxToolCalls: 30,
+      maxOutputBytes: 96_000,
+    },
     isolated: true,
   },
   shell: {
@@ -98,6 +125,10 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     allowedTools: ["RunCommand", "Await"],
     maxIterations: 5,
     timeout: 300_000,
+    resourceLimits: {
+      maxToolCalls: 8,
+      maxOutputBytes: 32_000,
+    },
     isolated: true,
   },
   test: {
@@ -105,6 +136,10 @@ export const SUBAGENT_CONFIGS: Record<SubagentType, SubagentConfig> = {
     allowedTools: ["RunCommand", "Await", "ReadFile"],
     maxIterations: 8,
     timeout: 600_000,
+    resourceLimits: {
+      maxToolCalls: 12,
+      maxOutputBytes: 64_000,
+    },
     isolated: true,
   },
 };

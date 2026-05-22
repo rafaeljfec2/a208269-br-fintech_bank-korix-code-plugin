@@ -55,7 +55,7 @@ Entregas concluídas desde a versão 1.1:
 - **Sprint 2**: Task/Subagent MVP — ✅ expandido e concluído para 5 tipos.
 - **Sprint 3**: ReadFile image metadata + Glob — ✅ concluído.
 - **Sprint 4**: WebFetch + TodoWrite + subagent hardening inicial — ✅ concluído.
-- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🔜 próxima fase.
+- **Sprint 5**: Resource limits, cancellation hardening e validation loop — 🟡 em andamento.
 
 **Próximo objetivo**: sair de "features presentes" para "features confiáveis sob falha, timeout, cancelamento e uso real".
 
@@ -74,6 +74,8 @@ Entregas concluídas desde a versão 1.1:
 **Workflow**: `korix-sdd` com TDD
 
 **Objetivo**: garantir que subagents tenham limites operacionais confiáveis e que timeout/cancelamento limpem execução em andamento de forma previsível.
+
+**Status atual**: `5.1 Resource Limits Contract` implementado. Próximo corte recomendado: `5.2 Cancellation Propagation Audit`.
 
 #### Escopo
 

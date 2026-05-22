@@ -8,6 +8,7 @@ import {
   type SubagentConfig,
   type SubagentType,
 } from "./subagentTypes";
+import type { ToolCallRecord } from "../runtime/runtimeTypes";
 
 export interface SubagentRunnerOptions {
   readonly parentRegistry: ToolRegistry;
@@ -97,23 +98,36 @@ export class SubagentRunner {
       const output = [...messages]
         .reverse()
         .find((message) => message.role === "assistant")?.content;
+      const toolCalls = finalResult.finalState.conversation.toolCallHistory;
+      const outputText = output ?? "";
+      const outputBytes = this.estimateOutputBytes(outputText, toolCalls);
+      const stopReason = this.resolveStopReason(
+        finalResult.success,
+        finalResult.error,
+      );
 
       const subagentResult: SubagentResult = {
         success: finalResult.success,
-        output: output ?? "",
+        output: outputText,
         iterations: finalResult.iterations,
         duration: Date.now() - startTime,
         ...(finalResult.error ? { error: finalResult.error } : {}),
         metadata: {
-          toolsCalled: finalResult.finalState.conversation.toolCallHistory.map(
-            (toolCall) => toolCall.toolName,
-          ),
+          toolsCalled: toolCalls.map((toolCall) => toolCall.toolName),
+          toolCallCount: toolCalls.length,
+          outputBytes,
+          stopReason,
         },
       };
 
-      this.recordRunMetrics(request.type, subagentResult);
+      const limitedResult = this.applyResourceLimits(
+        subagentResult,
+        config,
+      );
 
-      return subagentResult;
+      this.recordRunMetrics(request.type, limitedResult);
+
+      return limitedResult;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown subagent error";
@@ -125,6 +139,9 @@ export class SubagentRunner {
         error: message,
         metadata: {
           toolsCalled: [],
+          toolCallCount: 0,
+          outputBytes: 0,
+          stopReason: this.resolveStopReason(false, message),
         },
       };
 
@@ -157,6 +174,79 @@ export class SubagentRunner {
     }
 
     return registry;
+  }
+
+  private applyResourceLimits(
+    result: SubagentResult,
+    config: SubagentConfig,
+  ): SubagentResult {
+    const toolCallCount = result.metadata.toolCallCount ?? 0;
+    if (toolCallCount > config.resourceLimits.maxToolCalls) {
+      return {
+        ...result,
+        success: false,
+        error: `Subagent exceeded tool call limit: ${toolCallCount}/${config.resourceLimits.maxToolCalls}`,
+        metadata: {
+          ...result.metadata,
+          stopReason: "tool_calls",
+          limitExceeded: "tool_calls",
+        },
+      };
+    }
+
+    const outputBytes = result.metadata.outputBytes ?? 0;
+    if (outputBytes > config.resourceLimits.maxOutputBytes) {
+      return {
+        ...result,
+        success: false,
+        error: `Subagent exceeded output byte limit: ${outputBytes}/${config.resourceLimits.maxOutputBytes}`,
+        metadata: {
+          ...result.metadata,
+          stopReason: "output_bytes",
+          limitExceeded: "output_bytes",
+        },
+      };
+    }
+
+    return result;
+  }
+
+  private estimateOutputBytes(
+    output: string,
+    toolCalls: readonly ToolCallRecord[],
+  ): number {
+    const toolOutput = toolCalls
+      .map((toolCall) => this.stringifyToolResult(toolCall.result))
+      .join("");
+
+    return Buffer.byteLength(output + toolOutput, "utf8");
+  }
+
+  private stringifyToolResult(result: unknown): string {
+    if (typeof result === "string") {
+      return result;
+    }
+
+    try {
+      return JSON.stringify(result) ?? "";
+    } catch {
+      return String(result);
+    }
+  }
+
+  private resolveStopReason(
+    success: boolean,
+    error: string | undefined,
+  ): SubagentResult["metadata"]["stopReason"] {
+    if (success) {
+      return "completed";
+    }
+
+    if (error && /timed out|timeout/i.test(error)) {
+      return "timeout";
+    }
+
+    return "runtime_error";
   }
 
   private recordRunMetrics(type: SubagentType, result: SubagentResult): void {

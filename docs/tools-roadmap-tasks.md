@@ -19,7 +19,7 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 | **Fase 2 (P0)** | Task/Subagents MVP | TBD | 32h | ✅ Concluído e expandido |
 | **Fase 3 (P1)** | ReadFile images + Glob | TBD | 28h | ✅ Concluído |
 | **Fase 4 (P2)** | WebFetch + TodoWrite + hardening inicial | TBD | TBD | ✅ Concluído |
-| **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | 🔜 Próximo |
+| **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | 🟡 Em andamento |
 | **Backlog** | Pooling, streaming, advanced recovery | TBD | TBD | ⚪ Backlog |
 
 ---
@@ -79,35 +79,37 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 ### Subtasks
 
 #### Task 5.1.1: SDD Intake & Spec
-- [ ] Criar `.sdd/subagent-resource-limits/intake.md`
-- [ ] Criar `.sdd/subagent-resource-limits/spec.md`
-- [ ] Definir ACs para limite de tool calls, output agregado e metadata de parada.
-- [ ] Definir explicitamente fora do escopo: pooling, streaming e retry avançado.
+- [x] Criar `.sdd/subagent-resource-limits/intake.md`
+- [x] Criar `.sdd/subagent-resource-limits/spec.md`
+- [x] Definir ACs para limite de tool calls, output agregado e metadata de parada.
+- [x] Definir explicitamente fora do escopo: pooling, streaming e retry avançado.
 
 #### Task 5.1.2: TDD Red
-- [ ] Red test: subagent falha quando excede máximo de tool calls.
-- [ ] Red test: subagent falha quando excede máximo de output agregado.
-- [ ] Red test: subagent normal não é afetado pelos limites.
-- [ ] Red test: timeout/cancel reason aparece em metadata quando aplicável.
+- [x] Red test: subagent falha quando excede máximo de tool calls.
+- [x] Red test: subagent falha quando excede máximo de output agregado.
+- [x] Red test: subagent normal não é afetado pelos limites.
+- [x] Red test: timeout/cancel reason aparece em metadata quando aplicável.
 
 #### Task 5.1.3: Contract & Types
-- [ ] Adicionar tipo `SubagentResourceLimits`.
-- [ ] Adicionar `resourceLimits` em `SubagentConfig`.
-- [ ] Adicionar metadata estruturada no `SubagentResult`.
-- [ ] Preservar readonly properties.
+- [x] Adicionar tipo `SubagentResourceLimits`.
+- [x] Adicionar `resourceLimits` em `SubagentConfig`.
+- [x] Adicionar metadata estruturada no `SubagentResult`.
+- [x] Preservar readonly properties.
 
 #### Task 5.1.4: Enforcement
-- [ ] Aplicar limite de tool calls no final do child run usando `toolCallHistory`.
-- [ ] Aplicar limite de output usando conteúdo final + tool outputs quando disponível.
-- [ ] Retornar falha estruturada sem lançar erro desnecessário.
-- [ ] Manter comportamento atual para runs dentro dos limites.
+- [x] Aplicar limite de tool calls no final do child run usando `toolCallHistory`.
+- [x] Aplicar limite de output usando conteúdo final + tool outputs quando disponível.
+- [x] Retornar falha estruturada sem lançar erro desnecessário.
+- [x] Manter comportamento atual para runs dentro dos limites.
 
 #### Task 5.1.5: Verification
-- [ ] Rodar testes focados de subagent.
-- [ ] Rodar `pnpm run lint`.
-- [ ] Rodar `pnpm run test`.
-- [ ] Rodar `git diff --check`.
-- [ ] Rodar architecture gate e registrar violações preexistentes.
+- [x] Rodar testes focados de subagent.
+- [x] Rodar `pnpm run lint`.
+- [x] Rodar `pnpm run test`.
+- [x] Rodar `git diff --check`.
+- [x] Rodar architecture gate e registrar violações preexistentes.
+
+**Status**: ✅ Implementado.
 
 **Critério de aceitação**: subagents têm limites operacionais explícitos, testados e visíveis em resultado/metadata, sem alterar ferramentas individuais.
 
