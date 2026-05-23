@@ -120,6 +120,12 @@ export class ToolScheduler {
       signal?: AbortSignal,
     ) => Promise<ToolResult<T>>,
   ): Promise<TaskResult<T>[]> {
+    const taskIds = new Set(tasks.map((task) => task.id));
+
+    for (const taskId of taskIds) {
+      this.completed.delete(taskId);
+    }
+
     // Validate dependency graph (detect cycles)
     for (const task of tasks) {
       if (task.dependencies && task.dependencies.length > 0) {
@@ -135,7 +141,13 @@ export class ToolScheduler {
     const promises = tasks.map((task) => this.schedule(task, executor));
 
     // Wait for all to complete
-    return Promise.all(promises);
+    try {
+      return await Promise.all(promises);
+    } finally {
+      for (const taskId of taskIds) {
+        this.completed.delete(taskId);
+      }
+    }
   }
 
   /**

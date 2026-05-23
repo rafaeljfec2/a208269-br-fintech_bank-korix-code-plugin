@@ -327,6 +327,7 @@ export class ExecutionEngine {
           | "stop"
           | "max_tokens"
           | "stop_sequence"
+          | "tool_calls"
           | undefined;
         // NOTE: Don't emit "done" here! It's emitted after tool execution in step()
         break;
@@ -360,7 +361,7 @@ export class ExecutionEngine {
           recoverable: false,
           timestamp: Date.now(),
         });
-        continue;
+        throw result.error;
       }
 
       this.handleToolCallComplete(
@@ -509,9 +510,12 @@ export class ExecutionEngine {
 
       const duration = result.metadata?.duration ?? 0;
       this.metrics.recordToolDuration(duration);
+      const observationPayload = result.success
+        ? result.data
+        : this.buildFailedToolObservation(result);
       const observationSummary = this.observationEngine.summarizeToolResult(
         toolCall.name,
-        result.success ? result.data : { error: result.error },
+        observationPayload,
         result.success,
       );
 
@@ -645,6 +649,20 @@ export class ExecutionEngine {
 
   private isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+  }
+
+  private buildFailedToolObservation(result: {
+    readonly data?: unknown;
+    readonly error?: string;
+  }): unknown {
+    if (result.data === undefined) {
+      return { error: result.error };
+    }
+
+    return {
+      data: result.data,
+      error: result.error,
+    };
   }
 
   private buildToolContext(state: RuntimeState): ToolContext {

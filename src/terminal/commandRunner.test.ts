@@ -106,6 +106,27 @@ describe("CommandRunner background sessions", () => {
     });
   });
 
+  it("should strip echoed internal marker commands from foreground stdout", async () => {
+    const fakePty = new FakePty();
+    const runner = new CommandRunner(
+      createSessionManager(fakePty),
+      createLogger(),
+    );
+
+    const resultPromise = runner.run("git status --short");
+    const wrappedCommand = String(fakePty.write.mock.calls[0]?.[0] ?? "");
+
+    fakePty.emitData(`${wrappedCommand.replace(/\n/g, "\r\n")}\r\n`);
+    fakePty.emitData(" M src/file.ts\r\n");
+    fakePty.emitData("__KORIX_BACKGROUND_EXIT_foreground:0__\r\n");
+
+    await expect(resultPromise).resolves.toMatchObject({
+      stdout: " M src/file.ts\n",
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+
   it("should start a background command and return a session id without waiting for exit", async () => {
     const fakePty = new FakePty();
     const runner = new CommandRunner(

@@ -214,6 +214,10 @@ export class AgentLoop {
         const isEndTurn =
           stepResult.stopReason === "end_turn" ||
           stepResult.stopReason === "stop";
+        const isTerminalProviderStop =
+          isEndTurn ||
+          stepResult.stopReason === "max_tokens" ||
+          stepResult.stopReason === "stop_sequence";
 
         // Stop only when the provider ended without any tool work.
         // Interactive tools add a tool_result message with the user's answer,
@@ -247,7 +251,7 @@ export class AgentLoop {
         if (
           requiredToolUnsatisfied ||
           stepResult.completeAfterInteractiveToolCalls === true ||
-          (isEndTurn && !hadAnyToolCalls)
+          (isTerminalProviderStop && !hadAnyToolCalls)
         ) {
           completed = true;
         }

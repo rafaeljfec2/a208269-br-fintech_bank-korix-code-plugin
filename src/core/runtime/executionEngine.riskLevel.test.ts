@@ -122,6 +122,51 @@ class DeltaToolCallProvider implements AIProvider {
   }
 }
 
+class MalformedDeltaToolCallProvider implements AIProvider {
+  readonly type = "test";
+  readonly config: ProviderConfig = {
+    type: "test",
+    apiKey: "test",
+    model: "test-model",
+  };
+
+  async *send(
+    _input: ProviderInput,
+    context: RequestContext,
+  ): AsyncGenerator<ProviderEvent, ProviderMetadata, void> {
+    const correlation = {
+      correlationId: context.correlationId,
+      sessionId: context.sessionId,
+      agentRunId: context.agentRunId,
+      iterationId: context.iterationId,
+    };
+
+    yield {
+      type: "tool_call_delta",
+      index: 0,
+      id: "tool-call-1",
+      name: "GitStatus",
+      argumentsChunk: "{",
+      timestamp: Date.now(),
+      correlation,
+    };
+    yield {
+      type: "finish",
+      reason: "tool_calls",
+      timestamp: Date.now(),
+      correlation,
+    };
+    return {
+      model: this.config.model,
+      totalDuration: 1,
+    };
+  }
+
+  dispose(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 describe("ExecutionEngine tool risk inference", () => {
   it("should treat FileChunks as read-only and skip approval", async () => {
     const logger = new Logger({ level: "error" });
@@ -256,5 +301,90 @@ describe("ExecutionEngine tool risk inference", () => {
       {},
       expect.objectContaining({ workspaceRoot: "/repo" }),
     );
+  });
+
+  it("should reject malformed streamed tool calls instead of continuing without tools", async () => {
+    const logger = new Logger({ level: "error" });
+    const eventEmitter = new RuntimeEventEmitter();
+    const toolRegistry = new ToolRegistry();
+    const tool: Tool<Record<string, never>, { readonly branch: string }> = {
+      name: "GitStatus",
+      description: "Get git status.",
+      schema: z.object({}),
+      execute: vi.fn(async () => ({
+        success: true,
+        data: {
+          branch: "develop",
+        },
+      })),
+    };
+    toolRegistry.register(tool);
+
+    const engine = new ExecutionEngine(
+      new MalformedDeltaToolCallProvider(),
+      toolRegistry,
+      new PermissionManager(),
+      eventEmitter,
+      new CheckpointManager(logger),
+      new RuntimeMetrics(logger),
+      new IterationGuard(logger, eventEmitter),
+      new CancellationManager(logger, eventEmitter),
+      logger,
+      "system",
+    );
+    const state = new RuntimeState({
+      mode: "agent",
+      workspaceRoot: "/repo",
+      openFiles: [],
+    });
+
+    await expect(engine.step(state)).rejects.toThrow(
+      "Failed to parse tool call arguments",
+    );
+  });
+
+  it("should include structured failure data in observation summaries", async () => {
+    const logger = new Logger({ level: "error" });
+    const eventEmitter = new RuntimeEventEmitter();
+    const toolRegistry = new ToolRegistry();
+    const tool: Tool<Record<string, never>, { readonly stdout: string; readonly exitCode: number }> = {
+      name: "RunCommand",
+      description: "Run a command.",
+      schema: z.object({}),
+      requiresApproval: () => false,
+      execute: vi.fn(async () => ({
+        success: false,
+        error: "Command exited with code 128",
+        data: {
+          stdout: "fatal: not a git repository\n",
+          exitCode: 128,
+        },
+      })),
+    };
+    toolRegistry.register(tool);
+
+    const engine = new ExecutionEngine(
+      new ToolCallProvider("RunCommand", "{}"),
+      toolRegistry,
+      new PermissionManager(),
+      eventEmitter,
+      new CheckpointManager(logger),
+      new RuntimeMetrics(logger),
+      new IterationGuard(logger, eventEmitter),
+      new CancellationManager(logger, eventEmitter),
+      logger,
+      "system",
+    );
+    const state = new RuntimeState({
+      mode: "agent",
+      workspaceRoot: "/repo",
+      openFiles: [],
+    });
+
+    await engine.step(state);
+
+    const observation =
+      state.getMemory().thinking.observationSummaries[0]?.summary ?? "";
+    expect(observation).toContain("fatal: not a git repository");
   });
 });

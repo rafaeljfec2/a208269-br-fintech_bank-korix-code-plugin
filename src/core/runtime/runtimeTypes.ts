@@ -39,7 +39,12 @@ export interface StepResult {
   requiredToolSatisfied?: boolean;
   hadThinking: boolean;
   tokenCount: number;
-  stopReason?: "end_turn" | "stop" | "max_tokens" | "stop_sequence";
+  stopReason?:
+    | "end_turn"
+    | "stop"
+    | "max_tokens"
+    | "stop_sequence"
+    | "tool_calls";
   error?: string;
   recoverable: boolean;
 }

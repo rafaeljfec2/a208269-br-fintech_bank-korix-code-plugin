@@ -173,6 +173,7 @@ export class CommandRunner {
     };
 
     const markerPattern = this.createExitMarkerPattern(sessionId);
+    const commandWithMarker = this.withExitMarker(command, sessionId);
 
     entry.pty.clearOutput();
     entry.pty.onData((data) => {
@@ -186,6 +187,11 @@ export class CommandRunner {
           clearTimeout(session.timeoutId);
         }
         session.output = session.output.replace(markerPattern, "");
+        session.output = this.stripCommandEcho(
+          session.output,
+          command,
+          commandWithMarker,
+        );
       }
 
       session.output = this.capBackgroundOutput(session.output);
@@ -213,7 +219,7 @@ export class CommandRunner {
     session.timeoutId.unref?.();
 
     this.backgroundSessions.set(sessionId, session);
-    entry.pty.write(this.withExitMarker(command, sessionId));
+    entry.pty.write(commandWithMarker);
 
     return {
       stdout: session.output,
@@ -258,7 +264,11 @@ export class CommandRunner {
         }
 
         const duration = Date.now() - startTime;
-        const cleanStdout = this.stripCommandEcho(stdout, command);
+        const cleanStdout = this.stripCommandEcho(
+          stdout,
+          command,
+          commandWithMarker,
+        );
 
         const result: CommandResult = {
           stdout: cleanStdout,
@@ -281,6 +291,7 @@ export class CommandRunner {
 
       pty.clearOutput();
       const markerPattern = this.createExitMarkerPattern("foreground");
+      const commandWithMarker = this.withExitMarker(command, "foreground");
 
       pty.onData((data) => {
         stdout += data;
@@ -302,7 +313,7 @@ export class CommandRunner {
         finish(false, exitCode, timeoutId);
       });
 
-      pty.write(this.withExitMarker(command, "foreground"));
+      pty.write(commandWithMarker);
     });
   }
 
@@ -340,9 +351,23 @@ export class CommandRunner {
     return `${command}\nprintf '\\n__KORIX_BACKGROUND_EXIT_${this.toMarkerId(sessionId)}:%s__\\n' "$?"`;
   }
 
-  private stripCommandEcho(output: string, command: string): string {
+  private stripCommandEcho(
+    output: string,
+    command: string,
+    wrappedCommand?: string,
+  ): string {
     const normalizedOutput = output.replace(/\r\n/g, "\n");
     const normalizedCommand = command.replace(/\r\n/g, "\n").trimEnd();
+    const normalizedWrappedCommand = wrappedCommand
+      ?.replace(/\r\n/g, "\n")
+      .trimEnd();
+
+    if (
+      normalizedWrappedCommand &&
+      normalizedOutput.startsWith(`${normalizedWrappedCommand}\n`)
+    ) {
+      return normalizedOutput.slice(normalizedWrappedCommand.length + 1);
+    }
 
     if (normalizedOutput.startsWith(`${normalizedCommand}\n`)) {
       return normalizedOutput.slice(normalizedCommand.length + 1);

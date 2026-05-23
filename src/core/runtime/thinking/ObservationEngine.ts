@@ -64,6 +64,7 @@ export class ObservationEngine {
       /error/i,
       /failed/i,
       /failure/i,
+      /fatal/i,
       /exception/i,
       /expected/i,
       /received/i,
