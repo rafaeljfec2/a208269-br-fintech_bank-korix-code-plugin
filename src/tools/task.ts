@@ -70,6 +70,7 @@ MVP scope:
       context: input.context,
       executionContext: context.execution,
       parentSignal: context.signal,
+      parentStateSnapshot: context.getRuntimeStateSnapshot?.(),
     });
 
     return {

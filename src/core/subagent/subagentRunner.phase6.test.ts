@@ -254,4 +254,64 @@ describe("SubagentRunner phase 6 capabilities", () => {
     expect(result.metadata.resourceUsage?.durationMs).toBeGreaterThanOrEqual(0);
     expect(result.metadata.resourceUsage?.heapUsedBytes).toBeGreaterThan(0);
   });
+
+  it("should report when a parent state snapshot is received", async () => {
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: () =>
+        ({
+          async *run() {
+            yield {
+              type: "iteration_start",
+              iteration: 0,
+              timestamp: Date.now(),
+            };
+            return createSuccessResult("observed");
+          },
+        }) as unknown as AgentLoop,
+    });
+
+    const result = await runner.run({
+      type: "explore",
+      prompt: "Find code",
+      executionContext: {
+        mode: "agent",
+        workspaceRoot: "/repo",
+        openFiles: [],
+      },
+      parentStateSnapshot: {
+        context: {
+          mode: "agent",
+          workspaceRoot: "/repo",
+          openFiles: [],
+        },
+        conversation: {
+          messages: [],
+          turnCount: 0,
+          toolCallHistory: [],
+          todos: [],
+        },
+        execution: {
+          isExecuting: false,
+          currentIteration: 0,
+          maxIterations: 25,
+          startTime: 0,
+          lastActivityTime: 0,
+        },
+        workspace: {
+          root: "/repo",
+          openFiles: [],
+          modifiedFiles: [],
+        },
+        memory: {
+          shortTerm: [],
+          conversationContext: [],
+        },
+        correlationId: "runtime-parent",
+      },
+    });
+
+    expect(result.metadata.parentStateSnapshotReceived).toBe(true);
+  });
 });

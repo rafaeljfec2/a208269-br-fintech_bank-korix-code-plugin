@@ -4,7 +4,10 @@
 
 import { z } from "zod";
 import type { ExecutionContext } from "../core/types";
-import type { TodoItem } from "../core/runtime/runtimeTypes";
+import type {
+  SerializedRuntimeStateSnapshot,
+  TodoItem,
+} from "../core/runtime/runtimeTypes";
 import type {
   SubagentRequest,
   SubagentResult,
@@ -20,6 +23,7 @@ export interface ToolContext {
   readonly signal?: AbortSignal;
   userId?: string;
   runSubagent?: (request: SubagentRequest) => Promise<SubagentResult>;
+  getRuntimeStateSnapshot?: () => SerializedRuntimeStateSnapshot;
   updateTodos?: (todos: readonly TodoItem[]) => readonly TodoItem[];
   getTodos?: () => readonly TodoItem[];
 }

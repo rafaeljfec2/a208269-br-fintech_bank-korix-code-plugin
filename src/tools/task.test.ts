@@ -61,6 +61,36 @@ describe("TaskTool", () => {
 
   it("should call the runtime subagent callback", async () => {
     const controller = new AbortController();
+    const parentStateSnapshot = {
+      context: {
+        mode: "agent" as const,
+        workspaceRoot: "/test/workspace",
+        openFiles: [],
+      },
+      conversation: {
+        messages: [],
+        turnCount: 0,
+        toolCallHistory: [],
+        todos: [],
+      },
+      execution: {
+        isExecuting: false,
+        currentIteration: 0,
+        maxIterations: 25,
+        startTime: 0,
+        lastActivityTime: 0,
+      },
+      workspace: {
+        root: "/test/workspace",
+        openFiles: [],
+        modifiedFiles: [],
+      },
+      memory: {
+        shortTerm: [],
+        conversationContext: [],
+      },
+      correlationId: "runtime-test",
+    };
     const runSubagent = vi.fn(async () => ({
       success: true,
       output: "Found src/auth.ts",
@@ -73,7 +103,11 @@ describe("TaskTool", () => {
 
     const result = await TaskTool.execute(
       { type: "explore", prompt: "Find auth" },
-      createMockToolContext({ runSubagent, signal: controller.signal }),
+      createMockToolContext({
+        runSubagent,
+        signal: controller.signal,
+        getRuntimeStateSnapshot: () => parentStateSnapshot,
+      }),
     );
 
     expect(result.success, result.error).toBe(true);
@@ -94,6 +128,7 @@ describe("TaskTool", () => {
       context: undefined,
       executionContext: expect.objectContaining({ mode: "agent" }),
       parentSignal: controller.signal,
+      parentStateSnapshot,
     });
   });
 

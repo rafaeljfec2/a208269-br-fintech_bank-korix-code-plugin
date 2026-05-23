@@ -690,6 +690,7 @@ export class ExecutionEngine {
         return updated;
       },
       getTodos: () => state.getTodos(),
+      getRuntimeStateSnapshot: () => state.serialize(),
       runSubagent: (request) => {
         const runner = new SubagentRunner({
           parentRegistry: this.toolRegistry,

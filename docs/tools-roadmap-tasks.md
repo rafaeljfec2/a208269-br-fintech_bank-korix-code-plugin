@@ -22,7 +22,8 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 | **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | ✅ Concluído |
 | **Fase 6 (P1)** | Subagent progress + pooling + recovery | TBD | TBD | ✅ Concluído |
 | **Fase 7 (P1)** | State serialization + resource monitoring | TBD | TBD | ✅ Concluído |
-| **Backlog** | Parent-to-child state wiring, CPU hard limits | TBD | TBD | ⚪ Backlog |
+| **Fase 8 (P1)** | Parent-to-child state wiring | TBD | TBD | ✅ Concluído |
+| **Backlog** | CPU hard limits, replay/debug UI | TBD | TBD | ⚪ Backlog |
 
 ---
 
@@ -418,6 +419,51 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - `src/core/subagent/subagentRunner.phase6.test.ts`
 - `src/core/subagent/subagentRunner.ts`
 - `src/core/subagent/subagentTypes.ts`
+
+## FASE 8: Parent-to-Child State Wiring (P1)
+
+**Objetivo**: conectar o snapshot serializado da Fase 7 ao fluxo de subagents, permitindo que o parent disponibilize estado estruturado ao child sem mutação compartilhada.
+
+## 8.1 Parent State Snapshot Contract
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Adicionar `getRuntimeStateSnapshot` ao `ToolContext`.
+- [x] Adicionar `parentStateSnapshot` ao `SubagentRequest`.
+- [x] Adicionar metadata `parentStateSnapshotReceived`.
+- [x] Preservar compatibilidade para callers sem snapshot.
+
+**Critério de aceitação**: tools podem obter uma cópia serializada do runtime parent e repassar ao subagent request.
+
+## 8.2 Runtime Wiring
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] `ExecutionEngine.buildToolContext()` expõe `state.serialize()`.
+- [x] `TaskTool` repassa `parentStateSnapshot`.
+- [x] `SubagentRunner` registra se recebeu snapshot.
+- [x] Testar que o snapshot é JSON-safe e não muta parent state.
+
+**Critério de aceitação**: subagent recebe snapshot estruturado do parent de forma rastreável, sem restaurar automaticamente o child state nesta fase.
+
+**Evidência**:
+
+- `src/core/runtime/executionEngine.parentState.test.ts`
+- `src/tools/task.test.ts`
+- `src/core/subagent/subagentRunner.phase6.test.ts`
+- `src/harness/toolRegistry.ts`
+- `src/core/runtime/executionEngine.ts`
+- `src/tools/task.ts`
+- `src/core/subagent/subagentTypes.ts`
+- `src/core/subagent/subagentRunner.ts`
 
 ## UX Guardrail: Model-Based Mode Switch Prompt
 

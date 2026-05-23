@@ -154,6 +154,8 @@ export class SubagentRunner {
           outputBytes,
           resourceUsage: this.createResourceUsage(startTime),
           recoveryAttempts,
+          parentStateSnapshotReceived:
+            request.parentStateSnapshot !== undefined,
           stopReason,
         },
       };
@@ -176,6 +178,8 @@ export class SubagentRunner {
           outputBytes: 0,
           resourceUsage: this.createResourceUsage(startTime),
           recoveryAttempts,
+          parentStateSnapshotReceived:
+            request.parentStateSnapshot !== undefined,
           stopReason: this.resolveStopReason(
             false,
             message,
@@ -385,7 +389,11 @@ export class SubagentRunner {
     }
 
     const cancelChild = (): void => {
-      void agentLoop.cancel("Parent execution cancelled");
+      agentLoop.cancel("Parent execution cancelled").catch((error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : "Unknown cancellation error";
+        console.error("Subagent cancellation failed", message);
+      });
     };
 
     if (parentSignal.aborted) {

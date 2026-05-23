@@ -1,5 +1,6 @@
 import type { ExecutionContext } from "../types";
 import type { RuntimeEvent } from "../runtime/runtimeEvents";
+import type { SerializedRuntimeStateSnapshot } from "../runtime/runtimeTypes";
 
 export type SubagentType = "explore" | "plan" | "review" | "shell" | "test";
 export type SubagentProgressEventType =
@@ -39,6 +40,7 @@ export interface SubagentRequest {
   readonly context?: Record<string, unknown>;
   readonly executionContext: ExecutionContext;
   readonly parentSignal?: AbortSignal;
+  readonly parentStateSnapshot?: SerializedRuntimeStateSnapshot;
   readonly onEvent?: (event: SubagentProgressEvent) => void;
 }
 
@@ -54,6 +56,7 @@ export interface SubagentResult {
     readonly outputBytes?: number;
     readonly resourceUsage?: SubagentResourceUsage;
     readonly recoveryAttempts?: number;
+    readonly parentStateSnapshotReceived?: boolean;
     readonly stopReason?:
       | "completed"
       | "runtime_error"
