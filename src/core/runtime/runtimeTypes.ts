@@ -153,6 +153,13 @@ export interface MemorySnapshot {
   readonly thinking?: ThinkingMemorySnapshot;
 }
 
+export interface SerializedMemorySnapshot {
+  readonly shortTerm: readonly (readonly [string, unknown])[];
+  readonly conversationContext: readonly string[];
+  readonly lastCheckpointId?: string;
+  readonly thinking?: ThinkingMemorySnapshot;
+}
+
 export interface ThinkingMemorySnapshot {
   readonly taskProfile?: ThinkingRunProfile;
   readonly evidencePack?: EvidencePack;
@@ -169,6 +176,15 @@ export interface RuntimeStateSnapshot {
   readonly execution: ExecutionStateSnapshot;
   readonly workspace: WorkspaceStateSnapshot;
   readonly memory: MemorySnapshot;
+  readonly correlationId: string;
+}
+
+export interface SerializedRuntimeStateSnapshot {
+  readonly context: ExecutionContext;
+  readonly conversation: ConversationStateSnapshot;
+  readonly execution: ExecutionStateSnapshot;
+  readonly workspace: SerializedWorkspaceStateSnapshot;
+  readonly memory: SerializedMemorySnapshot;
   readonly correlationId: string;
 }
 
@@ -219,6 +235,18 @@ export interface WorkspaceStateSnapshot {
   };
   readonly openFiles: readonly string[];
   readonly modifiedFiles: ReadonlySet<string>;
+}
+
+export interface SerializedWorkspaceStateSnapshot {
+  readonly root: string;
+  readonly currentFile?: string;
+  readonly selection?: {
+    readonly start: { readonly line: number; readonly character: number };
+    readonly end: { readonly line: number; readonly character: number };
+    readonly text: string;
+  };
+  readonly openFiles: readonly string[];
+  readonly modifiedFiles: readonly string[];
 }
 
 /**

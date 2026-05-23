@@ -6,6 +6,7 @@ import {
   type SubagentRequest,
   type SubagentResult,
   type SubagentConfig,
+  type SubagentResourceUsage,
   type SubagentProgressEventType,
   type SubagentType,
 } from "./subagentTypes";
@@ -151,15 +152,13 @@ export class SubagentRunner {
           toolsCalled: toolCalls.map((toolCall) => toolCall.toolName),
           toolCallCount: toolCalls.length,
           outputBytes,
+          resourceUsage: this.createResourceUsage(startTime),
           recoveryAttempts,
           stopReason,
         },
       };
 
-      const limitedResult = this.applyResourceLimits(
-        subagentResult,
-        config,
-      );
+      const limitedResult = this.applyResourceLimits(subagentResult, config);
 
       return limitedResult;
     } catch (error) {
@@ -175,6 +174,7 @@ export class SubagentRunner {
           toolsCalled: [],
           toolCallCount: 0,
           outputBytes: 0,
+          resourceUsage: this.createResourceUsage(startTime),
           recoveryAttempts,
           stopReason: this.resolveStopReason(
             false,
@@ -280,6 +280,13 @@ export class SubagentRunner {
       .join("");
 
     return Buffer.byteLength(output + toolOutput, "utf8");
+  }
+
+  private createResourceUsage(startTime: number): SubagentResourceUsage {
+    return {
+      durationMs: Date.now() - startTime,
+      heapUsedBytes: process.memoryUsage().heapUsed,
+    };
   }
 
   private stringifyToolResult(result: unknown): string {

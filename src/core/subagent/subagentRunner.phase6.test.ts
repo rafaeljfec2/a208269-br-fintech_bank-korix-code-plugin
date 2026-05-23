@@ -222,4 +222,36 @@ describe("SubagentRunner phase 6 capabilities", () => {
     expect(result.metadata.stopReason).toBe("runtime_error");
     expect(result.metadata.recoveryAttempts).toBe(1);
   });
+
+  it("should include resource usage metadata in subagent results", async () => {
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: () =>
+        ({
+          async *run() {
+            yield {
+              type: "iteration_start",
+              iteration: 0,
+              timestamp: Date.now(),
+            };
+            return createSuccessResult("observed");
+          },
+        }) as unknown as AgentLoop,
+    });
+
+    const result = await runner.run({
+      type: "explore",
+      prompt: "Find code",
+      executionContext: {
+        mode: "agent",
+        workspaceRoot: "/repo",
+        openFiles: [],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.metadata.resourceUsage?.durationMs).toBeGreaterThanOrEqual(0);
+    expect(result.metadata.resourceUsage?.heapUsedBytes).toBeGreaterThan(0);
+  });
 });

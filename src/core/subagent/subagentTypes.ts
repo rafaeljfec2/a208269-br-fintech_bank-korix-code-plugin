@@ -28,6 +28,11 @@ export interface SubagentResourceLimits {
   readonly maxOutputBytes: number;
 }
 
+export interface SubagentResourceUsage {
+  readonly durationMs: number;
+  readonly heapUsedBytes: number;
+}
+
 export interface SubagentRequest {
   readonly type: SubagentType;
   readonly prompt: string;
@@ -47,6 +52,7 @@ export interface SubagentResult {
     readonly toolsCalled: readonly string[];
     readonly toolCallCount?: number;
     readonly outputBytes?: number;
+    readonly resourceUsage?: SubagentResourceUsage;
     readonly recoveryAttempts?: number;
     readonly stopReason?:
       | "completed"

@@ -315,6 +315,61 @@ describe("RuntimeState", () => {
       expect(snapshot.conversation.messages).toHaveLength(1);
       expect(state.getConversation().messages).toHaveLength(2);
     });
+
+    it("should serialize to a JSON-safe snapshot", () => {
+      state.addMessage({ role: "user", content: "Serialize", timestamp: 1000 });
+      state.recordToolCall(
+        "ReadFile",
+        { path: "/test.ts" },
+        { data: "content" },
+        12,
+        true,
+      );
+      state.updateTodos([
+        {
+          content: "Check serialization",
+          status: "in_progress",
+          activeForm: "Checking serialization",
+        },
+      ]);
+      state.markFileModified("/src/runtime.ts");
+      state.setCheckpoint("chk-serialize");
+
+      const serialized = state.serialize();
+      const reparsed = JSON.parse(JSON.stringify(serialized));
+
+      expect(Array.isArray(reparsed.workspace.modifiedFiles)).toBe(true);
+      expect(reparsed.workspace.modifiedFiles).toEqual(["/src/runtime.ts"]);
+      expect(Array.isArray(reparsed.memory.shortTerm)).toBe(true);
+      expect(reparsed.memory.lastCheckpointId).toBe("chk-serialize");
+      expect(reparsed.conversation.todos).toHaveLength(1);
+      expect(reparsed.conversation.toolCallHistory).toHaveLength(1);
+    });
+
+    it("should deserialize a serialized runtime state", () => {
+      state.addMessage({ role: "user", content: "Original", timestamp: 1000 });
+      state.incrementIteration();
+      state.markFileModified("/src/original.ts");
+      state.updateTodos([
+        {
+          content: "Restore state",
+          status: "completed",
+          activeForm: "Restoring state",
+        },
+      ]);
+
+      const restored = RuntimeState.deserialize(state.serialize());
+
+      expect(restored.getConversation().messages[0]?.content).toBe("Original");
+      expect(restored.getConversation().todos[0]?.content).toBe(
+        "Restore state",
+      );
+      expect(restored.getExecution().currentIteration).toBe(1);
+      expect(
+        restored.getWorkspace().modifiedFiles.has("/src/original.ts"),
+      ).toBe(true);
+      expect(restored.getCorrelationId()).toBe(state.getCorrelationId());
+    });
   });
 
   describe("immutability", () => {

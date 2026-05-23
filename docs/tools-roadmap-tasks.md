@@ -21,7 +21,8 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 | **Fase 4 (P2)** | WebFetch + TodoWrite + hardening inicial | TBD | TBD | ✅ Concluído |
 | **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | ✅ Concluído |
 | **Fase 6 (P1)** | Subagent progress + pooling + recovery | TBD | TBD | ✅ Concluído |
-| **Backlog** | State serialization, resource monitoring | TBD | TBD | ⚪ Backlog |
+| **Fase 7 (P1)** | State serialization + resource monitoring | TBD | TBD | ✅ Concluído |
+| **Backlog** | Parent-to-child state wiring, CPU hard limits | TBD | TBD | ⚪ Backlog |
 
 ---
 
@@ -367,6 +368,53 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 **Evidência**:
 
+- `src/core/subagent/subagentRunner.phase6.test.ts`
+- `src/core/subagent/subagentRunner.ts`
+- `src/core/subagent/subagentTypes.ts`
+
+## FASE 7: Subagent State & Resource Monitoring (P1)
+
+**Objetivo**: tornar o estado do runtime serializável para futuras passagens parent-to-child e expor resource usage básico de subagents sem kill automático.
+
+## 7.1 RuntimeState Serialization
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Adicionar tipos serializáveis para runtime, memory e workspace.
+- [x] Converter `Map` para entries.
+- [x] Converter `Set` para array.
+- [x] Implementar `RuntimeState.serialize()`.
+- [x] Implementar `RuntimeState.deserialize(snapshot)`.
+- [x] Cobrir JSON round-trip e restauração com testes.
+
+**Critério de aceitação**: `RuntimeState` pode produzir um snapshot JSON-safe e restaurar state equivalente para conversation, execution, workspace e memory simples.
+
+## 7.2 Subagent Resource Monitoring
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Adicionar `SubagentResourceUsage`.
+- [x] Registrar `durationMs`.
+- [x] Registrar `heapUsedBytes`.
+- [x] Expor `resourceUsage` em `SubagentResult.metadata`.
+- [x] Não matar sessões/processos automaticamente.
+- [x] Cobrir metadata com teste focado.
+
+**Critério de aceitação**: cada resultado de subagent carrega uso básico de recursos para observabilidade, preservando limits e cancellation existentes.
+
+**Evidência**:
+
+- `src/core/runtime/runtimeState.test.ts`
+- `src/core/runtime/runtimeState.ts`
+- `src/core/runtime/runtimeTypes.ts`
 - `src/core/subagent/subagentRunner.phase6.test.ts`
 - `src/core/subagent/subagentRunner.ts`
 - `src/core/subagent/subagentTypes.ts`

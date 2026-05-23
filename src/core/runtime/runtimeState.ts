@@ -11,6 +11,7 @@
 import type { Message, ExecutionContext } from "../types";
 import type {
   RuntimeStateSnapshot,
+  SerializedRuntimeStateSnapshot,
   ConversationStateSnapshot,
   ExecutionStateSnapshot,
   WorkspaceStateSnapshot,
@@ -263,7 +264,11 @@ export class RuntimeState {
   private readonly correlationId: string;
   private readonly context: ExecutionContext;
 
-  constructor(context: ExecutionContext, maxIterations = 25) {
+  constructor(
+    context: ExecutionContext,
+    maxIterations = 25,
+    correlationId?: string,
+  ) {
     this.context = {
       ...context,
       openFiles: [...context.openFiles],
@@ -279,7 +284,9 @@ export class RuntimeState {
     this.execution = new ExecutionState(maxIterations);
     this.workspace = new WorkspaceState(context.workspaceRoot, context);
     this.memory = new MemoryState();
-    this.correlationId = `runtime-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    this.correlationId =
+      correlationId ??
+      `runtime-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
   // === Getters (immutable snapshots) ===
@@ -405,6 +412,49 @@ export class RuntimeState {
       memory: this.memory.getSnapshot(),
       correlationId: this.correlationId,
     };
+  }
+
+  serialize(): SerializedRuntimeStateSnapshot {
+    const snapshot = this.createSnapshot();
+
+    return {
+      context: this.getContext(),
+      conversation: snapshot.conversation,
+      execution: snapshot.execution,
+      workspace: {
+        ...snapshot.workspace,
+        modifiedFiles: Array.from(snapshot.workspace.modifiedFiles),
+      },
+      memory: {
+        ...snapshot.memory,
+        shortTerm: Array.from(snapshot.memory.shortTerm.entries()),
+      },
+      correlationId: snapshot.correlationId,
+    };
+  }
+
+  static deserialize(snapshot: SerializedRuntimeStateSnapshot): RuntimeState {
+    const state = new RuntimeState(
+      snapshot.context,
+      snapshot.execution.maxIterations,
+      snapshot.correlationId,
+    );
+
+    state.restoreSnapshot({
+      conversation: snapshot.conversation,
+      execution: snapshot.execution,
+      workspace: {
+        ...snapshot.workspace,
+        modifiedFiles: new Set(snapshot.workspace.modifiedFiles),
+      },
+      memory: {
+        ...snapshot.memory,
+        shortTerm: new Map(snapshot.memory.shortTerm),
+      },
+      correlationId: snapshot.correlationId,
+    });
+
+    return state;
   }
 
   restoreSnapshot(snapshot: RuntimeStateSnapshot): void {

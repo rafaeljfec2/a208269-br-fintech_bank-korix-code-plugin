@@ -5,6 +5,7 @@ export {
   type SubagentProgressEvent,
   type SubagentProgressEventType,
   type SubagentRequest,
+  type SubagentResourceUsage,
   type SubagentResult,
   type SubagentType,
 } from "./subagentTypes";
