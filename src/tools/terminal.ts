@@ -53,7 +53,7 @@ Examples:
 
   async execute(
     input: RunCommandInput,
-    _context: ToolContext,
+    context: ToolContext,
   ): Promise<ToolResult<RunCommandOutput>> {
     const container = getGlobalContainer();
     const commandRunner = container.get<CommandRunner>(TOKENS.CommandRunner);
@@ -71,7 +71,13 @@ Examples:
       const result = await commandRunner.run(input.command, {
         sessionId: input.sessionId,
         timeout: input.timeout,
-        cwd: input.cwd,
+        cwd:
+          input.cwd ??
+          (context.workspaceRoot.length > 0 ? context.workspaceRoot : undefined),
+        env: {
+          GIT_PAGER: "cat",
+          PAGER: "cat",
+        },
         background: input.background,
       });
 
@@ -89,6 +95,27 @@ Examples:
           success: false,
           error: `Command timed out after ${result.duration}ms`,
           data: output,
+        };
+      }
+
+      if (result.exitCode !== null && result.exitCode !== 0) {
+        const details = [result.stderr, result.stdout]
+          .filter((item) => item.trim().length > 0)
+          .join("\n")
+          .trim();
+
+        return {
+          success: false,
+          error:
+            details.length > 0
+              ? `Command exited with code ${result.exitCode}: ${details}`
+              : `Command exited with code ${result.exitCode}`,
+          data: output,
+          metadata: {
+            duration: result.duration,
+            approved: true,
+            timestamp: Date.now(),
+          },
         };
       }
 

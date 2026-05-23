@@ -69,7 +69,7 @@ export class TaskAnalyzer {
   ];
 
   analyze(message: string, context: ExecutionContext): ThinkingRunProfile {
-    const normalized = message.toLowerCase();
+    const normalized = this.normalizeForIntent(message).toLowerCase();
     const mentionedSymbols = this.extractMentionedSymbols(message);
     const intent = this.detectIntent(normalized);
     const riskLevel = this.detectRisk(normalized, intent);
@@ -105,8 +105,16 @@ export class TaskAnalyzer {
   }
 
   private detectIntent(message: string): ThinkingIntent {
+    if (this.isGitMutatingRequest(message)) {
+      return "modify";
+    }
+
+    if (this.isGitOperationRequest(message)) {
+      return "validate";
+    }
+
     if (
-      /\b(implemente|implement|crie|create|altere|modify|fix|corrija|patch|refactor)\b/.test(
+      /\b(implemente|implement|crie|create|altere|modify|fix|corrija|patch|refactor|atualize|atualiza|update)\b/.test(
         message,
       )
     ) {
@@ -143,7 +151,7 @@ export class TaskAnalyzer {
     intent: ThinkingIntent,
   ): ThinkingRiskLevel {
     if (
-      /\b(delete|remove|rm\s+-rf|reset --hard|push|commit|deploy|produção|production)\b/.test(
+      /\b(delete|remove|rm\s+-rf|reset --hard|push|commit|deploy|producao|production)\b/.test(
         message,
       )
     ) {
@@ -152,6 +160,7 @@ export class TaskAnalyzer {
 
     if (
       intent === "modify" ||
+      this.isGitOperationRequest(message) ||
       /\b(run|execute|instale|install|migrate|migration)\b/.test(message)
     ) {
       return "medium";
@@ -316,6 +325,29 @@ export class TaskAnalyzer {
 
   private normalizeForIntent(message: string): string {
     return message.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  private isGitMutatingRequest(message: string): boolean {
+    return (
+      this.isGitOperationRequest(message) &&
+      /\b(atualize|atualiza|update|pull|merge|rebase|checkout|commit|push|reset|sincronize|sync)\b/.test(
+        message,
+      )
+    );
+  }
+
+  private isGitOperationRequest(message: string): boolean {
+    const hasExplicitGitCommand = /\bgit\s+[a-z-]+\b/.test(message);
+    const hasGitTerm =
+      /\b(git|commit|commits|branch|branches|develop|main|master|fetch|pull|merge|rebase|checkout)\b/.test(
+        message,
+      );
+    const hasGitAction =
+      /\b(analise|analisar|verifique|check|liste|listar|log|status|diff|fetch|pull|merge|rebase|checkout|atualize|atualiza|update|sincronize|sync)\b/.test(
+        message,
+      );
+
+    return hasExplicitGitCommand || (hasGitTerm && hasGitAction);
   }
 
   private detectWorkspaceAccess(message: string): WorkspaceAccessSignal {

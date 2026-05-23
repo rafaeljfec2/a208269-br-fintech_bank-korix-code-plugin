@@ -3,7 +3,7 @@
  * Allows users to configure API keys, models, and advanced settings
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useVSCode } from '../../hooks/useVSCode';
 import type { TestConnectionPayload, SaveSettingsPayload } from '../../../shared/protocol';
 
@@ -13,6 +13,7 @@ interface SettingsState {
   readonly provider: ProviderType;
   readonly apiKey: string;
   readonly model: string;
+  readonly availableModels: readonly string[];
   readonly baseUrl: string;
   readonly maxTokens: number;
   readonly temperature: number;
@@ -56,6 +57,18 @@ const PROVIDER_MODELS: Record<ProviderType, readonly string[]> = {
   ],
 };
 
+function getBaseUrlPlaceholder(provider: ProviderType): string {
+  if (provider === 'litellm') {
+    return 'https://litellm.int.thomsonreuters.com';
+  }
+
+  if (provider === 'ollama') {
+    return 'http://localhost:11434';
+  }
+
+  return 'https://openrouter.ai/api/v1';
+}
+
 export default function SettingsPanel() {
   const { sendMessage } = useVSCode();
 
@@ -63,6 +76,7 @@ export default function SettingsPanel() {
     provider: 'anthropic',
     apiKey: '',
     model: 'claude-sonnet-4-6',
+    availableModels: [],
     baseUrl: '',
     maxTokens: 4096,
     temperature: 0.7,
@@ -87,6 +101,7 @@ export default function SettingsPanel() {
           provider: message.payload.provider,
           apiKey: '',
           model: message.payload.model,
+          availableModels: message.payload.availableModels ?? [],
           baseUrl: message.payload.baseUrl ?? '',
           maxTokens: message.payload.maxTokens,
           temperature: message.payload.temperature,
@@ -122,6 +137,7 @@ export default function SettingsPanel() {
       ...settings,
       provider,
       model: PROVIDER_MODELS[provider][0] ?? '',
+      availableModels: [],
       baseUrl: '',
     });
     setTestResult(null);
@@ -180,8 +196,9 @@ export default function SettingsPanel() {
 
         {/* Provider Selection */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">Provider</label>
+          <label htmlFor="provider-select" className="block text-sm font-medium">Provider</label>
           <select
+            id="provider-select"
             value={settings.provider}
             onChange={(e) => handleProviderChange(e.target.value as ProviderType)}
             className="w-full px-3 py-2 bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)] rounded text-sm focus:outline-none focus:ring-1 focus:ring-[var(--vscode-button-background)]"
@@ -196,13 +213,14 @@ export default function SettingsPanel() {
 
         {/* API Key */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">
+          <label htmlFor="api-key-input" className="block text-sm font-medium">
             API Key
             {settings.hasApiKey && (
               <span className="ml-2 text-xs text-green-500">✓ Saved</span>
             )}
           </label>
           <input
+            id="api-key-input"
             type="password"
             value={settings.apiKey}
             onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
@@ -216,13 +234,17 @@ export default function SettingsPanel() {
 
         {/* Model Selection */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium">Model</label>
+          <label htmlFor="model-select" className="block text-sm font-medium">Model</label>
           <select
+            id="model-select"
             value={settings.model}
             onChange={(e) => setSettings({ ...settings, model: e.target.value })}
             className="w-full px-3 py-2 bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)] rounded text-sm focus:outline-none focus:ring-1 focus:ring-[var(--vscode-button-background)]"
           >
-            {PROVIDER_MODELS[settings.provider].map((model) => (
+            {(settings.availableModels.length > 0
+              ? settings.availableModels
+              : PROVIDER_MODELS[settings.provider]
+            ).map((model) => (
               <option key={model} value={model}>
                 {model}
               </option>
@@ -233,20 +255,15 @@ export default function SettingsPanel() {
         {/* Base URL (Optional for some providers) */}
         {(settings.provider === 'litellm' || settings.provider === 'ollama' || settings.provider === 'openrouter') && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium">
+            <label htmlFor="base-url-input" className="block text-sm font-medium">
               Base URL {settings.provider === 'litellm' && <span className="text-red-500">*</span>}
             </label>
             <input
+              id="base-url-input"
               type="text"
               value={settings.baseUrl}
               onChange={(e) => setSettings({ ...settings, baseUrl: e.target.value })}
-              placeholder={
-                settings.provider === 'litellm'
-                  ? 'https://litellm.int.thomsonreuters.com'
-                  : settings.provider === 'ollama'
-                    ? 'http://localhost:11434'
-                    : 'https://openrouter.ai/api/v1'
-              }
+              placeholder={getBaseUrlPlaceholder(settings.provider)}
               className="w-full px-3 py-2 bg-[var(--vscode-input-background)] border border-[var(--vscode-input-border)] rounded text-sm focus:outline-none focus:ring-1 focus:ring-[var(--vscode-button-background)]"
             />
           </div>
@@ -268,17 +285,18 @@ export default function SettingsPanel() {
             <div className="mt-4 space-y-4 pl-6">
               {/* Max Tokens */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">
+                <label htmlFor="max-tokens-input" className="block text-sm font-medium">
                   Max Tokens: {settings.maxTokens}
                 </label>
                 <input
+                  id="max-tokens-input"
                   type="range"
                   min="1024"
                   max="8192"
                   step="512"
                   value={settings.maxTokens}
                   onChange={(e) =>
-                    setSettings({ ...settings, maxTokens: parseInt(e.target.value, 10) })
+                    setSettings({ ...settings, maxTokens: Number.parseInt(e.target.value, 10) })
                   }
                   className="w-full"
                 />
@@ -289,17 +307,18 @@ export default function SettingsPanel() {
 
               {/* Temperature */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium">
+                <label htmlFor="temperature-input" className="block text-sm font-medium">
                   Temperature: {settings.temperature.toFixed(2)}
                 </label>
                 <input
+                  id="temperature-input"
                   type="range"
                   min="0"
                   max="1"
                   step="0.1"
                   value={settings.temperature}
                   onChange={(e) =>
-                    setSettings({ ...settings, temperature: parseFloat(e.target.value) })
+                    setSettings({ ...settings, temperature: Number.parseFloat(e.target.value) })
                   }
                   className="w-full"
                 />

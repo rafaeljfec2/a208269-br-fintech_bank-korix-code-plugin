@@ -61,8 +61,39 @@ describe("RunCommandTool", () => {
     expect(commandRunnerMock.run).toHaveBeenCalledWith("npm test", {
       sessionId: undefined,
       timeout: undefined,
-      cwd: undefined,
+      cwd: "/test/workspace",
+      env: {
+        GIT_PAGER: "cat",
+        PAGER: "cat",
+      },
       background: true,
+    });
+  });
+
+  it("should prefer explicit cwd over the workspace root", async () => {
+    commandRunnerMock.run.mockResolvedValue({
+      stdout: "done\n",
+      stderr: "",
+      exitCode: 0,
+      timedOut: false,
+      duration: 12,
+    });
+
+    const result = await RunCommandTool.execute(
+      { command: "git status", cwd: "/custom/repo" },
+      createMockToolContext(),
+    );
+
+    expect(result.success, result.error).toBe(true);
+    expect(commandRunnerMock.run).toHaveBeenCalledWith("git status", {
+      sessionId: undefined,
+      timeout: undefined,
+      cwd: "/custom/repo",
+      env: {
+        GIT_PAGER: "cat",
+        PAGER: "cat",
+      },
+      background: undefined,
     });
   });
 
@@ -85,6 +116,30 @@ describe("RunCommandTool", () => {
       stdout: "done\n",
       stderr: "",
       exitCode: 0,
+      timedOut: false,
+    });
+  });
+
+  it("should fail when a foreground command exits with non-zero status", async () => {
+    commandRunnerMock.run.mockResolvedValue({
+      stdout: "fatal: not a git repository\n",
+      stderr: "",
+      exitCode: 128,
+      timedOut: false,
+      duration: 12,
+    });
+
+    const result = await RunCommandTool.execute(
+      { command: "git log --oneline -5" },
+      createMockToolContext(),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Command exited with code 128");
+    expect(result.data).toEqual({
+      stdout: "fatal: not a git repository\n",
+      stderr: "",
+      exitCode: 128,
       timedOut: false,
     });
   });

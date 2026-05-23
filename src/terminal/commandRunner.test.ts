@@ -63,6 +63,49 @@ function createSessionManager(fakePty: FakePty): TerminalSessionManager {
 }
 
 describe("CommandRunner background sessions", () => {
+  it("should complete a foreground command when the internal marker is emitted", async () => {
+    const fakePty = new FakePty();
+    const runner = new CommandRunner(
+      createSessionManager(fakePty),
+      createLogger(),
+    );
+
+    const resultPromise = runner.run("git log --oneline -20");
+
+    expect(fakePty.write).toHaveBeenCalledWith(
+      expect.stringContaining("__KORIX_BACKGROUND_EXIT_foreground"),
+    );
+
+    fakePty.emitData("abc123 commit message\n");
+    fakePty.emitData("__KORIX_BACKGROUND_EXIT_foreground:0__\n");
+
+    await expect(resultPromise).resolves.toMatchObject({
+      stdout: "abc123 commit message\n",
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+
+  it("should strip echoed foreground commands from stdout", async () => {
+    const fakePty = new FakePty();
+    const runner = new CommandRunner(
+      createSessionManager(fakePty),
+      createLogger(),
+    );
+
+    const resultPromise = runner.run("git status --short");
+
+    fakePty.emitData("git status --short\r\n");
+    fakePty.emitData(" M src/file.ts\r\n");
+    fakePty.emitData("__KORIX_BACKGROUND_EXIT_foreground:0__\r\n");
+
+    await expect(resultPromise).resolves.toMatchObject({
+      stdout: " M src/file.ts\n",
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+
   it("should start a background command and return a session id without waiting for exit", async () => {
     const fakePty = new FakePty();
     const runner = new CommandRunner(

@@ -258,9 +258,10 @@ export class CommandRunner {
         }
 
         const duration = Date.now() - startTime;
+        const cleanStdout = this.stripCommandEcho(stdout, command);
 
         const result: CommandResult = {
-          stdout,
+          stdout: cleanStdout,
           stderr,
           exitCode,
           timedOut,
@@ -279,9 +280,16 @@ export class CommandRunner {
       };
 
       pty.clearOutput();
+      const markerPattern = this.createExitMarkerPattern("foreground");
 
       pty.onData((data) => {
         stdout += data;
+        const match = markerPattern.exec(stdout);
+
+        if (match) {
+          stdout = stdout.replace(markerPattern, "");
+          finish(false, Number(match[1]), timeoutId);
+        }
       });
 
       const timeoutId = setTimeout(() => {
@@ -294,7 +302,7 @@ export class CommandRunner {
         finish(false, exitCode, timeoutId);
       });
 
-      pty.write(command);
+      pty.write(this.withExitMarker(command, "foreground"));
     });
   }
 
@@ -330,6 +338,17 @@ export class CommandRunner {
 
   private withExitMarker(command: string, sessionId: string): string {
     return `${command}\nprintf '\\n__KORIX_BACKGROUND_EXIT_${this.toMarkerId(sessionId)}:%s__\\n' "$?"`;
+  }
+
+  private stripCommandEcho(output: string, command: string): string {
+    const normalizedOutput = output.replace(/\r\n/g, "\n");
+    const normalizedCommand = command.replace(/\r\n/g, "\n").trimEnd();
+
+    if (normalizedOutput.startsWith(`${normalizedCommand}\n`)) {
+      return normalizedOutput.slice(normalizedCommand.length + 1);
+    }
+
+    return output;
   }
 
   private createExitMarkerPattern(sessionId: string): RegExp {

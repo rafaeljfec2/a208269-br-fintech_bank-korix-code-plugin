@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type * as vscode from "vscode";
 import type { ProviderType } from "./types";
 
@@ -9,8 +9,10 @@ const vscodeState = vi.hoisted(() => ({
   listener: undefined as
     | ((event: { affectsConfiguration: (section: string) => boolean }) => void)
     | undefined,
-  secrets: new Map<string, string>([["korix.apiKey.litellm", "secret-key"]]),
+  secrets: new Map<string, string>(),
 }));
+
+const fetchMock = vi.fn<typeof fetch>();
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -22,7 +24,7 @@ vi.mock("vscode", () => ({
           const values = new Map<string, unknown>([
             ["provider", "litellm"],
             ["litellm.model", "test-model"],
-            ["litellm.apiBase", "https://litellm.test"],
+            ["litellm.baseUrl", "https://litellm.test"],
             ["maxTokens", 1024],
             ["temperature", 0.2],
           ]);
@@ -50,6 +52,18 @@ vi.mock("vscode", () => ({
 import { ProviderConfigManager } from "./config";
 
 describe("ProviderConfigManager", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", fetchMock);
+    vscodeState.getConfigurationCalls = 0;
+    vscodeState.secretGetCalls = 0;
+    vscodeState.secretStoreCalls = 0;
+    vscodeState.listener = undefined;
+    vscodeState.secrets = new Map<string, string>([
+      ["korix.apiKey.litellm", "secret-key"],
+    ]);
+  });
+
   const createContext = (): vscode.ExtensionContext =>
     ({
       subscriptions: [],
@@ -87,6 +101,13 @@ describe("ProviderConfigManager", () => {
     expect(vscodeState.secretGetCalls).toBe(2);
   });
 
+  it("should expose configured model without requiring an API key", () => {
+    vscodeState.secrets.clear();
+    const manager = new ProviderConfigManager(createContext());
+
+    expect(manager.getConfiguredModel("litellm")).toBe("test-model");
+  });
+
   it("should invalidate cache when korix configuration changes", async () => {
     const manager = new ProviderConfigManager(createContext());
 
@@ -97,6 +118,66 @@ describe("ProviderConfigManager", () => {
     });
     await manager.getConfig("litellm");
 
-    expect(vscodeState.secretGetCalls).toBeGreaterThanOrEqual(3);
+    expect(vscodeState.secretGetCalls).toBe(2);
+  });
+
+  it("should list LiteLLM models from the configured endpoint", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "openai/gpt-5.5" },
+            { model_name: "anthropic/claude-opus-4-7" },
+            { model: "openai/gpt-5.5" },
+            { id: "anthropic/*" },
+            { id: "all-proxy-models" },
+            { id: "openai/gpt-image-1.5" },
+            { id: "openai/text-embedding-3-small" },
+            { id: "openai/gpt-realtime" },
+            { id: "openai/gpt-5-search-api" },
+            { id: "vertex_ai/gemini-2.5-pro" },
+            "gemini/gemini-2.5-pro",
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const manager = new ProviderConfigManager(createContext());
+    const models = await manager.listLiteLLMModels();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://litellm.test/models?return_wildcard_routes=false",
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          "x-litellm-api-key": "secret-key",
+        },
+      },
+    );
+    expect(models).toEqual([
+      "anthropic/claude-opus-4-7",
+      "gemini/gemini-2.5-pro",
+      "openai/gpt-5.5",
+      "vertex_ai/gemini-2.5-pro",
+    ]);
+  });
+
+  it("should not request LiteLLM models without an API key", async () => {
+    vscodeState.secrets.clear();
+
+    const manager = new ProviderConfigManager(createContext());
+
+    await expect(manager.listLiteLLMModels()).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("should return an empty model list when LiteLLM discovery fails", async () => {
+    fetchMock.mockRejectedValue(new Error("network down"));
+
+    const manager = new ProviderConfigManager(createContext());
+
+    await expect(manager.listLiteLLMModels()).resolves.toEqual([]);
   });
 });

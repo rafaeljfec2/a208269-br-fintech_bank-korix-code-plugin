@@ -117,4 +117,31 @@ describe("TaskAnalyzer", () => {
     expect(profile.riskLevel).toBe("medium");
     expect(profile.requiresToolUse).toBe(true);
   });
+
+  it("should require tools for git branch update requests", () => {
+    const profile = new TaskAnalyzer().analyze(
+      "faça analise dos ultimos commits, atualiza a branch develop",
+      context,
+    );
+
+    expect(profile.intent).toBe("modify");
+    expect(profile.riskLevel).toBe("medium");
+    expect(profile.requiresToolUse).toBe(true);
+    expect(profile.workspaceAccess).toEqual({
+      requested: false,
+      action: "none",
+      explicit: false,
+    });
+  });
+
+  it("should require tools for explicit git command inspection requests", () => {
+    const profile = new TaskAnalyzer().analyze(
+      "git fetch origin && git log --oneline -20 origin/develop",
+      context,
+    );
+
+    expect(profile.intent).toBe("validate");
+    expect(profile.riskLevel).toBe("medium");
+    expect(profile.requiresToolUse).toBe(true);
+  });
 });

@@ -84,6 +84,94 @@ export interface AnthropicTool {
   readonly cache_control?: { readonly type: "ephemeral" };
 }
 
+export interface OpenAIChatCompletionsRequest {
+  readonly model: string;
+  readonly messages: readonly OpenAIChatMessage[];
+  readonly max_tokens?: number;
+  readonly max_completion_tokens?: number;
+  readonly tools?: readonly OpenAIChatTool[];
+  readonly tool_choice?: OpenAIChatToolChoice;
+  readonly temperature?: number;
+  readonly stream?: boolean;
+}
+
+export type OpenAIChatMessage =
+  | {
+      readonly role: "system" | "user";
+      readonly content: string;
+    }
+  | {
+      readonly role: "assistant";
+      readonly content: string | null;
+      readonly tool_calls?: readonly OpenAIChatToolCall[];
+    }
+  | {
+      readonly role: "tool";
+      readonly content: string;
+      readonly tool_call_id: string;
+    };
+
+export interface OpenAIChatToolCall {
+  readonly id: string;
+  readonly type: "function";
+  readonly function: {
+    readonly name: string;
+    readonly arguments: string;
+  };
+}
+
+export interface OpenAIChatTool {
+  readonly type: "function";
+  readonly function: {
+    readonly name: string;
+    readonly description: string;
+    readonly parameters: {
+      readonly type: "object";
+      readonly properties: Record<string, unknown>;
+      readonly required?: readonly string[];
+    };
+  };
+}
+
+export type OpenAIChatToolChoice =
+  | "auto"
+  | "required"
+  | {
+      readonly type: "function";
+      readonly function: {
+        readonly name: string;
+      };
+    };
+
+export interface OpenAIStreamChunk {
+  readonly id?: string;
+  readonly object?: string;
+  readonly choices?: readonly OpenAIStreamChoice[];
+  readonly usage?: {
+    readonly prompt_tokens?: number;
+    readonly completion_tokens?: number;
+  };
+}
+
+export interface OpenAIStreamChoice {
+  readonly index: number;
+  readonly delta?: {
+    readonly content?: string | null;
+    readonly tool_calls?: readonly OpenAIStreamToolCall[];
+  };
+  readonly finish_reason?: string | null;
+}
+
+export interface OpenAIStreamToolCall {
+  readonly index: number;
+  readonly id?: string;
+  readonly type?: "function";
+  readonly function?: {
+    readonly name?: string;
+    readonly arguments?: string;
+  };
+}
+
 // Mantém aliases para compatibilidade
 export type LiteLLMRequest = AnthropicMessagesRequest;
 export type OpenAIMessage = AnthropicMessage; // Deprecated: use AnthropicMessage
@@ -167,9 +255,6 @@ export interface ErrorEvent {
     readonly message: string;
   };
 }
-
-// Alias para compatibilidade
-export type OpenAIStreamChunk = AnthropicStreamEvent;
 
 /**
  * SSE event from stream

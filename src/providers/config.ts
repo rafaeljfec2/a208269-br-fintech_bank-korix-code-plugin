@@ -6,6 +6,40 @@ import * as vscode from "vscode";
 import type { ProviderConfig, ProviderType } from "./types";
 
 const API_KEY_PREFIX = "korix.apiKey";
+const DEFAULT_LITELLM_BASE_URL = "https://litellm.int.thomsonreuters.com";
+const LITELLM_NON_CHAT_MODEL_PARTS = [
+  "/low/",
+  "/medium/",
+  "/high/",
+  "/standard/",
+  "/hd/",
+  "256-x-",
+  "512-x-",
+  "1024-x-",
+  "1536-x-",
+  "1792-x-",
+  "audio",
+  "babbage",
+  "container",
+  "dall-e",
+  "davinci",
+  "embedding",
+  "ft:",
+  "gpt-image",
+  "image",
+  "instruct",
+  "moderation",
+  "realtime",
+  "search",
+  "sora",
+  "transcribe",
+  "tts",
+  "whisper",
+] as const;
+
+interface LiteLLMModelsResponse {
+  readonly data?: readonly unknown[];
+}
 
 export class ProviderConfigManager {
   private readonly configCache = new Map<ProviderType, ProviderConfig | null>();
@@ -64,6 +98,10 @@ export class ProviderConfigManager {
     return providerConfig;
   }
 
+  getConfiguredModel(type: ProviderType): string {
+    return this.getModel(type);
+  }
+
   async setApiKey(type: ProviderType, apiKey: string): Promise<void> {
     const key = `${API_KEY_PREFIX}.${type}`;
     await this.context.secrets.store(key, apiKey);
@@ -95,6 +133,44 @@ export class ProviderConfigManager {
     this.invalidateCache(type);
   }
 
+  async listLiteLLMModels(): Promise<readonly string[]> {
+    const apiKey = await this.getApiKey("litellm");
+    if (!apiKey) {
+      return [];
+    }
+
+    try {
+      const baseUrl = this.normalizeBaseUrl(
+        this.getBaseUrl("litellm") ?? DEFAULT_LITELLM_BASE_URL,
+      );
+      const response = await fetch(
+        `${baseUrl}/models?return_wildcard_routes=false`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "x-litellm-api-key": apiKey,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const payload = (await response.json()) as LiteLLMModelsResponse;
+      const models =
+        payload.data
+          ?.map((item) => this.extractLiteLLMModelId(item))
+          .filter((item): item is string => item !== undefined)
+          .filter((modelId) => this.isSelectableLiteLLMModel(modelId)) ?? [];
+
+      return [...new Set(models)].sort((a, b) => a.localeCompare(b));
+    } catch {
+      return [];
+    }
+  }
+
   invalidateCache(type?: ProviderType): void {
     if (type) {
       this.configCache.delete(type);
@@ -102,6 +178,10 @@ export class ProviderConfigManager {
     }
 
     this.configCache.clear();
+  }
+
+  private normalizeBaseUrl(baseUrl: string): string {
+    return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
   }
 
   private getModel(type: ProviderType): string {
@@ -142,13 +222,58 @@ export class ProviderConfigManager {
           "https://openrouter.ai/api/v1",
         );
       case "litellm":
-        return config.get<string>(
-          "litellm.apiBase",
-          "https://litellm.int.thomsonreuters.com",
-        );
+        return config.get<string>("litellm.baseUrl", DEFAULT_LITELLM_BASE_URL);
       default:
         return undefined;
     }
+  }
+
+  private extractLiteLLMModelId(value: unknown): string | undefined {
+    if (typeof value === "string") {
+      return value.trim().length > 0 ? value.trim() : undefined;
+    }
+
+    if (typeof value !== "object" || value === null) {
+      return undefined;
+    }
+
+    const record = value as Readonly<Record<string, unknown>>;
+    const candidate = record.id ?? record.model_name ?? record.model;
+
+    return typeof candidate === "string" && candidate.trim().length > 0
+      ? candidate.trim()
+      : undefined;
+  }
+
+  private isSelectableLiteLLMModel(modelId: string): boolean {
+    const normalized = modelId.trim().toLowerCase();
+
+    if (
+      normalized.length === 0 ||
+      normalized.includes("*") ||
+      normalized === "all-proxy-models"
+    ) {
+      return false;
+    }
+
+    if (LITELLM_NON_CHAT_MODEL_PARTS.some((part) => normalized.includes(part))) {
+      return false;
+    }
+
+    return (
+      normalized.startsWith("anthropic/") ||
+      normalized.startsWith("claude-") ||
+      normalized.startsWith("us.anthropic.") ||
+      normalized.startsWith("openai/gpt-") ||
+      normalized.startsWith("openai/o") ||
+      normalized.startsWith("gemini/") ||
+      normalized.startsWith("vertex_ai/claude-") ||
+      normalized.startsWith("vertex_ai/gemini-") ||
+      normalized.startsWith("vertex_ai/deepseek-ai/") ||
+      normalized.startsWith("vertex_ai/minimaxai/") ||
+      normalized.startsWith("vertex_ai/moonshotai/") ||
+      normalized.startsWith("vertex_ai/zai-org/")
+    );
   }
 
   async promptForApiKey(type: ProviderType): Promise<string | undefined> {

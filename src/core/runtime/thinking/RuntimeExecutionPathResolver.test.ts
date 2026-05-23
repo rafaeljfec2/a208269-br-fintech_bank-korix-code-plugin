@@ -77,4 +77,15 @@ describe("RuntimeExecutionPathResolver", () => {
     expect(plan.path).toBe("agent_loop");
     expect(plan.reason).toBe("tool_required");
   });
+
+  it("should route git branch update requests to the agent loop", () => {
+    const plan = resolve(
+      "faça analise dos ultimos commits, atualiza a branch develop",
+    );
+
+    expect(plan).toEqual({
+      path: "agent_loop",
+      reason: "tool_required",
+    });
+  });
 });

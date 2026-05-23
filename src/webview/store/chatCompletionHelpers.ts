@@ -8,6 +8,20 @@ const FALLBACK_COMPLETION_CONTENT =
   "Korix concluiu a execução. Preparando o resumo final com os detalhes abaixo.";
 
 export function finalizeChatStreaming(chat: ChatSession): ChatSession {
+  const lastMessage = chat.messages[chat.messages.length - 1];
+  if (
+    chat.streamingContent.trim().length === 0 &&
+    lastMessage?.role === "assistant" &&
+    lastMessage.metadata?.runtimeFallback
+  ) {
+    return {
+      ...chat,
+      streamingContent: "",
+      isStreaming: false,
+      isThinking: false,
+    };
+  }
+
   const message = buildFinalAssistantMessage(chat);
 
   return {

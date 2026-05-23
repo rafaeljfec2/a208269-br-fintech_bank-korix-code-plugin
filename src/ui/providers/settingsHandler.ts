@@ -30,6 +30,8 @@ export class SettingsHandler {
         >("provider", "anthropic");
 
       const config = await this.configManager.getConfig(providerType);
+      const model =
+        config?.model ?? this.configManager.getConfiguredModel(providerType);
       const maxTokens = vscode.workspace
         .getConfiguration("korix")
         .get<number>("maxTokens", 4096);
@@ -39,12 +41,17 @@ export class SettingsHandler {
 
       // Check if API key exists (don't send the key itself)
       const hasApiKey = !!(await this.configManager.getApiKey(providerType));
+      const availableModels =
+        providerType === "litellm"
+          ? await this.configManager.listLiteLLMModels()
+          : [];
 
       const message: ExtensionToWebviewMessage = {
         type: "settings_loaded",
         payload: {
           provider: providerType,
-          model: config?.model ?? "claude-sonnet-4-6",
+          model,
+          availableModels,
           baseUrl: config?.baseUrl,
           maxTokens,
           temperature,

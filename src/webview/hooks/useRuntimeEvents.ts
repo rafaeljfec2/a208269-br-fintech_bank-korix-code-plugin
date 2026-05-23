@@ -119,9 +119,13 @@ export function useRuntimeEvents() {
 
       try {
         if (message.type === "init") {
-          const { mode, model, isExecuting } = message.payload;
+          const { mode, provider, model, availableModels, isExecuting } =
+            message.payload;
           store.setMode(mode);
+          store.setProvider(provider);
           store.setModel(model);
+          store.setAvailableModels(availableModels ?? []);
+          store.setProviderReady(true);
           store.setExecuting(isExecuting);
           return;
         }
@@ -264,6 +268,7 @@ export function useRuntimeEvents() {
                 const toolChoice = event.toolChoice
                   ? `, choice ${event.toolChoice}`
                   : "";
+                const modelContext = `${store.provider}/${store.model}`;
 
                 store.addTimelineEvent({
                   type: "thinking",
@@ -279,7 +284,7 @@ export function useRuntimeEvents() {
                 addActiveEventItem({
                   stage: "provider_request_start",
                   title: "Waiting model",
-                  summary: `Provider request sent with ${event.toolCount} tool(s).`,
+                  summary: `${modelContext} with ${event.toolCount} tool(s).`,
                   status: "pending",
                   timestamp: event.timestamp,
                   metadata: {
@@ -918,7 +923,7 @@ export function useRuntimeEvents() {
                     event.iterations === 1 ? "iteração" : "iterações";
                   const toolLabel =
                     toolCount === 1 ? "ferramenta" : "ferramentas";
-                  const summary = `Concluído: ${event.iterations} ${iterationLabel}, ${toolCount} ${toolLabel}, ${tokenCount} tokens em ${duration.toFixed(1)}s.`;
+                  const summary = `Concluído: ${event.iterations} ${iterationLabel}, ${toolCount} ${toolLabel}, ${tokenCount} tokens em ${duration.toFixed(1)}s. Provider: ${store.provider}. Model: ${store.model}.`;
 
                   if (completedChatId) {
                     store.replaceLastAssistantFallbackContent(

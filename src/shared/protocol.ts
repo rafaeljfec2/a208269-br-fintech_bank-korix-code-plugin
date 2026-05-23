@@ -12,7 +12,14 @@ import type { RuntimeEvent } from "../core/runtime/runtimeEvents";
 export interface InitPayload {
   readonly sessionId: string;
   readonly mode: "ask" | "plan" | "agent";
+  readonly provider:
+    | "anthropic"
+    | "openai"
+    | "ollama"
+    | "openrouter"
+    | "litellm";
   readonly model: string;
+  readonly availableModels?: readonly string[];
   readonly isExecuting: boolean;
   readonly workspaceRoot?: string;
 }
@@ -38,6 +45,7 @@ export interface ModeChangedPayload {
 export interface SettingsLoadedPayload {
   readonly provider: string;
   readonly model: string;
+  readonly availableModels?: readonly string[];
   readonly baseUrl?: string;
   readonly maxTokens: number;
   readonly temperature: number;
@@ -83,6 +91,13 @@ export type ExtensionToWebviewMessage =
 export interface SendMessagePayload {
   readonly content: string;
   readonly mode: "ask" | "plan" | "agent";
+  readonly provider?:
+    | "anthropic"
+    | "openai"
+    | "ollama"
+    | "openrouter"
+    | "litellm";
+  readonly model?: string;
   readonly messages?: readonly {
     role: "user" | "assistant" | "system";
     content: string;

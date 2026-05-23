@@ -19,7 +19,9 @@ describe("settingsSlice", () => {
 
       expect(state.mode).toBe("ask");
       expect(state.model).toBe("claude-sonnet-4-6");
+      expect(state.availableModels).toEqual([]);
       expect(state.provider).toBe("anthropic");
+      expect(state.isProviderReady).toBe(false);
       expect(state.sessionId).toBe("");
     });
   });
@@ -73,6 +75,18 @@ describe("settingsSlice", () => {
     });
   });
 
+  describe("setAvailableModels", () => {
+    it("should update available models", () => {
+      const { setAvailableModels } = store.getState();
+
+      setAvailableModels(["anthropic/claude-opus-4-7"]);
+
+      expect(store.getState().availableModels).toEqual([
+        "anthropic/claude-opus-4-7",
+      ]);
+    });
+  });
+
   describe("setProvider", () => {
     it("should update provider", () => {
       const { setProvider } = store.getState();
@@ -90,6 +104,16 @@ describe("settingsSlice", () => {
 
       const state = store.getState();
       expect(state.provider).toBe("custom-llm");
+    });
+  });
+
+  describe("setProviderReady", () => {
+    it("should mark provider config as ready", () => {
+      const { setProviderReady } = store.getState();
+
+      setProviderReady(true);
+
+      expect(store.getState().isProviderReady).toBe(true);
     });
   });
 

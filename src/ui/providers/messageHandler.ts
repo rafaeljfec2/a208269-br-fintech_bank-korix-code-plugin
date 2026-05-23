@@ -183,11 +183,18 @@ export class MessageHandler {
       >("provider", "anthropic");
 
     const config = await this.configManager.getConfig(providerType);
-    const model = config?.model ?? "claude-sonnet-4-6";
+    const model =
+      config?.model ?? this.configManager.getConfiguredModel(providerType);
+    const availableModels =
+      providerType === "litellm"
+        ? await this.configManager.listLiteLLMModels()
+        : [];
 
     const initPayload: InitPayload = {
       mode,
+      provider: providerType,
       model,
+      availableModels,
       sessionId,
       isExecuting,
       workspaceRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
@@ -227,6 +234,8 @@ export class MessageHandler {
           message.payload.content,
           message.payload.messages ?? [],
           message.payload.mode,
+          message.payload.provider,
+          message.payload.model,
         );
         break;
 
@@ -290,10 +299,15 @@ export class MessageHandler {
       content: string;
     }[],
     mode: "ask" | "plan" | "agent",
+    provider?: "anthropic" | "openai" | "ollama" | "openrouter" | "litellm",
+    model?: string,
   ): Promise<void> {
     this.stateManager.setMode(mode);
 
-    await this.agentExecutor.execute(content, previousMessages, mode);
+    await this.agentExecutor.execute(content, previousMessages, mode, {
+      provider,
+      model,
+    });
   }
 
   /**

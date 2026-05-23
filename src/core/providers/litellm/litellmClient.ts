@@ -9,9 +9,15 @@ import type { Transport } from "../transport/httpTransport";
 import type {
   AnthropicMessagesRequest,
   AnthropicStreamEvent,
+  OpenAIChatCompletionsRequest,
+  OpenAIStreamChunk,
 } from "./litellmTypes";
 import type { CorrelationContext } from "../types";
-import { SSEParser, parseStreamChunk } from "./litellmParser";
+import {
+  SSEParser,
+  parseOpenAIStreamChunk,
+  parseStreamChunk,
+} from "./litellmParser";
 import { detectBudgetError } from "./litellmErrors";
 
 // User-Agent usado pelo Axiom Agents (funciona com LiteLLM TR)
@@ -83,6 +89,40 @@ export class LiteLLMClient {
     yield* this.parseSSEStream(response.body, signal);
   }
 
+  async *streamChatCompletions(
+    request: OpenAIChatCompletionsRequest,
+    _correlation: CorrelationContext,
+    signal?: AbortSignal,
+  ): AsyncGenerator<OpenAIStreamChunk, void, void> {
+    const url = `${this.apiBase}/v1/chat/completions`;
+
+    const response = await this.transport.request(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": CLAUDE_PROXY_USER_AGENT,
+        },
+        body: JSON.stringify({ ...request, stream: true }),
+      },
+      signal,
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `LiteLLM request failed: ${response.status} ${response.statusText} - ${errorText}`,
+      );
+    }
+
+    if (!response.body) {
+      throw new Error("No response body");
+    }
+
+    yield* this.parseOpenAISSEStream(response.body, signal);
+  }
+
   /**
    * Parse SSE stream incrementalmente (Anthropic format)
    */
@@ -125,5 +165,74 @@ export class LiteLLMClient {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  private async *parseOpenAISSEStream(
+    body: ReadableStream<Uint8Array>,
+    signal?: AbortSignal,
+  ): AsyncGenerator<OpenAIStreamChunk, void, void> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let sawTerminalEvent = false;
+
+    this.parser.reset();
+
+    try {
+      while (true) {
+        if (signal?.aborted) {
+          await reader.cancel();
+          break;
+        }
+
+        let readResult: ReadableStreamReadResult<Uint8Array>;
+        try {
+          readResult = await reader.read();
+        } catch (error) {
+          if (sawTerminalEvent && this.isBenignStreamTermination(error)) {
+            return;
+          }
+
+          throw error;
+        }
+
+        const { done, value } = readResult;
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+
+        for (const event of this.parser.parse(chunk)) {
+          if (event.data.trim() === "[DONE]") {
+            return;
+          }
+
+          const streamEvent = parseOpenAIStreamChunk(event.data);
+
+          if (!streamEvent) {
+            continue;
+          }
+
+          if (this.hasTerminalFinishReason(streamEvent)) {
+            sawTerminalEvent = true;
+          }
+
+          yield streamEvent;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  private hasTerminalFinishReason(chunk: OpenAIStreamChunk): boolean {
+    return (
+      chunk.choices?.some((choice) => choice.finish_reason !== null) ?? false
+    );
+  }
+
+  private isBenignStreamTermination(error: unknown): boolean {
+    return (
+      error instanceof TypeError &&
+      error.message.toLowerCase().includes("terminated")
+    );
   }
 }

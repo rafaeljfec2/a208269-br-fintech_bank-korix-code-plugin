@@ -30,6 +30,7 @@ import type { StepResult } from "./runtimeTypes";
 import { ObservationEngine } from "./thinking/ObservationEngine";
 import type { ToolUsePolicy } from "./thinking/types";
 import { SubagentRunner } from "../subagent/subagentRunner";
+import { ToolCallAssembler } from "./toolAssembly";
 
 interface PendingToolCall {
   id: string;
@@ -58,6 +59,7 @@ export class ExecutionEngine {
   private currentTextBuffer = "";
   private currentThinkingBuffer = "";
   private pendingToolCalls: PendingToolCall[] = [];
+  private readonly toolCallAssembler = new ToolCallAssembler();
   private readonly observationEngine = new ObservationEngine();
 
   constructor(
@@ -303,51 +305,11 @@ export class ExecutionEngine {
         break;
 
       case "tool_call_complete":
-        this.logger.info("tool_call_complete received", {
-          name: event.name,
-          id: event.id,
-          argsLength: event.arguments.length,
-        });
-        this.logger.debug("Raw JSON arguments", {
-          args: event.arguments.substring(0, 500),
-        });
-
-        try {
-          const parsedInput: unknown = JSON.parse(event.arguments);
-          this.logger.info("Successfully parsed tool input", {
-            name: event.name,
-            input: JSON.stringify(parsedInput, null, 2).substring(0, 500),
-          });
-
-          this.pendingToolCalls.push({
-            id: event.id,
-            name: event.name,
-            input: parsedInput,
-          });
-
-          this.eventEmitter.emitEvent({
-            type: "tool_call",
-            id: event.id,
-            name: event.name,
-            input: parsedInput,
-            timestamp: Date.now(),
-          });
-        } catch (error) {
-          this.logger.error("CRITICAL: Failed to parse JSON for tool", {
-            name: event.name,
-            rawArgs: event.arguments,
-            error: (error as Error).message,
-          });
-
-          // Emit error event so the webview knows something went wrong
-          this.eventEmitter.emitEvent({
-            type: "error",
-            error: `Failed to parse tool arguments for ${event.name}: ${(error as Error).message}`,
-            iteration: state.getExecution().currentIteration,
-            recoverable: false,
-            timestamp: Date.now(),
-          });
-        }
+        this.handleToolCallComplete(
+          event.id,
+          event.name,
+          this.parseToolArguments(event.arguments),
+        );
         break;
 
       case "usage":
@@ -356,6 +318,10 @@ export class ExecutionEngine {
         break;
 
       case "finish":
+        this.handleToolAssemblyResults(
+          this.toolCallAssembler.process(event),
+          state,
+        );
         result.stopReason = event.reason as
           | "end_turn"
           | "stop"
@@ -369,10 +335,73 @@ export class ExecutionEngine {
         throw event.error;
 
       case "tool_call_delta":
-        // LiteLLMNormalizer already assembles deltas into tool_call_complete
-        // This case is here for completeness but should not be reached
+        this.handleToolAssemblyResults(
+          this.toolCallAssembler.process(event),
+          state,
+        );
         break;
     }
+  }
+
+  private handleToolAssemblyResults(
+    results: ReturnType<ToolCallAssembler["process"]>,
+    state: RuntimeState,
+  ): void {
+    for (const result of results) {
+      if (result.type === "incomplete") {
+        continue;
+      }
+
+      if (result.type === "error") {
+        this.eventEmitter.emitEvent({
+          type: "error",
+          error: result.error.message,
+          iteration: state.getExecution().currentIteration,
+          recoverable: false,
+          timestamp: Date.now(),
+        });
+        continue;
+      }
+
+      this.handleToolCallComplete(
+        result.toolCall.id,
+        result.toolCall.name,
+        result.toolCall.input,
+      );
+    }
+  }
+
+  private handleToolCallComplete(
+    id: string,
+    name: string,
+    input: unknown,
+  ): void {
+    this.logger.info("tool_call_complete received", {
+      name,
+      id,
+    });
+
+    this.pendingToolCalls.push({
+      id,
+      name,
+      input,
+    });
+
+    this.eventEmitter.emitEvent({
+      type: "tool_call",
+      id,
+      name,
+      input,
+      timestamp: Date.now(),
+    });
+  }
+
+  private parseToolArguments(argumentsText: string): unknown {
+    if (argumentsText.trim().length === 0) {
+      return {};
+    }
+
+    return JSON.parse(argumentsText);
   }
 
   private async executeToolCalls(
@@ -698,6 +727,7 @@ export class ExecutionEngine {
     this.currentTextBuffer = "";
     this.currentThinkingBuffer = "";
     this.pendingToolCalls = [];
+    this.toolCallAssembler.reset();
   }
 
   private inferRiskLevel(toolName: string): "low" | "medium" | "high" {

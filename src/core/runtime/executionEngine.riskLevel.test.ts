@@ -28,7 +28,10 @@ class ToolCallProvider implements AIProvider {
     model: "test-model",
   };
 
-  constructor(private readonly toolName: string) {}
+  constructor(
+    private readonly toolName: string,
+    private readonly argumentsText = JSON.stringify({ path: "src/index.ts" }),
+  ) {}
 
   async *send(
     _input: ProviderInput,
@@ -46,7 +49,59 @@ class ToolCallProvider implements AIProvider {
       index: 0,
       id: "tool-call-1",
       name: this.toolName,
-      arguments: JSON.stringify({ path: "src/index.ts" }),
+      arguments: this.argumentsText,
+      timestamp: Date.now(),
+      correlation,
+    };
+    yield {
+      type: "finish",
+      reason: "tool_calls",
+      timestamp: Date.now(),
+      correlation,
+    };
+    return {
+      model: this.config.model,
+      totalDuration: 1,
+    };
+  }
+
+  dispose(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+class DeltaToolCallProvider implements AIProvider {
+  readonly type = "test";
+  readonly config: ProviderConfig = {
+    type: "test",
+    apiKey: "test",
+    model: "test-model",
+  };
+
+  async *send(
+    _input: ProviderInput,
+    context: RequestContext,
+  ): AsyncGenerator<ProviderEvent, ProviderMetadata, void> {
+    const correlation = {
+      correlationId: context.correlationId,
+      sessionId: context.sessionId,
+      agentRunId: context.agentRunId,
+      iterationId: context.iterationId,
+    };
+
+    yield {
+      type: "tool_call_delta",
+      index: 0,
+      id: "tool-call-1",
+      name: "GitStatus",
+      argumentsChunk: "{",
+      timestamp: Date.now(),
+      correlation,
+    };
+    yield {
+      type: "tool_call_delta",
+      index: 0,
+      argumentsChunk: "}",
       timestamp: Date.now(),
       correlation,
     };
@@ -113,5 +168,93 @@ describe("ExecutionEngine tool risk inference", () => {
 
     expect(toolExecute).toHaveBeenCalledTimes(1);
     expect(approvalRequester).not.toHaveBeenCalled();
+  });
+
+  it("should treat empty tool arguments as an empty object", async () => {
+    const logger = new Logger({ level: "error" });
+    const eventEmitter = new RuntimeEventEmitter();
+    const toolExecute = vi.fn(async () => ({
+      success: true,
+      data: {
+        ok: true,
+      },
+    }));
+    const toolRegistry = new ToolRegistry();
+    const tool: Tool<Record<string, never>, { readonly ok: boolean }> = {
+      name: "GitStatus",
+      description: "Get git status.",
+      schema: z.object({}),
+      execute: toolExecute,
+    };
+    toolRegistry.register(tool);
+
+    const engine = new ExecutionEngine(
+      new ToolCallProvider("GitStatus", ""),
+      toolRegistry,
+      new PermissionManager(),
+      eventEmitter,
+      new CheckpointManager(logger),
+      new RuntimeMetrics(logger),
+      new IterationGuard(logger, eventEmitter),
+      new CancellationManager(logger, eventEmitter),
+      logger,
+      "system",
+    );
+    const state = new RuntimeState({
+      mode: "agent",
+      workspaceRoot: "/repo",
+      openFiles: [],
+    });
+
+    await engine.step(state);
+
+    expect(toolExecute).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ workspaceRoot: "/repo" }),
+    );
+  });
+
+  it("should assemble streamed tool call deltas before executing tools", async () => {
+    const logger = new Logger({ level: "error" });
+    const eventEmitter = new RuntimeEventEmitter();
+    const toolExecute = vi.fn(async () => ({
+      success: true,
+      data: {
+        branch: "develop",
+      },
+    }));
+    const toolRegistry = new ToolRegistry();
+    const tool: Tool<Record<string, never>, { readonly branch: string }> = {
+      name: "GitStatus",
+      description: "Get git status.",
+      schema: z.object({}),
+      execute: toolExecute,
+    };
+    toolRegistry.register(tool);
+
+    const engine = new ExecutionEngine(
+      new DeltaToolCallProvider(),
+      toolRegistry,
+      new PermissionManager(),
+      eventEmitter,
+      new CheckpointManager(logger),
+      new RuntimeMetrics(logger),
+      new IterationGuard(logger, eventEmitter),
+      new CancellationManager(logger, eventEmitter),
+      logger,
+      "system",
+    );
+    const state = new RuntimeState({
+      mode: "agent",
+      workspaceRoot: "/repo",
+      openFiles: [],
+    });
+
+    await engine.step(state);
+
+    expect(toolExecute).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ workspaceRoot: "/repo" }),
+    );
   });
 });

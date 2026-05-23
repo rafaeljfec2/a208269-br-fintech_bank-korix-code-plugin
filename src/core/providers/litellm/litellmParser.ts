@@ -3,7 +3,11 @@
  * Stateless, backpressure-aware, handles fragmentation
  */
 
-import type { SSEEvent, AnthropicStreamEvent } from "./litellmTypes";
+import type {
+  SSEEvent,
+  AnthropicStreamEvent,
+  OpenAIStreamChunk,
+} from "./litellmTypes";
 import { LiteLLMStreamingError } from "./litellmErrors";
 
 /**
@@ -124,6 +128,22 @@ export function parseStreamChunk(data: string): AnthropicStreamEvent | null {
   } catch (error) {
     throw new LiteLLMStreamingError(
       `Failed to parse Anthropic stream event: ${data.substring(0, 100)}`,
+      error instanceof Error ? error : undefined,
+    );
+  }
+}
+
+export function parseOpenAIStreamChunk(data: string): OpenAIStreamChunk | null {
+  const trimmed = data.trim();
+  if (trimmed === "" || trimmed === "[DONE]") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(data) as OpenAIStreamChunk;
+  } catch (error) {
+    throw new LiteLLMStreamingError(
+      `Failed to parse OpenAI stream event: ${data.substring(0, 100)}`,
       error instanceof Error ? error : undefined,
     );
   }

@@ -24,6 +24,9 @@ describe("useRuntimeEvents", () => {
   const mockUpdateMetrics = vi.fn();
   const mockSetMode = vi.fn();
   const mockSetModel = vi.fn();
+  const mockSetProvider = vi.fn();
+  const mockSetAvailableModels = vi.fn();
+  const mockSetProviderReady = vi.fn();
   const mockCreateSession = vi.fn();
   const mockAppendOutput = vi.fn();
   const mockCreateChat = vi.fn();
@@ -57,6 +60,9 @@ describe("useRuntimeEvents", () => {
       updateMetrics: mockUpdateMetrics,
       setMode: mockSetMode,
       setModel: mockSetModel,
+      setProvider: mockSetProvider,
+      setAvailableModels: mockSetAvailableModels,
+      setProviderReady: mockSetProviderReady,
       createSession: mockCreateSession,
       appendOutput: mockAppendOutput,
       createChat: mockCreateChat,
@@ -76,6 +82,8 @@ describe("useRuntimeEvents", () => {
       contexts: [],
       currentContextId: null,
       metrics: { toolCallCount: 0 },
+      provider: "litellm",
+      model: "openai/gpt-5.5",
       conversations: {},
       activeChatId: null,
     };
@@ -104,7 +112,9 @@ describe("useRuntimeEvents", () => {
               type: "init",
               payload: {
                 mode: "ask",
+                provider: "litellm",
                 model: "claude-sonnet-4-6",
+                availableModels: ["anthropic/claude-opus-4-7"],
                 isExecuting: false,
               },
             },
@@ -113,7 +123,12 @@ describe("useRuntimeEvents", () => {
       });
 
       expect(mockSetMode).toHaveBeenCalledWith("ask");
+      expect(mockSetProvider).toHaveBeenCalledWith("litellm");
       expect(mockSetModel).toHaveBeenCalledWith("claude-sonnet-4-6");
+      expect(mockSetAvailableModels).toHaveBeenCalledWith([
+        "anthropic/claude-opus-4-7",
+      ]);
+      expect(mockSetProviderReady).toHaveBeenCalledWith(true);
       expect(mockSetExecuting).toHaveBeenCalledWith(false);
     });
   });
@@ -293,7 +308,7 @@ describe("useRuntimeEvents", () => {
         expect.objectContaining({
           stage: "provider_request_start",
           title: "Waiting model",
-          summary: "Provider request sent with 2 tool(s).",
+          summary: "litellm/openai/gpt-5.5 with 2 tool(s).",
         }),
       );
     });
@@ -766,7 +781,7 @@ describe("useRuntimeEvents", () => {
       );
       expect(mockReplaceLastAssistantFallbackContent).toHaveBeenCalledWith(
         "test-chat-id",
-        "Concluído: 2 iterações, 3 ferramentas, 128 tokens em 0.5s.",
+        "Concluído: 2 iterações, 3 ferramentas, 128 tokens em 0.5s. Provider: litellm. Model: openai/gpt-5.5.",
       );
     });
 

@@ -18,6 +18,9 @@ describe('BottomBar', () => {
   const baseState = {
     mode: 'agent',
     model: 'claude-sonnet-4-6',
+    availableModels: [],
+    provider: 'litellm',
+    isProviderReady: true,
     isExecuting: false,
     activeQuestion: null,
     setMode: vi.fn(),
@@ -80,6 +83,66 @@ describe('BottomBar', () => {
     expect(screen.getByPlaceholderText('Pergunte ao Korix...')).toBeInTheDocument();
   });
 
+  it('should show the current mode label in the mode selector', () => {
+    render(<BottomBar />);
+
+    expect(screen.getByRole('button', { name: /Agent/i })).toBeInTheDocument();
+  });
+
+  it('should show current labels for model, workspace, and approval selectors', () => {
+    render(<BottomBar />);
+
+    expect(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /All files/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Confirmar Escritas/i })).toBeInTheDocument();
+  });
+
+  it('should persist selected LiteLLM model to the extension settings', () => {
+    render(<BottomBar />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+    fireEvent.click(screen.getByText('GPT-5.5'));
+
+    expect(baseState.setModel).toHaveBeenCalledWith('openai/gpt-5.5');
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'save_settings',
+      payload: {
+        provider: 'litellm',
+        model: 'openai/gpt-5.5',
+      },
+    });
+  });
+
+  it('should render LiteLLM models loaded from the extension', () => {
+    vi.mocked(useStore).mockImplementation((selector) =>
+      selector({
+        ...baseState,
+        model: 'openai/gpt-5.3-codex',
+        availableModels: ['openai/gpt-5.3-codex'],
+      }),
+    );
+
+    render(<BottomBar />);
+
+    expect(screen.getByRole('button', { name: /gpt-5\.3-codex/i })).toBeInTheDocument();
+  });
+
+  it('should group Vertex AI Gemini models as Gemini options', () => {
+    vi.mocked(useStore).mockImplementation((selector) =>
+      selector({
+        ...baseState,
+        model: 'vertex_ai/gemini-2.5-pro',
+        availableModels: ['vertex_ai/gemini-2.5-pro'],
+      }),
+    );
+
+    render(<BottomBar />);
+
+    fireEvent.click(screen.getByRole('button', { name: /gemini-2\.5-pro/i }));
+
+    expect(screen.getByText('GEMINI')).toBeInTheDocument();
+  });
+
   it('should include the selected mode when sending a chat message', () => {
     render(<BottomBar />);
 
@@ -93,8 +156,31 @@ describe('BottomBar', () => {
       payload: {
         content: 'olhe tres arquivos do projeto',
         mode: 'agent',
+        provider: 'litellm',
+        model: 'claude-sonnet-4-6',
         messages: [],
       },
     });
+  });
+
+  it('should wait for provider settings before sending a chat message', () => {
+    vi.mocked(useStore).mockImplementation((selector) =>
+      selector({
+        ...baseState,
+        isProviderReady: false,
+      }),
+    );
+
+    render(<BottomBar />);
+
+    const input = screen.getByPlaceholderText('Carregando configuração...');
+    fireEvent.change(input, {
+      target: { value: 'olhe tres arquivos do projeto' },
+    });
+    fireEvent.click(screen.getByTitle('Send (Enter)'));
+
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'send_message' }),
+    );
   });
 });

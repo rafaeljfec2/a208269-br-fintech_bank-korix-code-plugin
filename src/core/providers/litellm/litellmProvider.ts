@@ -1,8 +1,6 @@
 /**
  * LiteLLM Provider - stateless, event-driven
  * Emite ProviderEvents puros, NÃO mantém estado
- *
- * IMPORTANTE: Usa Anthropic Messages API format (/v1/messages), NÃO OpenAI format!
  */
 
 import type {
@@ -25,6 +23,7 @@ import { LiteLLMClient } from "./litellmClient";
 import { LiteLLMNormalizer } from "./litellmNormalizer";
 import { classifyError } from "./litellmErrors";
 import { getDefaultTemperature, validateTemperature } from "../normalization";
+import { LiteLLMOpenAIAdapter } from "./litellmOpenAIAdapter";
 
 /**
  * LiteLLM Provider implementation
@@ -36,6 +35,7 @@ export class LiteLLMProvider implements AIProvider {
 
   private readonly client: LiteLLMClient;
   private readonly normalizer: LiteLLMNormalizer;
+  private readonly openAIAdapter: LiteLLMOpenAIAdapter;
 
   constructor(config: ProviderConfig, transport: Transport) {
     this.config = config;
@@ -44,6 +44,7 @@ export class LiteLLMProvider implements AIProvider {
       transport,
     );
     this.normalizer = new LiteLLMNormalizer();
+    this.openAIAdapter = new LiteLLMOpenAIAdapter(config);
   }
 
   /**
@@ -57,6 +58,10 @@ export class LiteLLMProvider implements AIProvider {
     const startTime = Date.now();
 
     try {
+      if (this.usesOpenAIChatCompletions(this.config.model)) {
+        return yield* this.sendOpenAI(input, context, startTime);
+      }
+
       // Build request (Anthropic Messages API format)
       const request = this.buildRequest(input);
 
@@ -125,6 +130,53 @@ export class LiteLLMProvider implements AIProvider {
 
   async dispose(): Promise<void> {
     // LiteLLM não requer cleanup (HTTP stateless)
+  }
+
+  private async *sendOpenAI(
+    input: ProviderInput,
+    context: RequestContext,
+    startTime: number,
+  ): AsyncGenerator<ProviderEvent, ProviderMetadata, void> {
+    const request = this.openAIAdapter.buildRequest(input);
+    const stream = this.client.streamChatCompletions(
+      request,
+      {
+        correlationId: context.correlationId,
+        sessionId: context.sessionId,
+        agentRunId: context.agentRunId,
+        iterationId: context.iterationId,
+      },
+      context.signal,
+    );
+
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    for await (const chunk of stream) {
+      const events = this.openAIAdapter.normalizeChunk(chunk, {
+        correlationId: context.correlationId,
+        sessionId: context.sessionId,
+        agentRunId: context.agentRunId,
+        iterationId: context.iterationId,
+      });
+
+      for (const event of events) {
+        if (event.type === "usage") {
+          totalInputTokens = event.inputTokens;
+          totalOutputTokens = event.outputTokens;
+        }
+        yield event;
+      }
+    }
+
+    return {
+      model: this.config.model,
+      totalDuration: Date.now() - startTime,
+      usage:
+        totalInputTokens > 0 || totalOutputTokens > 0
+          ? { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }
+          : undefined,
+    };
   }
 
   /**
@@ -359,7 +411,7 @@ export class LiteLLMProvider implements AIProvider {
   private convertToolChoice(
     toolChoice: ProviderInput["toolChoice"],
   ): AnthropicMessagesRequest["tool_choice"] {
-    if (!toolChoice) {
+    if (!toolChoice || toolChoice === "none") {
       return undefined;
     }
 
@@ -367,7 +419,7 @@ export class LiteLLMProvider implements AIProvider {
       return { type: "any" };
     }
 
-    if (toolChoice === "auto" || toolChoice === "none") {
+    if (toolChoice === "auto") {
       return { type: toolChoice };
     }
 
@@ -405,6 +457,10 @@ export class LiteLLMProvider implements AIProvider {
    */
   private isClaude4x(model: string): boolean {
     return /claude-(opus|sonnet|haiku)-4.[0-9]+/i.test(model);
+  }
+
+  private usesOpenAIChatCompletions(model: string): boolean {
+    return model.toLowerCase().startsWith("openai/");
   }
 }
 

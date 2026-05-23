@@ -32,6 +32,7 @@ import { RuntimeMetrics } from "../../core/runtime/runtimeMetrics";
 import { askSingleChoice } from "../../core/runtime/userQuestion";
 import type { ExecutionContext, Mode } from "../../core/types";
 import type { ChatHistoryMessage } from "../../core/runtime/thinking/InteractionContextCompiler";
+import type { ProviderType } from "../../providers/types";
 
 interface PlannedInteraction {
   readonly compiledInteraction: {
@@ -42,6 +43,11 @@ interface PlannedInteraction {
   readonly taskProfile: ThinkingRunProfile;
   readonly toolUsePolicy: ToolUsePolicy;
   readonly executionPlan: RuntimeExecutionPlan;
+}
+
+interface RuntimeProviderSelection {
+  readonly provider?: ProviderType;
+  readonly model?: string;
 }
 
 export class AgentExecutor {
@@ -70,13 +76,14 @@ export class AgentExecutor {
       content: string;
     }[],
     interactionMode: Mode,
+    providerSelection: RuntimeProviderSelection = {},
   ): Promise<void> {
-      this.logger.info("User message received", {
-        length: content.length,
-        historyLength: previousMessages.length,
+    this.logger.info("User message received", {
+      length: content.length,
+      historyLength: previousMessages.length,
       lastHistoryRole: previousMessages.at(-1)?.role,
-        mode: interactionMode,
-      });
+      mode: interactionMode,
+    });
 
     try {
       // Get provider config
@@ -97,9 +104,15 @@ export class AgentExecutor {
         );
         return;
       }
+      const effectiveProviderConfig =
+        providerSelection.provider === providerType && providerSelection.model
+          ? { ...providerConfig, model: providerSelection.model }
+          : providerConfig;
 
       // Create provider instance
-      const provider = this.agentLoopFactory.createProvider(providerConfig);
+      const provider = this.agentLoopFactory.createProvider(
+        effectiveProviderConfig,
+      );
 
       try {
         const modeSwitch = await this.modeSwitchAdvisor.resolve({
@@ -140,11 +153,13 @@ export class AgentExecutor {
           const systemPrompt = contextBuilder.buildDirectAnswer({
             mode,
             providerType,
-            model: providerConfig.model,
+            model: effectiveProviderConfig.model,
             profile: planned.executionPlan.profile,
           });
           const maxTokens = Math.min(
-            providerConfig.maxTokens ?? planned.executionPlan.maxTokens ?? 1536,
+            effectiveProviderConfig.maxTokens ??
+              planned.executionPlan.maxTokens ??
+              1536,
             planned.executionPlan.maxTokens ?? 1536,
           );
 
@@ -176,13 +191,13 @@ export class AgentExecutor {
         const systemPrompt = contextBuilder.build({
           mode,
           providerType,
-          model: providerConfig.model,
+          model: effectiveProviderConfig.model,
           maxIterations: 25,
         });
 
         // Create AgentLoop with system prompt
         const agentLoop = this.agentLoopFactory.createAgentLoop(provider, systemPrompt, {
-          maxTokens: providerConfig.maxTokens,
+          maxTokens: effectiveProviderConfig.maxTokens,
         });
 
         this.stateManager.prepareInteraction(planned.context);

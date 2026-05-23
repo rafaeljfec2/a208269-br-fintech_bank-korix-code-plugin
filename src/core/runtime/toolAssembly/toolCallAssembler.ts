@@ -90,7 +90,7 @@ export class ToolCallAssembler {
    */
   private complete(event: ToolCallCompleteEvent): AssemblyResult {
     try {
-      const input = JSON.parse(event.arguments) as Record<string, unknown>;
+      const input = parseToolArguments(event.arguments);
       return {
         type: "complete",
         toolCall: {
@@ -117,7 +117,7 @@ export class ToolCallAssembler {
 
     for (const [index, partial] of this.activeToolCalls) {
       try {
-        const input = JSON.parse(partial.arguments) as Record<string, unknown>;
+        const input = parseToolArguments(partial.arguments);
         results.push({
           type: "complete",
           toolCall: {
@@ -163,4 +163,12 @@ export class ToolCallAssembler {
       ),
     };
   }
+}
+
+function parseToolArguments(argumentsText: string): Record<string, unknown> {
+  if (argumentsText.trim().length === 0) {
+    return {};
+  }
+
+  return JSON.parse(argumentsText) as Record<string, unknown>;
 }

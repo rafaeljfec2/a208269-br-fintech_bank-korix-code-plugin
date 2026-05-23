@@ -145,6 +145,26 @@ describe("chatSlice", () => {
       );
       expect(chat?.messages[0]?.metadata?.runtimeFallback).toBe(false);
     });
+
+    it("should not duplicate fallback assistant messages on repeated finalization", () => {
+      const { addActiveThinkingItem, finalizeStreaming } = store.getState();
+
+      addActiveThinkingItem(chatId, {
+        id: "event-1",
+        stage: "done",
+        title: "Provider turn completed",
+        summary: "Final response stream is ready to commit.",
+        status: "success",
+        timestamp: 123,
+      });
+
+      finalizeStreaming(chatId);
+      finalizeStreaming(chatId);
+
+      const chat = store.getState().conversations[chatId];
+      expect(chat?.messages).toHaveLength(1);
+      expect(chat?.messages[0]?.metadata?.runtimeFallback).toBe(true);
+    });
   });
 
   describe("thinking timeline", () => {
