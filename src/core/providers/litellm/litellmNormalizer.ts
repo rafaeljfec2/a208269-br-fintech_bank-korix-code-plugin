@@ -74,7 +74,9 @@ export class LiteLLMNormalizer {
       case "content_block_stop":
         // Fim do bloco - emitir tool_call_complete se for tool call
         if (this.currentToolCall) {
-          const fullJson = this.currentToolCall.jsonChunks.join("");
+          const assembledJson = this.currentToolCall.jsonChunks.join("");
+          const fullJson =
+            assembledJson.trim().length === 0 ? "{}" : assembledJson;
 
           // Validate JSON is parseable before emitting
           try {
@@ -189,9 +191,6 @@ export class LiteLLMNormalizer {
 
     // Text delta
     if (delta.type === "text_delta" && delta.text) {
-      // Thinking: Anthropic emite thinking em content blocks especiais
-      // Por ora, tratamos como token normal
-      // TODO: detectar thinking blocks se necessário
       events.push({
         type: "token",
         value: delta.text,

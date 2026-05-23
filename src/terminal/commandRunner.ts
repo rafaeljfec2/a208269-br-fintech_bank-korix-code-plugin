@@ -21,6 +21,11 @@ interface BackgroundSession {
 }
 
 const MAX_BACKGROUND_OUTPUT_CHARS = 200_000;
+const ESCAPE_CHARACTER = "\u001B";
+const ANSI_CONTROL_SEQUENCE_PATTERN = new RegExp(
+  String.raw`${ESCAPE_CHARACTER}(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|${ESCAPE_CHARACTER}\\))`,
+  "g",
+);
 
 export class CommandRunner {
   private readonly backgroundSessions = new Map<string, BackgroundSession>();
@@ -103,9 +108,7 @@ export class CommandRunner {
     return this.executeWithTimeout(entry.pty, command, timeout, startTime);
   }
 
-  getSessionStatus(
-    sessionId: string,
-  ): Promise<BackgroundSessionStatus | null> {
+  getSessionStatus(sessionId: string): Promise<BackgroundSessionStatus | null> {
     const session = this.backgroundSessions.get(sessionId);
 
     if (!session) {
@@ -114,7 +117,7 @@ export class CommandRunner {
 
     return Promise.resolve({
       sessionId: session.id,
-      output: session.output,
+      output: this.sanitizeTerminalOutput(session.output),
       exited: session.exited,
       exitCode: session.exitCode,
     });
@@ -356,11 +359,12 @@ export class CommandRunner {
     command: string,
     wrappedCommand?: string,
   ): string {
-    const normalizedOutput = output.replace(/\r\n/g, "\n");
-    const normalizedCommand = command.replace(/\r\n/g, "\n").trimEnd();
-    const normalizedWrappedCommand = wrappedCommand
-      ?.replace(/\r\n/g, "\n")
-      .trimEnd();
+    const normalizedOutput = this.sanitizeTerminalOutput(output);
+    const normalizedCommand = this.normalizeLineEndings(command).trimEnd();
+    const normalizedWrappedCommand =
+      wrappedCommand === undefined
+        ? undefined
+        : this.normalizeLineEndings(wrappedCommand).trimEnd();
 
     if (
       normalizedWrappedCommand &&
@@ -373,12 +377,34 @@ export class CommandRunner {
       return normalizedOutput.slice(normalizedCommand.length + 1);
     }
 
-    return output;
+    return normalizedOutput;
+  }
+
+  private sanitizeTerminalOutput(output: string): string {
+    return output
+      .replaceAll(ANSI_CONTROL_SEQUENCE_PATTERN, "")
+      .split("")
+      .filter((char) => {
+        const code = char.codePointAt(0) ?? 0;
+        return (
+          code === 9 ||
+          code === 10 ||
+          code === 13 ||
+          (code > 31 && code !== 127)
+        );
+      })
+      .join("")
+      .replaceAll("\r\n", "\n")
+      .replaceAll("\r", "\n");
+  }
+
+  private normalizeLineEndings(value: string): string {
+    return value.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
   }
 
   private createExitMarkerPattern(sessionId: string): RegExp {
     return new RegExp(
-      `__KORIX_BACKGROUND_EXIT_${this.escapeRegex(this.toMarkerId(sessionId))}:(-?\\d+)__\\r?\\n?`,
+      String.raw`__KORIX_BACKGROUND_EXIT_${this.escapeRegex(this.toMarkerId(sessionId))}:(-?\d+)__\r?\n?`,
     );
   }
 
@@ -387,7 +413,7 @@ export class CommandRunner {
   }
 
   private escapeRegex(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
   }
 
   private capBackgroundOutput(output: string): string {

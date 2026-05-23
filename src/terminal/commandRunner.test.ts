@@ -127,6 +127,25 @@ describe("CommandRunner background sessions", () => {
     });
   });
 
+  it("should strip terminal control sequences from foreground stdout", async () => {
+    const fakePty = new FakePty();
+    const runner = new CommandRunner(
+      createSessionManager(fakePty),
+      createLogger(),
+    );
+
+    const resultPromise = runner.run("git log -5 --oneline");
+
+    fakePty.emitData("\u001b[?2004h\u001b[32mabc123\u001b[0m commit\r\n");
+    fakePty.emitData("__KORIX_BACKGROUND_EXIT_foreground:0__\r\n");
+
+    await expect(resultPromise).resolves.toMatchObject({
+      stdout: "abc123 commit\n",
+      exitCode: 0,
+      timedOut: false,
+    });
+  });
+
   it("should start a background command and return a session id without waiting for exit", async () => {
     const fakePty = new FakePty();
     const runner = new CommandRunner(
@@ -164,6 +183,21 @@ describe("CommandRunner background sessions", () => {
       exited: false,
       exitCode: null,
     });
+  });
+
+  it("should strip terminal control sequences from background output", async () => {
+    const fakePty = new FakePty();
+    const runner = new CommandRunner(
+      createSessionManager(fakePty),
+      createLogger(),
+    );
+
+    const result = await runner.run("npm test", { background: true });
+    fakePty.emitData("\u001b[?2004h\u001b[31mfailing\u001b[0m\r\n");
+
+    const status = await runner.getSessionStatus(result.sessionId ?? "");
+
+    expect(status?.output).toBe("failing\n");
   });
 
   it("should mark a background session exited when the internal marker is emitted", async () => {
