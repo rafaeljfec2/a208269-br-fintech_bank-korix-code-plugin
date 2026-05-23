@@ -19,8 +19,9 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 | **Fase 2 (P0)** | Task/Subagents MVP | TBD | 32h | ✅ Concluído e expandido |
 | **Fase 3 (P1)** | ReadFile images + Glob | TBD | 28h | ✅ Concluído |
 | **Fase 4 (P2)** | WebFetch + TodoWrite + hardening inicial | TBD | TBD | ✅ Concluído |
-| **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | 🟡 Em andamento |
-| **Backlog** | Pooling, streaming, advanced recovery | TBD | TBD | ⚪ Backlog |
+| **Fase 5 (P0)** | Resource limits + cancellation hardening | TBD | TBD | ✅ Concluído |
+| **Fase 6 (P1)** | Subagent progress + pooling + recovery | TBD | TBD | ✅ Concluído |
+| **Backlog** | State serialization, resource monitoring | TBD | TBD | ⚪ Backlog |
 
 ---
 
@@ -312,6 +313,63 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 - `src/core/subagent/subagentRunner.ts`
 - `src/core/subagent/subagentTypes.ts`
 - `src/core/runtime/agentLoop.ts`
+
+## FASE 6: Subagent Progress & Performance (P1)
+
+**Objetivo**: melhorar observabilidade, custo de execução e resiliência básica dos subagents sem alterar o contrato de tools individuais.
+
+## 6.1 Subagent Result Streaming / Progress Events
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Definir `SubagentProgressEvent`.
+- [x] Adicionar callback opcional `SubagentRequest.onEvent`.
+- [x] Encaminhar eventos `iteration_start`, `tool_call` e `iteration_complete`.
+- [x] Preservar runs existentes sem callback.
+- [x] Cobrir com teste focado.
+
+**Critério de aceitação**: o parent consegue observar progresso relevante do subagent sem acoplar diretamente o child `AgentLoop`.
+
+## 6.2 Subagent Registry Pooling
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Adicionar pool LRU interno de registries por tipo de subagent.
+- [x] Limitar pool a 5 entradas.
+- [x] Reutilizar registry em runs repetidos do mesmo tipo.
+- [x] Não compartilhar `AgentLoop`, `RuntimeState` ou `CancellationManager`.
+- [x] Cobrir com teste focado.
+
+**Critério de aceitação**: runs repetidos evitam recriação desnecessária de registry mantendo isolamento de runtime.
+
+## 6.3 Basic Subagent Recovery
+
+**Prioridade**: 🟡 P1
+
+**Status**: ✅ Implementado.
+
+### Subtasks
+
+- [x] Implementar retry único para erro transitório.
+- [x] Não retry para cancelamento ou resource limit.
+- [x] Registrar `metadata.recoveryAttempts`.
+- [x] Cobrir sucesso após retry e falha persistente.
+
+**Critério de aceitação**: falhas transitórias conhecidas recebem uma segunda tentativa controlada e rastreável.
+
+**Evidência**:
+
+- `src/core/subagent/subagentRunner.phase6.test.ts`
+- `src/core/subagent/subagentRunner.ts`
+- `src/core/subagent/subagentTypes.ts`
 
 ## UX Guardrail: Model-Based Mode Switch Prompt
 

@@ -6,9 +6,14 @@ import {
   type SubagentRequest,
   type SubagentResult,
   type SubagentConfig,
+  type SubagentProgressEventType,
   type SubagentType,
 } from "./subagentTypes";
 import type { ToolCallRecord } from "../runtime/runtimeTypes";
+import type { RuntimeEvent } from "../runtime/runtimeEvents";
+
+const REGISTRY_POOL_LIMIT = 5;
+const MAX_RECOVERY_ATTEMPTS = 1;
 
 export interface SubagentRunnerOptions {
   readonly parentRegistry: ToolRegistry;
@@ -40,6 +45,7 @@ interface MutableSubagentRunnerMetrics {
 }
 
 export class SubagentRunner {
+  private readonly registryPool = new Map<SubagentType, ToolRegistry>();
   private readonly metrics: MutableSubagentRunnerMetrics = {
     totalRuns: 0,
     successfulRuns: 0,
@@ -60,8 +66,31 @@ export class SubagentRunner {
 
   async run(request: SubagentRequest): Promise<SubagentResult> {
     const startTime = Date.now();
+    let recoveryAttempts = 0;
+
+    while (true) {
+      const result = await this.runAttempt(
+        request,
+        startTime,
+        recoveryAttempts,
+      );
+
+      if (!this.shouldRetry(result, recoveryAttempts)) {
+        this.recordRunMetrics(request.type, result);
+        return result;
+      }
+
+      recoveryAttempts += 1;
+    }
+  }
+
+  private async runAttempt(
+    request: SubagentRequest,
+    startTime: number,
+    recoveryAttempts: number,
+  ): Promise<SubagentResult> {
     const config = SUBAGENT_CONFIGS[request.type];
-    const registry = this.createSubagentRegistry(config);
+    const registry = this.getPooledSubagentRegistry(config);
     const agentLoop = this.options.createAgentLoop(
       registry,
       buildSubagentPrompt(request.type),
@@ -94,6 +123,7 @@ export class SubagentRunner {
 
       let result = await generator.next();
       while (!result.done) {
+        this.emitProgressEvent(request, result.value);
         result = await generator.next();
       }
 
@@ -121,6 +151,7 @@ export class SubagentRunner {
           toolsCalled: toolCalls.map((toolCall) => toolCall.toolName),
           toolCallCount: toolCalls.length,
           outputBytes,
+          recoveryAttempts,
           stopReason,
         },
       };
@@ -129,8 +160,6 @@ export class SubagentRunner {
         subagentResult,
         config,
       );
-
-      this.recordRunMetrics(request.type, limitedResult);
 
       return limitedResult;
     } catch (error) {
@@ -146,6 +175,7 @@ export class SubagentRunner {
           toolsCalled: [],
           toolCallCount: 0,
           outputBytes: 0,
+          recoveryAttempts,
           stopReason: this.resolveStopReason(
             false,
             message,
@@ -154,12 +184,31 @@ export class SubagentRunner {
         },
       };
 
-      this.recordRunMetrics(request.type, subagentResult);
-
       return subagentResult;
     } finally {
       unlinkParentCancellation();
     }
+  }
+
+  private getPooledSubagentRegistry(config: SubagentConfig): ToolRegistry {
+    const cached = this.registryPool.get(config.type);
+    if (cached) {
+      this.registryPool.delete(config.type);
+      this.registryPool.set(config.type, cached);
+      return cached;
+    }
+
+    const registry = this.createSubagentRegistry(config);
+    this.registryPool.set(config.type, registry);
+
+    if (this.registryPool.size > REGISTRY_POOL_LIMIT) {
+      const oldestKey = this.registryPool.keys().next().value;
+      if (oldestKey) {
+        this.registryPool.delete(oldestKey);
+      }
+    }
+
+    return registry;
   }
 
   getMetrics(): SubagentRunnerMetrics {
@@ -266,6 +315,58 @@ export class SubagentRunner {
     }
 
     return "runtime_error";
+  }
+
+  private shouldRetry(
+    result: SubagentResult,
+    recoveryAttempts: number,
+  ): boolean {
+    if (
+      result.success ||
+      recoveryAttempts >= MAX_RECOVERY_ATTEMPTS ||
+      result.metadata.stopReason === "cancelled" ||
+      result.metadata.limitExceeded
+    ) {
+      return false;
+    }
+
+    return this.isTransientError(result.error);
+  }
+
+  private isTransientError(error: string | undefined): boolean {
+    if (!error) {
+      return false;
+    }
+
+    return /\b(timeout|econnreset|etimedout|network|temporarily unavailable|rate limit|429|503)\b/i.test(
+      error,
+    );
+  }
+
+  private emitProgressEvent(
+    request: SubagentRequest,
+    event: RuntimeEvent,
+  ): void {
+    if (!request.onEvent || !this.isProgressEvent(event)) {
+      return;
+    }
+
+    request.onEvent({
+      subagentType: request.type,
+      eventType: event.type,
+      event,
+      timestamp: Date.now(),
+    });
+  }
+
+  private isProgressEvent(
+    event: RuntimeEvent,
+  ): event is RuntimeEvent & { readonly type: SubagentProgressEventType } {
+    return (
+      event.type === "iteration_start" ||
+      event.type === "tool_call" ||
+      event.type === "iteration_complete"
+    );
   }
 
   private linkParentCancellation(

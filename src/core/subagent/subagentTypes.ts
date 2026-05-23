@@ -1,6 +1,18 @@
 import type { ExecutionContext } from "../types";
+import type { RuntimeEvent } from "../runtime/runtimeEvents";
 
 export type SubagentType = "explore" | "plan" | "review" | "shell" | "test";
+export type SubagentProgressEventType =
+  | "iteration_start"
+  | "tool_call"
+  | "iteration_complete";
+
+export interface SubagentProgressEvent {
+  readonly subagentType: SubagentType;
+  readonly eventType: SubagentProgressEventType;
+  readonly event: RuntimeEvent;
+  readonly timestamp: number;
+}
 
 export interface SubagentConfig {
   readonly type: SubagentType;
@@ -22,6 +34,7 @@ export interface SubagentRequest {
   readonly context?: Record<string, unknown>;
   readonly executionContext: ExecutionContext;
   readonly parentSignal?: AbortSignal;
+  readonly onEvent?: (event: SubagentProgressEvent) => void;
 }
 
 export interface SubagentResult {
@@ -34,6 +47,7 @@ export interface SubagentResult {
     readonly toolsCalled: readonly string[];
     readonly toolCallCount?: number;
     readonly outputBytes?: number;
+    readonly recoveryAttempts?: number;
     readonly stopReason?:
       | "completed"
       | "runtime_error"
