@@ -66,6 +66,10 @@ export class SubagentRunner {
       registry,
       buildSubagentPrompt(request.type),
     );
+    const unlinkParentCancellation = this.linkParentCancellation(
+      agentLoop,
+      request.parentSignal,
+    );
 
     try {
       const generator = agentLoop.run(
@@ -104,6 +108,7 @@ export class SubagentRunner {
       const stopReason = this.resolveStopReason(
         finalResult.success,
         finalResult.error,
+        request.parentSignal,
       );
 
       const subagentResult: SubagentResult = {
@@ -141,13 +146,19 @@ export class SubagentRunner {
           toolsCalled: [],
           toolCallCount: 0,
           outputBytes: 0,
-          stopReason: this.resolveStopReason(false, message),
+          stopReason: this.resolveStopReason(
+            false,
+            message,
+            request.parentSignal,
+          ),
         },
       };
 
       this.recordRunMetrics(request.type, subagentResult);
 
       return subagentResult;
+    } finally {
+      unlinkParentCancellation();
     }
   }
 
@@ -237,9 +248,17 @@ export class SubagentRunner {
   private resolveStopReason(
     success: boolean,
     error: string | undefined,
+    parentSignal?: AbortSignal,
   ): SubagentResult["metadata"]["stopReason"] {
     if (success) {
       return "completed";
+    }
+
+    if (
+      parentSignal?.aborted ||
+      (error && /cancelled|canceled|abort/i.test(error))
+    ) {
+      return "cancelled";
     }
 
     if (error && /timed out|timeout/i.test(error)) {
@@ -247,6 +266,30 @@ export class SubagentRunner {
     }
 
     return "runtime_error";
+  }
+
+  private linkParentCancellation(
+    agentLoop: AgentLoop,
+    parentSignal: AbortSignal | undefined,
+  ): () => void {
+    if (!parentSignal) {
+      return () => undefined;
+    }
+
+    const cancelChild = (): void => {
+      void agentLoop.cancel("Parent execution cancelled");
+    };
+
+    if (parentSignal.aborted) {
+      cancelChild();
+      return () => undefined;
+    }
+
+    parentSignal.addEventListener("abort", cancelChild, { once: true });
+
+    return () => {
+      parentSignal.removeEventListener("abort", cancelChild);
+    };
   }
 
   private recordRunMetrics(type: SubagentType, result: SubagentResult): void {

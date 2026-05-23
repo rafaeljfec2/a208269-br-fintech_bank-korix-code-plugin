@@ -378,4 +378,8 @@ export class AgentLoop {
       }
     }
   }
+
+  async cancel(reason: string): Promise<void> {
+    await this.cancellationManager.cancel(reason, 0);
+  }
 }

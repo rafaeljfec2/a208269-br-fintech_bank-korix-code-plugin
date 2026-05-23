@@ -21,6 +21,7 @@ export interface SubagentRequest {
   readonly prompt: string;
   readonly context?: Record<string, unknown>;
   readonly executionContext: ExecutionContext;
+  readonly parentSignal?: AbortSignal;
 }
 
 export interface SubagentResult {
@@ -36,6 +37,7 @@ export interface SubagentResult {
     readonly stopReason?:
       | "completed"
       | "runtime_error"
+      | "cancelled"
       | "timeout"
       | "tool_calls"
       | "output_bytes";

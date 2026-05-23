@@ -60,6 +60,7 @@ describe("TaskTool", () => {
   });
 
   it("should call the runtime subagent callback", async () => {
+    const controller = new AbortController();
     const runSubagent = vi.fn(async () => ({
       success: true,
       output: "Found src/auth.ts",
@@ -72,7 +73,7 @@ describe("TaskTool", () => {
 
     const result = await TaskTool.execute(
       { type: "explore", prompt: "Find auth" },
-      createMockToolContext({ runSubagent }),
+      createMockToolContext({ runSubagent, signal: controller.signal }),
     );
 
     expect(result.success, result.error).toBe(true);
@@ -92,6 +93,7 @@ describe("TaskTool", () => {
       prompt: "Find auth",
       context: undefined,
       executionContext: expect.objectContaining({ mode: "agent" }),
+      parentSignal: controller.signal,
     });
   });
 

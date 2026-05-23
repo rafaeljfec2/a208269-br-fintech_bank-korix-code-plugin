@@ -69,6 +69,7 @@ MVP scope:
       prompt: input.prompt,
       context: input.context,
       executionContext: context.execution,
+      parentSignal: context.signal,
     });
 
     return {

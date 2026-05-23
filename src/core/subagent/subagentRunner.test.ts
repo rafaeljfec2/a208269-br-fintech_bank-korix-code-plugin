@@ -426,4 +426,87 @@ describe("SubagentRunner", () => {
 
     expect(run.mock.calls[0]?.[3]?.maxIterations).toBe(5);
   });
+
+  it("should cancel the child agent loop when the parent signal aborts", async () => {
+    const controller = new AbortController();
+    const cancel = vi.fn(async () => undefined);
+    let continueRun: (() => void) | undefined;
+
+    const run = vi.fn(async function* () {
+      yield {
+        type: "iteration_start",
+        iteration: 0,
+        timestamp: Date.now(),
+      };
+      await new Promise<void>((resolve) => {
+        continueRun = resolve;
+      });
+      return {
+        success: false,
+        error: "Execution was cancelled",
+        iterations: 1,
+        metrics: {
+          totalTokens: 0,
+          totalToolCalls: 0,
+          iterations: 1,
+          duration: 10,
+          checkpoints: 0,
+          recoveries: 0,
+          toolBreakdown: {},
+          eventTimeline: [],
+        },
+        finalState: {
+          conversation: {
+            messages: [],
+            turnCount: 1,
+            toolCallHistory: [],
+          },
+          execution: {
+            isExecuting: false,
+            currentIteration: 1,
+            maxIterations: 10,
+            startTime: 0,
+            lastActivityTime: 0,
+          },
+          workspace: {
+            root: "/repo",
+            openFiles: [],
+            modifiedFiles: new Set(),
+          },
+          memory: {
+            shortTerm: new Map(),
+            conversationContext: [],
+          },
+          correlationId: "corr-1",
+        },
+      };
+    });
+
+    const runner = new SubagentRunner({
+      parentRegistry: createParentRegistry(),
+      createRegistry: () => new ToolRegistry(),
+      createAgentLoop: () => ({ run, cancel }) as unknown as AgentLoop,
+    });
+
+    const resultPromise = runner.run({
+      type: "explore",
+      prompt: "Find example",
+      executionContext: {
+        mode: "agent",
+        workspaceRoot: "/repo",
+        openFiles: [],
+      },
+      parentSignal: controller.signal,
+    });
+
+    await vi.waitFor(() => expect(continueRun).toBeDefined());
+    controller.abort();
+    continueRun?.();
+
+    const result = await resultPromise;
+
+    expect(cancel).toHaveBeenCalledWith("Parent execution cancelled");
+    expect(result.success).toBe(false);
+    expect(result.metadata.stopReason).toBe("cancelled");
+  });
 });

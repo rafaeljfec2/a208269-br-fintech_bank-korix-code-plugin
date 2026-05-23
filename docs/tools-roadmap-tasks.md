@@ -290,17 +290,28 @@ Este documento quebra cada fase do roadmap em subtasks executáveis e rastreáve
 
 ### Subtasks
 
-- [ ] Criar `.sdd/parent-subagent-cancellation-link/intake.md`.
-- [ ] Mapear onde subagents criam `AgentLoop`/`CancellationManager` próprios.
-- [ ] Red test: cancelamento do parent cancela subagent em execução.
-- [ ] Implementar propagação sem compartilhar estado mutável indevido.
-- [ ] Registrar metadata de cancelamento no `SubagentResult`.
-- [ ] Rodar testes focados.
-- [ ] Rodar `pnpm run lint`.
-- [ ] Rodar `pnpm run test`.
-- [ ] Atualizar roadmap.
+- [x] Criar `.sdd/parent-subagent-cancellation-link/intake.md`.
+- [x] Mapear onde subagents criam `AgentLoop`/`CancellationManager` próprios.
+- [x] Red test: cancelamento do parent cancela subagent em execução.
+- [x] Implementar propagação sem compartilhar estado mutável indevido.
+- [x] Registrar metadata de cancelamento no `SubagentResult`.
+- [x] Rodar testes focados.
+- [x] Rodar `pnpm run lint`.
+- [x] Rodar `pnpm run test`.
+- [x] Atualizar roadmap.
 
 **Critério de aceitação**: cancelamento do agente pai interrompe subagents filhos de forma explícita e rastreável, sem afetar sessões de terminal por efeito colateral.
+
+**Status**: ✅ Implementado.
+
+**Evidência**:
+
+- `src/tools/task.test.ts`
+- `src/core/subagent/subagentRunner.test.ts`
+- `src/tools/task.ts`
+- `src/core/subagent/subagentRunner.ts`
+- `src/core/subagent/subagentTypes.ts`
+- `src/core/runtime/agentLoop.ts`
 
 ## UX Guardrail: Model-Based Mode Switch Prompt
 
