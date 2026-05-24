@@ -1,78 +1,118 @@
-import { describe, expect, it } from "vitest";
-import type { ExecutionCompleteEvent } from "../core/runtime/runtimeEvents";
-import { buildChatParticipantCompletionMarkdown } from "./chatParticipantSupport";
+import { describe, expect, it, vi } from "vitest";
+import { buildEvidencePack } from "./chatParticipantSupport";
+import type { ContextEngine } from "../context/contextEngine";
+import type { EvidenceRequest } from "../core/runtime/thinking";
 
-function completionEvent(
-  overrides: Partial<ExecutionCompleteEvent> = {},
-): ExecutionCompleteEvent {
+function createRequest(): EvidenceRequest {
   return {
-    type: "execution_complete",
-    success: true,
-    iterations: 2,
-    metrics: {
-      totalTokens: 123,
-      totalToolCalls: 3,
-      iterations: 2,
-      duration: 1540,
-      checkpoints: 0,
-      recoveries: 0,
-      toolBreakdown: {},
-      eventTimeline: [],
+    message: "fix login",
+    profile: {
+      intent: "modify",
+      riskLevel: "low",
+      requiresWorkspaceEvidence: true,
+      requiresToolUse: true,
+      workspaceAccess: {
+        requested: true,
+        action: "read",
+        explicit: true,
+      },
+      mentionedSymbols: ["login"],
+      constraints: [],
+      summary: "Fix login",
     },
-    timestamp: 1,
-    ...overrides,
+    context: {
+      mode: "agent",
+      workspaceRoot: "/workspace",
+      currentFile: "/workspace/src/login.ts",
+      selection: {
+        start: { line: 1, character: 0 },
+        end: { line: 2, character: 0 },
+        text: "login",
+      },
+      openFiles: ["/workspace/src/login.ts"],
+    },
   };
 }
 
-describe("chatParticipantSupport", () => {
-  it("should build a completion summary when tools ran without final text", () => {
-    const summary = buildChatParticipantCompletionMarkdown({
-      streamedText: "",
-      toolCallCount: 3,
-      failedToolCount: 0,
-      completion: completionEvent(),
-      cancelled: false,
+describe("buildEvidencePack", () => {
+  it("builds evidence through ContextIR and preserves workspace metadata", async () => {
+    const buildContextIr = vi.fn().mockResolvedValue({
+      version: "0.1",
+      task: {
+        userPrompt: "fix login",
+        activeFile: "/workspace/src/login.ts",
+        mentionedSymbols: ["login"],
+        constraints: [],
+      },
+      workspace: {
+        root: "/workspace",
+        languageHints: [],
+        openFiles: ["/workspace/src/login.ts"],
+        changedFiles: [],
+      },
+      budget: {
+        maxTokens: 100,
+        estimatedTokens: 10,
+        tokensBeforeOptimization: 10,
+      },
+      context: {
+        symbols: [],
+        files: [
+          {
+            path: "/workspace/src/login.ts",
+            score: 10,
+            scoreFactors: [],
+            includedMode: "full",
+            reasons: [],
+            estimatedTokens: 10,
+            content: "export function login() { return true; }",
+          },
+        ],
+        diagnostics: [],
+      },
+      omitted: [],
+      metrics: {
+        contextBuildLatencyMs: 0,
+        selectedFilesCount: 1,
+        selectedSymbolsCount: 0,
+        selectedDiagnosticsCount: 0,
+        selectedRelevantSymbolsCount: 0,
+        legacyBaselineTokens: 10,
+        tokenSavingsPercent: 0,
+        contextValuePerToken: 0.1,
+        cacheHitRatio: 0,
+      },
     });
+    const contextEngine: Pick<
+      ContextEngine,
+      "buildContextIr" | "formatContextIr"
+    > = {
+      buildContextIr,
+      formatContextIr: () => "formatted context",
+    };
 
-    expect(summary).toBe(
-      "Concluído: 2 iterações, 3 ferramentas, 123 tokens em 1.5s.",
+    const evidence = await buildEvidencePack(
+      createRequest(),
+      contextEngine as ContextEngine,
     );
-  });
 
-  it("should append a compact summary after streamed task output", () => {
-    const summary = buildChatParticipantCompletionMarkdown({
-      streamedText: "Arquivo criado.",
-      toolCallCount: 1,
-      failedToolCount: 0,
-      completion: completionEvent({
-        iterations: 1,
-        metrics: {
-          totalTokens: 42,
-          totalToolCalls: 1,
-          iterations: 1,
-          duration: 900,
-          checkpoints: 0,
-          recoveries: 0,
-          toolBreakdown: {},
-          eventTimeline: [],
-        },
+    expect(buildContextIr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userPrompt: "fix login",
+        workspaceRoot: "/workspace",
+        currentFile: "/workspace/src/login.ts",
+        openFiles: ["/workspace/src/login.ts"],
+        mentionedSymbols: ["login"],
+        tokenBudget: 24000,
       }),
-      cancelled: false,
-    });
-
-    expect(summary).toBe(
-      "\n\nConcluído: 1 iteração, 1 ferramenta, 42 tokens em 0.9s.",
     );
-  });
-
-  it("should skip summaries for direct answers without runtime activity", () => {
-    const summary = buildChatParticipantCompletionMarkdown({
-      streamedText: "Async/await simplifica Promises.",
-      toolCallCount: 0,
-      failedToolCount: 0,
-      cancelled: false,
-    });
-
-    expect(summary).toBeNull();
+    expect(evidence.providerContext).toBe("formatted context");
+    expect(evidence.items).toEqual([
+      {
+        path: "/workspace/src/login.ts",
+        priority: 10,
+        tokenCount: 10,
+      },
+    ]);
   });
 });

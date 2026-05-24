@@ -11,12 +11,26 @@ import type {
   WorkspaceIndex,
 } from "../types";
 
+interface IndexedWorkspaceFile {
+  readonly path: string;
+  readonly content: string;
+  readonly language?: string;
+  readonly lastModified?: number;
+}
+
+interface WorkspaceIndexerEvents {
+  readonly onFileIndexed?: (file: IndexedWorkspaceFile) => void;
+  readonly onFileDeleted?: (path: string) => void;
+}
+
 export class WorkspaceIndexer {
-  private index: WorkspaceIndex;
+  private readonly index: WorkspaceIndex;
   private fileWatcher?: vscode.FileSystemWatcher;
   private indexing = false;
+  private initialized = false;
+  private initializePromise?: Promise<void>;
 
-  constructor() {
+  constructor(private readonly events: WorkspaceIndexerEvents = {}) {
     this.index = {
       files: new Map(),
       symbols: new Map(),
@@ -26,13 +40,23 @@ export class WorkspaceIndexer {
   }
 
   async initialize(): Promise<void> {
-    const logger = getLogger();
-    logger.info("Initializing workspace indexer");
+    if (this.initialized) {
+      return;
+    }
+
+    this.initializePromise ??= this.initializeOnce();
+    await this.initializePromise;
+  }
+
+  private async initializeOnce(): Promise<void> {
+    const logger = this.getOptionalLogger();
+    logger?.info("Initializing workspace indexer");
 
     await this.indexWorkspace();
     this.setupFileWatcher();
+    this.initialized = true;
 
-    logger.info("Workspace indexer initialized", {
+    logger?.info("Workspace indexer initialized", {
       fileCount: this.index.files.size,
       symbolCount: Array.from(this.index.symbols.values()).flat().length,
       importCount: this.index.imports.length,
@@ -44,7 +68,7 @@ export class WorkspaceIndexer {
       return;
     }
 
-    const logger = getLogger();
+    const logger = this.getOptionalLogger();
     this.indexing = true;
 
     try {
@@ -54,24 +78,25 @@ export class WorkspaceIndexer {
         1000,
       );
 
-      logger.info("Found files to index", { count: files.length });
+      logger?.info("Found files to index", { count: files.length });
 
       for (const file of files) {
-        await this.indexFile(file);
+        await this.indexFile(file, false);
       }
 
       this.index.lastIndexed = Date.now();
     } catch (error) {
-      logger.error("Failed to index workspace", error);
+      logger?.error("Failed to index workspace", error);
     } finally {
       this.indexing = false;
     }
   }
 
-  private async indexFile(uri: vscode.Uri): Promise<void> {
+  private async indexFile(uri: vscode.Uri, notify = true): Promise<void> {
     try {
       const stat = await vscode.workspace.fs.stat(uri);
       const document = await vscode.workspace.openTextDocument(uri);
+      const content = document.getText();
 
       const fileInfo: FileInfo = {
         path: uri.fsPath,
@@ -81,12 +106,25 @@ export class WorkspaceIndexer {
       };
 
       this.index.files.set(uri.fsPath, fileInfo);
+      this.index.imports = this.index.imports.filter(
+        (imp) => imp.source !== uri.fsPath,
+      );
 
       await this.extractSymbols(uri, document);
       this.extractImports(uri, document);
+      if (notify) {
+        this.events.onFileIndexed?.({
+          path: uri.fsPath,
+          content,
+          language: document.languageId,
+          lastModified: stat.mtime,
+        });
+      }
     } catch (error) {
-      const logger = getLogger();
-      logger.warn("Failed to index file", { file: uri.fsPath, error });
+      this.getOptionalLogger()?.warn("Failed to index file", {
+        file: uri.fsPath,
+        error,
+      });
     }
   }
 
@@ -132,7 +170,7 @@ export class WorkspaceIndexer {
       if (symbolInfos.length > 0) {
         this.index.symbols.set(uri.fsPath, symbolInfos);
       }
-    } catch (_error) {
+    } catch {
       // Symbol provider not available for this file type
     }
   }
@@ -169,29 +207,30 @@ export class WorkspaceIndexer {
   }
 
   private setupFileWatcher(): void {
-    const logger = getLogger();
+    const logger = this.getOptionalLogger();
 
     this.fileWatcher = vscode.workspace.createFileSystemWatcher(
       "**/*.{ts,tsx,js,jsx,py,go,rs,java,cpp,c,h}",
     );
 
     this.fileWatcher.onDidCreate(async (uri) => {
-      logger.debug("File created", { file: uri.fsPath });
+      logger?.debug("File created", { file: uri.fsPath });
       await this.indexFile(uri);
     });
 
     this.fileWatcher.onDidChange(async (uri) => {
-      logger.debug("File changed", { file: uri.fsPath });
+      logger?.debug("File changed", { file: uri.fsPath });
       await this.indexFile(uri);
     });
 
     this.fileWatcher.onDidDelete((uri) => {
-      logger.debug("File deleted", { file: uri.fsPath });
+      logger?.debug("File deleted", { file: uri.fsPath });
       this.index.files.delete(uri.fsPath);
       this.index.symbols.delete(uri.fsPath);
       this.index.imports = this.index.imports.filter(
         (imp) => imp.source !== uri.fsPath,
       );
+      this.events.onFileDeleted?.(uri.fsPath);
     });
   }
 
@@ -207,8 +246,16 @@ export class WorkspaceIndexer {
     return this.index.imports.filter((imp) => imp.source === path);
   }
 
+  getAllImports(): ImportInfo[] {
+    return [...this.index.imports];
+  }
+
   getAllFiles(): FileInfo[] {
     return Array.from(this.index.files.values());
+  }
+
+  getSymbolsByFile(): ReadonlyMap<string, readonly SymbolInfo[]> {
+    return new Map(this.index.symbols);
   }
 
   findSymbol(name: string): SymbolInfo | undefined {
@@ -223,5 +270,13 @@ export class WorkspaceIndexer {
 
   dispose(): void {
     this.fileWatcher?.dispose();
+  }
+
+  private getOptionalLogger(): ReturnType<typeof getLogger> | undefined {
+    try {
+      return getLogger();
+    } catch {
+      return undefined;
+    }
   }
 }

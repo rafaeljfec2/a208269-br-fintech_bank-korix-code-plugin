@@ -4,8 +4,9 @@
     "module": "ES2022",
     "lib": ["ES2022"],
     "moduleResolution": "node",
+    "ignoreDeprecations": "5.0",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
@@ -28,6 +29,9 @@
     "sourceMap": true,
     "composite": true,
     "paths": {
+      "@korix/context-compiler": [
+        "./packages/context-compiler/src/index.ts"
+      ],
       "@/core/*": ["./src/core/*"],
       "@/providers/*": ["./src/providers/*"],
       "@/harness/*": ["./src/harness/*"],
@@ -42,7 +46,8 @@
     }
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "packages/context-compiler/src/**/*"
   ],
   "exclude": [
     "node_modules",

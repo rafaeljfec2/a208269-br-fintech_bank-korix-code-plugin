@@ -12,6 +12,7 @@ export const TOKENS = {
   HeuristicRanker: Symbol("HeuristicRanker"),
   ContextBuilder: Symbol("ContextBuilder"),
   ContextEngine: Symbol("ContextEngine"),
+  ContextQualityTelemetryBuffer: Symbol("ContextQualityTelemetryBuffer"),
 
   // Terminal
   SessionManager: Symbol("SessionManager"),

@@ -71,6 +71,12 @@
         "title": "Korix: Test Provider Streaming",
         "category": "Korix",
         "icon": "$(debug-alt)"
+      },
+      {
+        "command": "korix.explainContextSelection",
+        "title": "Korix: Explain Context Selection",
+        "category": "Korix",
+        "icon": "$(graph)"
       }
     ],
     "viewsContainers": {
@@ -260,7 +266,8 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:native && npm run compile",
+    "build:native": "pnpm --filter @korix/context-compiler native:build",
     "build:css": "tailwindcss -i src/webview/main.css -o dist/webview.css --minify",
     "validate:css": "node scripts/validate-css.js",
     "compile": "npm run build:css && node esbuild.config.js --production && npm run validate:css",
@@ -274,6 +281,7 @@
     "test:litellm": "./scripts/run-test.sh"
   },
   "dependencies": {
+    "@korix/context-compiler": "workspace:*",
     "@anthropic-ai/sdk": "^0.27.0",
     "@types/dompurify": "^3.2.0",
     "clsx": "^2.1.1",

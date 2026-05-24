@@ -3,6 +3,7 @@
  */
 
 import * as vscode from "vscode";
+import path from "node:path";
 import type { Container } from "./container";
 import { TOKENS } from "./tokens";
 import { initializeLogger, type Logger } from "../telemetry/logger";
@@ -10,6 +11,10 @@ import { WorkspaceIndexer } from "../context/indexing/workspaceIndexer";
 import { HeuristicRanker } from "../context/ranking/heuristicRanker";
 import { ContextBuilder } from "../context/retrieval/contextBuilder";
 import { ContextEngine } from "../context/contextEngine";
+import {
+  ContextQualityTelemetryBuffer,
+  isNodeSQLiteRuntimeAvailable,
+} from "@korix/context-compiler";
 import { TerminalSessionManager } from "../terminal/session";
 import { CommandRunner } from "../terminal/commandRunner";
 import { PatchParser } from "../patch/parser";
@@ -38,11 +43,11 @@ import { TaskQueue } from "../core/runtime/taskQueue";
 export function configureContainer(
   container: Container,
   context: vscode.ExtensionContext,
-  workspaceRoot: string,
+  workspaceRoot: string | undefined,
 ): void {
   // Configuration values
   container.bindValue(TOKENS.ExtensionContext, context);
-  container.bindValue(TOKENS.WorkspaceRoot, workspaceRoot);
+  container.bindValue(TOKENS.WorkspaceRoot, workspaceRoot ?? process.cwd());
 
   // Logger (singleton)
   container.bindSingleton(TOKENS.Logger, () => {
@@ -90,7 +95,28 @@ export function configureContainer(
     return new ContextBuilder(indexer, ranker);
   });
 
-  container.bindSingleton(TOKENS.ContextEngine, () => new ContextEngine());
+  container.bindSingleton(TOKENS.ContextEngine, (c) => {
+    const ctx = c.get<vscode.ExtensionContext>(TOKENS.ExtensionContext);
+    if (!isNodeSQLiteRuntimeAvailable()) {
+      return new ContextEngine(undefined, {}, workspaceRoot);
+    }
+
+    return new ContextEngine(
+      undefined,
+      {
+        cacheDatabasePath: path.join(
+          ctx.globalStorageUri.fsPath,
+          "context-compiler-cache.sqlite",
+        ),
+      },
+      workspaceRoot,
+    );
+  });
+
+  container.bindSingleton(
+    TOKENS.ContextQualityTelemetryBuffer,
+    () => new ContextQualityTelemetryBuffer(),
+  );
 
   // Terminal services (singletons)
   container.bindSingleton(

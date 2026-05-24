@@ -191,8 +191,11 @@ export async function buildEvidencePack(
       )
     : undefined;
 
-  const contextWindow = await contextEngine.buildContext({
+  const contextIr = await contextEngine.buildContextIr({
+    userPrompt: request.message,
+    workspaceRoot: request.context.workspaceRoot,
     currentFile: request.context.currentFile,
+    openFiles: request.context.openFiles,
     userSelection:
       request.context.currentFile && range
         ? { file: request.context.currentFile, range }
@@ -202,14 +205,14 @@ export async function buildEvidencePack(
   });
 
   return {
-    summary: `${contextWindow.items.length} workspace item(s), ${contextWindow.totalTokens} estimated tokens.`,
-    providerContext: contextEngine.formatContext(contextWindow),
-    items: contextWindow.items.map((item) => ({
-      path: item.file,
-      priority: item.priority,
-      tokenCount: item.tokenCount,
+    summary: `${contextIr.context.files.length} workspace item(s), ${contextIr.budget.estimatedTokens} estimated tokens.`,
+    providerContext: contextEngine.formatContextIr(contextIr),
+    items: contextIr.context.files.map((item) => ({
+      path: item.path,
+      priority: item.score,
+      tokenCount: item.estimatedTokens,
     })),
-    totalTokens: contextWindow.totalTokens,
+    totalTokens: contextIr.budget.estimatedTokens,
   };
 }
 

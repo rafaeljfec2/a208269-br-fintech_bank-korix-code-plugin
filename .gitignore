@@ -39,6 +39,12 @@ coverage/
 # TypeScript
 *.tsbuildinfo
 
+# Rust
+target/
+packages/context-compiler/native/index.js
+packages/context-compiler/native/index.d.ts
+packages/context-compiler/native/index.*.node
+
 # Misc
 .cache/
 .temp/

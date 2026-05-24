@@ -8,6 +8,20 @@ const __dirname = path.dirname(__filename);
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+const nativeContextCompilerTargets = [
+  'darwin-arm64',
+  'darwin-universal',
+  'darwin-x64',
+  'linux-arm64-gnu',
+  'linux-arm64-musl',
+  'linux-x64-gnu',
+  'linux-x64-musl',
+  'win32-arm64-msvc',
+  'win32-x64-msvc',
+];
+const nativeContextCompilerArtifacts = new Set(
+  nativeContextCompilerTargets.map((target) => `index.${target}.node`),
+);
 
 const baseConfig = {
   bundle: true,
@@ -97,6 +111,61 @@ async function copyPrompts() {
   }
 }
 
+async function copyNativeContextCompiler() {
+  const srcDir = path.join(__dirname, 'packages', 'context-compiler', 'native');
+  const destDir = path.join(__dirname, 'dist', 'native');
+
+  let entries;
+  try {
+    entries = await fs.readdir(srcDir, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      console.log('[native] Context compiler native directory not found; using TypeScript fallback');
+      return;
+    }
+    throw error;
+  }
+
+  const nativeFiles = entries
+    .filter((entry) => entry.isFile() && nativeContextCompilerArtifacts.has(entry.name))
+    .map((entry) => entry.name);
+
+  if (nativeFiles.length === 0) {
+    console.log('[native] No context compiler native artifact found; using TypeScript fallback');
+    return;
+  }
+
+  await fs.mkdir(destDir, { recursive: true });
+  const copiedArtifacts = await Promise.all(
+    nativeFiles.map(async (file) => {
+      const srcPath = path.join(srcDir, file);
+      await fs.copyFile(srcPath, path.join(destDir, file));
+      const stats = await fs.stat(srcPath);
+      return {
+        name: file,
+        bytes: stats.size,
+      };
+    }),
+  );
+  await fs.writeFile(
+    path.join(destDir, 'context-compiler-native-manifest.json'),
+    JSON.stringify(
+      {
+        copiedArtifacts: nativeFiles,
+        copiedArtifactBytes: copiedArtifacts,
+        totalArtifactBytes: copiedArtifacts.reduce(
+          (total, artifact) => total + artifact.bytes,
+          0,
+        ),
+        supportedTargets: nativeContextCompilerTargets,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(`[native] Copied ${nativeFiles.length} context compiler native artifact(s)`);
+}
+
 async function build() {
   try {
     if (watch) {
@@ -112,6 +181,7 @@ async function build() {
 
       // Copy markdown prompt files
       await copyPrompts();
+      await copyNativeContextCompiler();
 
       console.log('[build] Build complete (extension + webview)');
 

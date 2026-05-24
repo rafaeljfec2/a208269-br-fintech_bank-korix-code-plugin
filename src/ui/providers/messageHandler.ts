@@ -30,6 +30,7 @@ import { AgentExecutor } from "./agentExecutor";
 import { SettingsHandler } from "./settingsHandler";
 import { ConnectionTester } from "./connectionTester";
 import type { ContextEngine } from "../../context/contextEngine";
+import type { ContextQualityTelemetryBuffer } from "@korix/context-compiler";
 
 export class MessageHandler {
   private readonly logger: Logger;
@@ -109,6 +110,9 @@ export class MessageHandler {
       this.eventEmitter,
       this.contextEngine,
       (mode) => this.postModeChanged(mode),
+      container.get<ContextQualityTelemetryBuffer>(
+        TOKENS.ContextQualityTelemetryBuffer,
+      ),
     );
     this.settingsHandler = new SettingsHandler(
       webview,

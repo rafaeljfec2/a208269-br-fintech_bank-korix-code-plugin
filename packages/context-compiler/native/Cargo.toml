@@ -1,0 +1,19 @@
+[package]
+name = "korix_context_compiler_native"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "3.4.0", default-features = false, features = ["napi4"] }
+napi-derive = "3.3.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+tree-sitter = "0.25.8"
+tree-sitter-javascript = "0.25.0"
+tree-sitter-typescript = "0.23.2"
+
+[build-dependencies]
+napi-build = "2.2.4"

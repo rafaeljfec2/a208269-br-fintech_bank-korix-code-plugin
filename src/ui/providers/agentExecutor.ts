@@ -13,8 +13,10 @@ import type { ToolRegistry } from "../../harness/toolRegistry";
 import type { RuntimeEventEmitter } from "../../core/runtime/runtimeEvents";
 import type { ContextEngine } from "../../context/contextEngine";
 import {
-  type EvidencePack,
-  type EvidenceRequest,
+  ContextQualityTelemetryBuffer,
+  type ContextQualityBenchmarkSummary,
+} from "@korix/context-compiler";
+import {
   ModeSwitchAdvisor,
   type ModeSwitchRecommendation,
   type RuntimeExecutionPlan,
@@ -32,7 +34,10 @@ import { RuntimeMetrics } from "../../core/runtime/runtimeMetrics";
 import { askSingleChoice } from "../../core/runtime/userQuestion";
 import type { ExecutionContext, Mode } from "../../core/types";
 import type { ChatHistoryMessage } from "../../core/runtime/thinking/InteractionContextCompiler";
-import type { ProviderType } from "../../providers/types";
+import type { AIProvider } from "../../core/providers/types";
+import type { ProviderConfig, ProviderType } from "../../providers/types";
+import { AgentEvidencePackBuilder } from "./agentEvidencePackBuilder";
+import { ContextQualityRuntimeTelemetry } from "./contextQualityRuntimeTelemetry";
 
 interface PlannedInteraction {
   readonly compiledInteraction: {
@@ -50,10 +55,18 @@ interface RuntimeProviderSelection {
   readonly model?: string;
 }
 
+interface ModeSwitchResolution {
+  readonly mode: Mode;
+  readonly planned: PlannedInteraction;
+  readonly declined: boolean;
+}
+
 export class AgentExecutor {
   private readonly interactionContextCompiler =
     new InteractionContextCompiler();
   private readonly modeSwitchAdvisor = new ModeSwitchAdvisor();
+  private readonly evidencePackBuilder: AgentEvidencePackBuilder;
+  private readonly contextQualityRuntimeTelemetry: ContextQualityRuntimeTelemetry;
 
   constructor(
     private readonly logger: Logger,
@@ -62,9 +75,21 @@ export class AgentExecutor {
     private readonly agentLoopFactory: AgentLoopFactory,
     private readonly toolRegistry: ToolRegistry,
     private readonly eventEmitter: RuntimeEventEmitter,
-    private readonly contextEngine: ContextEngine,
+    contextEngine: ContextEngine,
     private readonly onModeSelected?: (mode: Mode) => void,
-  ) {}
+    contextQualityTelemetry = new ContextQualityTelemetryBuffer(),
+  ) {
+    this.contextQualityRuntimeTelemetry = new ContextQualityRuntimeTelemetry(
+      logger,
+      eventEmitter,
+      contextQualityTelemetry,
+    );
+    this.evidencePackBuilder = new AgentEvidencePackBuilder(
+      contextEngine,
+      (contextIr) =>
+        this.contextQualityRuntimeTelemetry.setContextIr(contextIr),
+    );
+  }
 
   /**
    * Execute agent loop with user message and history
@@ -115,26 +140,20 @@ export class AgentExecutor {
       );
 
       try {
-        const modeSwitch = await this.modeSwitchAdvisor.resolve({
-          message: planned.effectiveContent,
-          profile: planned.taskProfile,
-          context: planned.context,
-          executionPlan: planned.executionPlan,
+        const modeSwitchResolution = await this.resolveModeSwitch({
+          content,
+          previousMessages,
+          mode,
+          planned,
           provider,
         });
 
-        if (modeSwitch) {
-          const selectedMode = await this.askModeSwitch(modeSwitch);
-          if (selectedMode === modeSwitch.currentMode) {
-            this.emitModeSwitchDeclined(modeSwitch);
-            return;
-          }
-
-          mode = selectedMode;
-          this.stateManager.setMode(mode);
-          this.onModeSelected?.(mode);
-          planned = this.planInteraction(content, previousMessages, mode);
+        if (modeSwitchResolution.declined) {
+          return;
         }
+
+        mode = modeSwitchResolution.mode;
+        planned = modeSwitchResolution.planned;
 
         // Build unified system prompt
         const contextBuilder = new PluginContextBuilder(
@@ -143,47 +162,15 @@ export class AgentExecutor {
         );
 
         if (planned.executionPlan.path === "direct_llm") {
-          const directInteraction = this.interactionContextCompiler.compile({
-            message: content,
+          await this.runDirectLlmExecution({
+            content,
             previousMessages,
             mode,
-            maxPreviousMessages: planned.executionPlan.maxHistoryMessages,
-            maxPreviousChars: planned.executionPlan.maxHistoryChars,
-          });
-          const systemPrompt = contextBuilder.buildDirectAnswer({
-            mode,
+            planned,
+            provider,
             providerType,
-            model: effectiveProviderConfig.model,
-            profile: planned.executionPlan.profile,
-          });
-          const maxTokens = Math.min(
-            effectiveProviderConfig.maxTokens ??
-              planned.executionPlan.maxTokens ??
-              1536,
-            planned.executionPlan.maxTokens ?? 1536,
-          );
-
-          this.stateManager.prepareInteraction(planned.context);
-          this.stateManager.startExecution();
-
-          try {
-            await new DirectLlmExecutor(
-              provider,
-              this.eventEmitter,
-              this.logger,
-            ).run({
-              initialMessage: directInteraction.effectiveMessage,
-              previousMessages: directInteraction.previousMessages,
-              context: planned.context,
-              systemPrompt,
-              maxTokens,
-            });
-          } finally {
-            this.stateManager.stopExecution();
-          }
-
-          this.logger.info("Direct LLM execution completed successfully", {
-            reason: planned.executionPlan.reason,
+            providerConfig: effectiveProviderConfig,
+            contextBuilder,
           });
           return;
         }
@@ -196,20 +183,28 @@ export class AgentExecutor {
         });
 
         // Create AgentLoop with system prompt
-        const agentLoop = this.agentLoopFactory.createAgentLoop(provider, systemPrompt, {
-          maxTokens: effectiveProviderConfig.maxTokens,
-        });
+        const agentLoop = this.agentLoopFactory.createAgentLoop(
+          provider,
+          systemPrompt,
+          {
+            maxTokens: effectiveProviderConfig.maxTokens,
+          },
+        );
 
         this.stateManager.prepareInteraction(planned.context);
 
         // Mark as executing
         this.stateManager.startExecution();
+        this.contextQualityRuntimeTelemetry.reset();
+        const detachContextQualityTelemetry =
+          this.contextQualityRuntimeTelemetry.attach();
 
         const orchestrator = new ThinkingOrchestrator({
           agentLoop,
           eventEmitter: this.eventEmitter,
           logger: this.logger,
-          evidenceProvider: (request) => this.buildEvidencePack(request),
+          evidenceProvider: (request) =>
+            this.evidencePackBuilder.build(request),
           workspaceEvidenceCollector: (request) =>
             new WorkspaceEvidenceCollector(this.toolRegistry).collect(request),
         });
@@ -245,6 +240,7 @@ export class AgentExecutor {
             `Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
           );
         } finally {
+          detachContextQualityTelemetry();
           this.stateManager.stopExecution();
         }
       } finally {
@@ -259,9 +255,7 @@ export class AgentExecutor {
     }
   }
 
-  private buildExecutionContext(
-    mode: Mode,
-  ): ExecutionContext {
+  private buildExecutionContext(mode: Mode): ExecutionContext {
     const activeEditor = vscode.window.activeTextEditor;
     const workspaceRoot =
       vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? "";
@@ -294,6 +288,107 @@ export class AgentExecutor {
           : undefined,
       openFiles,
     };
+  }
+
+  private async resolveModeSwitch(options: {
+    readonly content: string;
+    readonly previousMessages: readonly ChatHistoryMessage[];
+    readonly mode: Mode;
+    readonly planned: PlannedInteraction;
+    readonly provider: AIProvider;
+  }): Promise<ModeSwitchResolution> {
+    const modeSwitch = await this.modeSwitchAdvisor.resolve({
+      message: options.planned.effectiveContent,
+      profile: options.planned.taskProfile,
+      context: options.planned.context,
+      executionPlan: options.planned.executionPlan,
+      provider: options.provider,
+    });
+
+    if (!modeSwitch) {
+      return {
+        mode: options.mode,
+        planned: options.planned,
+        declined: false,
+      };
+    }
+
+    const selectedMode = await this.askModeSwitch(modeSwitch);
+    if (selectedMode === modeSwitch.currentMode) {
+      this.emitModeSwitchDeclined(modeSwitch);
+      return {
+        mode: options.mode,
+        planned: options.planned,
+        declined: true,
+      };
+    }
+
+    this.stateManager.setMode(selectedMode);
+    this.onModeSelected?.(selectedMode);
+
+    return {
+      mode: selectedMode,
+      planned: this.planInteraction(
+        options.content,
+        options.previousMessages,
+        selectedMode,
+      ),
+      declined: false,
+    };
+  }
+
+  private async runDirectLlmExecution(options: {
+    readonly content: string;
+    readonly previousMessages: readonly ChatHistoryMessage[];
+    readonly mode: Mode;
+    readonly planned: PlannedInteraction;
+    readonly provider: AIProvider;
+    readonly providerType: ProviderType;
+    readonly providerConfig: ProviderConfig;
+    readonly contextBuilder: PluginContextBuilder;
+  }): Promise<void> {
+    const directInteraction = this.interactionContextCompiler.compile({
+      message: options.content,
+      previousMessages: options.previousMessages,
+      mode: options.mode,
+      maxPreviousMessages: options.planned.executionPlan.maxHistoryMessages,
+      maxPreviousChars: options.planned.executionPlan.maxHistoryChars,
+    });
+    const systemPrompt = options.contextBuilder.buildDirectAnswer({
+      mode: options.mode,
+      providerType: options.providerType,
+      model: options.providerConfig.model,
+      profile: options.planned.executionPlan.profile,
+    });
+    const maxTokens = Math.min(
+      options.providerConfig.maxTokens ??
+        options.planned.executionPlan.maxTokens ??
+        1536,
+      options.planned.executionPlan.maxTokens ?? 1536,
+    );
+
+    this.stateManager.prepareInteraction(options.planned.context);
+    this.stateManager.startExecution();
+
+    try {
+      await new DirectLlmExecutor(
+        options.provider,
+        this.eventEmitter,
+        this.logger,
+      ).run({
+        initialMessage: directInteraction.effectiveMessage,
+        previousMessages: directInteraction.previousMessages,
+        context: options.planned.context,
+        systemPrompt,
+        maxTokens,
+      });
+    } finally {
+      this.stateManager.stopExecution();
+    }
+
+    this.logger.info("Direct LLM execution completed successfully", {
+      reason: options.planned.executionPlan.reason,
+    });
   }
 
   private planInteraction(
@@ -384,44 +479,7 @@ export class AgentExecutor {
     return value === "ask" || value === "plan" || value === "agent";
   }
 
-  private async buildEvidencePack(
-    request: EvidenceRequest,
-  ): Promise<EvidencePack> {
-    const tokenBudget = Math.min(
-      vscode.workspace
-        .getConfiguration("korix")
-        .get<number>("contextTokenBudget", 180000),
-      24000,
-    );
-
-    const range = request.context.selection
-      ? new vscode.Range(
-          request.context.selection.start.line,
-          request.context.selection.start.character,
-          request.context.selection.end.line,
-          request.context.selection.end.character,
-        )
-      : undefined;
-
-    const contextWindow = await this.contextEngine.buildContext({
-      currentFile: request.context.currentFile,
-      userSelection:
-        request.context.currentFile && range
-          ? { file: request.context.currentFile, range }
-          : undefined,
-      mentionedSymbols: [...request.profile.mentionedSymbols],
-      tokenBudget,
-    });
-
-    return {
-      summary: `${contextWindow.items.length} workspace item(s), ${contextWindow.totalTokens} estimated tokens.`,
-      providerContext: this.contextEngine.formatContext(contextWindow),
-      items: contextWindow.items.map((item) => ({
-        path: item.file,
-        priority: item.priority,
-        tokenCount: item.tokenCount,
-      })),
-      totalTokens: contextWindow.totalTokens,
-    };
+  getContextQualityTelemetrySummary(): ContextQualityBenchmarkSummary {
+    return this.contextQualityRuntimeTelemetry.summarize();
   }
 }

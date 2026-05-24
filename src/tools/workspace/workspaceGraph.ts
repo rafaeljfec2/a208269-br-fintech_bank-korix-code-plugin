@@ -16,7 +16,9 @@
 
 import { z } from "zod";
 import type { Tool, ToolContext, ToolResult } from "../../harness/toolRegistry";
-import { getContextEngine } from "../../context/contextEngine";
+import type { ContextEngine } from "../../context/contextEngine";
+import { getGlobalContainer } from "../../di/container";
+import { TOKENS } from "../../di/tokens";
 
 const WorkspaceGraphSchema = z.object({
   rootFile: z.string().optional().describe("Root file to start graph from"),
@@ -72,16 +74,16 @@ export const WorkspaceGraphTool: Tool<
     return true; // Allowed in all modes
   },
 
-  execute(
+  async execute(
     input: WorkspaceGraphInput,
     _context: ToolContext,
   ): Promise<ToolResult<WorkspaceGraphResult>> {
     const startTime = Date.now();
 
     try {
-      const graph = buildWorkspaceGraph(input);
+      const graph = await buildWorkspaceGraph(input);
 
-      return Promise.resolve({
+      return {
         success: true,
         data: graph,
         metadata: {
@@ -89,9 +91,9 @@ export const WorkspaceGraphTool: Tool<
           approved: true,
           timestamp: startTime,
         },
-      });
+      };
     } catch (error) {
-      return Promise.resolve({
+      return {
         success: false,
         error: (error as Error).message,
         metadata: {
@@ -99,7 +101,7 @@ export const WorkspaceGraphTool: Tool<
           approved: true,
           timestamp: startTime,
         },
-      });
+      };
     }
   },
 };
@@ -107,31 +109,24 @@ export const WorkspaceGraphTool: Tool<
 /**
  * Build workspace graph from index
  */
-function buildWorkspaceGraph(
-  _input: WorkspaceGraphInput,
-): WorkspaceGraphResult {
-  // @ts-expect-error - Reserved for future use
-  const _contextEngine = getContextEngine();
+async function buildWorkspaceGraph(
+  input: WorkspaceGraphInput,
+): Promise<WorkspaceGraphResult> {
+  const contextEngine =
+    getGlobalContainer().get<ContextEngine>(TOKENS.ContextEngine);
+  const graph = await contextEngine.getWorkspaceGraph({
+    rootFile: input.rootFile,
+    maxDepth: input.maxDepth,
+  });
+  const includeSymbols = input.includeSymbols ?? true;
 
-  // Access internal indexer (would need to expose via public API)
-  // For now, return a simplified graph
-  // In production, would integrate with WorkspaceIndexer
-
-  const nodes: GraphNode[] = [];
-  const edges: Array<{ from: string; to: string; type: string }> = [];
-
-  // Placeholder implementation
-  // Real implementation would:
-  // 1. Get all files from indexer
-  // 2. Build import graph
-  // 3. BFS from rootFile if specified
-  // 4. Track distances
-
-  // For now, return empty graph with metadata
   return {
-    nodes,
-    edges,
-    totalFiles: nodes.length,
-    totalImports: edges.length,
+    nodes: graph.nodes.map((node) => ({
+      ...node,
+      symbols: includeSymbols ? node.symbols : [],
+    })),
+    edges: graph.edges,
+    totalFiles: graph.totalFiles,
+    totalImports: graph.totalImports,
   };
 }

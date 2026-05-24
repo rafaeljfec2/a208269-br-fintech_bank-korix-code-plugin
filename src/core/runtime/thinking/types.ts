@@ -118,6 +118,10 @@ export interface ObservationSummary {
   readonly summary: string;
   readonly importantLines: readonly string[];
   readonly rawSize: number;
+  readonly optimizedOutput?: string;
+  readonly optimizedSize?: number;
+  readonly omittedCharacters?: number;
+  readonly optimizationReasons?: readonly string[];
   readonly truncated: boolean;
   readonly retryHint?: string;
   readonly timestamp: number;

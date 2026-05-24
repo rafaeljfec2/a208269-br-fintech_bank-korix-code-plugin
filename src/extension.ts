@@ -5,12 +5,11 @@ import { ProviderConfigManager } from "./providers/config";
 import type { AIProvider } from "./providers/types";
 import { KorixWebviewProvider } from "./ui/providers/webviewProvider";
 import { registerKorixChatParticipant } from "./ui/chatParticipant";
-import {
-  getKorixViewTarget,
-  supportsSecondarySidebar,
-} from "./ui/viewTarget";
+import { getKorixViewTarget, supportsSecondarySidebar } from "./ui/viewTarget";
 import type { Logger } from "./telemetry/logger";
 import type { ContextEngine } from "./context/contextEngine";
+import { explainContextSelection } from "./context/contextDebugCommand";
+import type { ContextQualityTelemetryBuffer } from "@korix/context-compiler";
 import type { TerminalSessionManager } from "./terminal/session";
 import type { RuntimeStateManager } from "./core/runtime/runtimeStateManager";
 import { registerAllTools } from "./tools";
@@ -33,8 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("Korix Code");
 
   // Create and configure DI container
-  const workspaceRoot =
-    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const container = createContainer();
   configureContainer(container, context, workspaceRoot);
   setGlobalContainer(container);
@@ -51,9 +49,16 @@ export function activate(context: vscode.ExtensionContext) {
   void initializeProvider();
 
   // Initialize Context Engine
-  void contextEngine.initialize().then(() => {
-    logger.info("Context Engine ready");
-  });
+  void contextEngine
+    .initialize()
+    .then(() => {
+      logger.info("Context Engine ready");
+    })
+    .catch((error: unknown) => {
+      logger.warn("Context Engine initialization failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 
   logger.info("DI Container initialized");
 
@@ -141,6 +146,28 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("korix.testProvider", async () => {
       await testProviderStreaming();
     }),
+
+    vscode.commands.registerCommand(
+      "korix.explainContextSelection",
+      async () => {
+        try {
+          const qualityTelemetry =
+            container.get<ContextQualityTelemetryBuffer>(
+              TOKENS.ContextQualityTelemetryBuffer,
+            );
+          await explainContextSelection(
+            contextEngine,
+            logger,
+            qualityTelemetry.summarize(),
+          );
+        } catch (error) {
+          logger.error("Failed to explain context selection", error);
+          vscode.window.showErrorMessage(
+            `Failed to explain context selection: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      },
+    ),
   ];
 
   context.subscriptions.push(...commands, outputChannel, statusBarItem);

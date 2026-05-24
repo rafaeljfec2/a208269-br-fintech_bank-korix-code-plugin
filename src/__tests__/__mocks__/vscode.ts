@@ -14,12 +14,34 @@ export const Uri = {
 
 export const workspace = {
   openTextDocument: () => Promise.resolve({}),
+  fs: {
+    stat: () => Promise.resolve({ size: 0, mtime: 0 }),
+  },
+  findFiles: () => Promise.resolve([]),
+  createFileSystemWatcher: () => ({
+    onDidCreate: () => ({ dispose: () => {} }),
+    onDidChange: () => ({ dispose: () => {} }),
+    onDidDelete: () => ({ dispose: () => {} }),
+    dispose: () => {},
+  }),
+  getConfiguration: () => ({
+    get: <T>(_key: string, defaultValue: T): T => defaultValue,
+  }),
 };
 
 export class Position {
   constructor(
     public line: number,
     public column: number,
+  ) {}
+}
+
+export class Range {
+  constructor(
+    public startLine: number,
+    public startColumn: number,
+    public endLine: number,
+    public endColumn: number,
   ) {}
 }
 
