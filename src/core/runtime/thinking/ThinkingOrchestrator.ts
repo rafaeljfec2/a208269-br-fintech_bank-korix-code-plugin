@@ -40,6 +40,8 @@ export interface ThinkingOrchestratorOptions {
   readonly agentLoop: AgentLoopLike;
   readonly eventEmitter: RuntimeEventEmitter;
   readonly logger: Logger;
+  readonly evidenceTimeoutMs?: number;
+  readonly agentLoopTimeoutMs?: number;
   readonly evidenceProvider?: (
     request: EvidenceRequest,
   ) => Promise<EvidencePack>;
@@ -49,6 +51,9 @@ export interface ThinkingOrchestratorOptions {
 }
 
 export class ThinkingOrchestrator {
+  private static readonly DEFAULT_EVIDENCE_TIMEOUT_MS = 12000;
+  private static readonly DEFAULT_AGENT_LOOP_TIMEOUT_MS = 60000;
+
   private readonly analyzer = new TaskAnalyzer();
   private readonly observationEngine = new ObservationEngine();
   private readonly reflectionEngine = new ReflectionEngine();
@@ -235,33 +240,38 @@ export class ThinkingOrchestrator {
         });
 
         try {
-          evidence = await this.options.evidenceProvider({
-            message: input.initialMessage,
-            profile,
-            context: input.context,
-          });
-
-          const contextNode = graph.addNode(
-            "context",
-            "Workspace evidence",
-            evidence.summary,
-            {
-              itemCount: evidence.items.length,
-              totalTokens: evidence.totalTokens,
-            },
+          evidence = await this.withEvidenceTimeout(
+            this.options.evidenceProvider({
+              message: input.initialMessage,
+              profile,
+              context: input.context,
+            }),
+            "Workspace evidence collection timed out.",
           );
-          graph.addEdge(analysisNode.id, contextNode.id, "depends_on");
 
-          this.options.eventEmitter.emitEvent({
-            type: "context_evidence",
-            evidence,
-            timestamp: Date.now(),
-          });
-          this.options.eventEmitter.emitEvent({
-            type: "thinking_step",
-            item: this.narrator.evidence(evidence),
-            timestamp: Date.now(),
-          });
+          if (evidence !== undefined) {
+            const contextNode = graph.addNode(
+              "context",
+              "Workspace evidence",
+              evidence.summary,
+              {
+                itemCount: evidence.items.length,
+                totalTokens: evidence.totalTokens,
+              },
+            );
+            graph.addEdge(analysisNode.id, contextNode.id, "depends_on");
+
+            this.options.eventEmitter.emitEvent({
+              type: "context_evidence",
+              evidence,
+              timestamp: Date.now(),
+            });
+            this.options.eventEmitter.emitEvent({
+              type: "thinking_step",
+              item: this.narrator.evidence(evidence),
+              timestamp: Date.now(),
+            });
+          }
         } catch (error) {
           this.options.logger.warn("Failed to collect thinking evidence", {
             error: error instanceof Error ? error.message : String(error),
@@ -298,7 +308,12 @@ export class ThinkingOrchestrator {
         runtimeMessage,
         input.context,
         input.previousMessages,
-        { toolUsePolicy: agentLoopToolUsePolicy },
+        {
+          toolUsePolicy: agentLoopToolUsePolicy,
+          timeoutMs:
+            this.options.agentLoopTimeoutMs ??
+            ThinkingOrchestrator.DEFAULT_AGENT_LOOP_TIMEOUT_MS,
+        },
       );
 
       let finalResult: AgentLoopResult | undefined;
@@ -440,8 +455,10 @@ export class ThinkingOrchestrator {
     });
 
     try {
-      const collection =
-        await this.options.workspaceEvidenceCollector?.(request);
+      const collection = await this.withEvidenceTimeout(
+        this.options.workspaceEvidenceCollector?.(request),
+        "Workspace evidence collection timed out.",
+      );
       const result = collection ?? {
         success: false,
         summary: "Workspace evidence collector is unavailable.",
@@ -573,6 +590,36 @@ export class ThinkingOrchestrator {
     }
 
     return validation;
+  }
+
+  private withEvidenceTimeout<T>(
+    promise: Promise<T | undefined> | undefined,
+    message: string,
+  ): Promise<T | undefined> {
+    if (promise === undefined) {
+      return Promise.resolve(undefined);
+    }
+
+    const timeoutMs =
+      this.options.evidenceTimeoutMs ??
+      ThinkingOrchestrator.DEFAULT_EVIDENCE_TIMEOUT_MS;
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(message));
+      }, timeoutMs);
+
+      promise.then(
+        (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        (error: unknown) => {
+          clearTimeout(timeout);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        },
+      );
+    });
   }
 
   private buildRuntimeMessage(

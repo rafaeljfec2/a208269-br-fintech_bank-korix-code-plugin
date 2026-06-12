@@ -127,6 +127,90 @@ describe("ThinkingOrchestrator", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("should continue when passive workspace evidence collection times out", async () => {
+    const context: ThinkingRunInput["context"] = {
+      mode: "plan",
+      workspaceRoot: "/workspace",
+      openFiles: ["/workspace/src/app.ts"],
+    };
+
+    const eventEmitter = new RuntimeEventEmitter();
+    const emittedEvents: RuntimeEvent[] = [];
+    eventEmitter.onEvent((event) => emittedEvents.push(event));
+    let agentLoopCalls = 0;
+
+    const agentLoop: AgentLoopLike = {
+      async *run(): AsyncGenerator<RuntimeEvent, AgentLoopResult> {
+        agentLoopCalls += 1;
+        eventEmitter.emitEvent({
+          type: "token",
+          content: "Não consegui validar contexto de workspace a tempo.",
+          timestamp: Date.now(),
+        });
+
+        yield {
+          type: "done",
+          stopReason: "end_turn",
+          timestamp: Date.now(),
+        };
+
+        const state = new RuntimeState(context, 25);
+        return {
+          success: true,
+          iterations: 1,
+          finalState: state.createSnapshot(),
+          metrics: {
+            totalTokens: 1,
+            totalToolCalls: 0,
+            iterations: 1,
+            duration: 1,
+            checkpoints: 0,
+            recoveries: 0,
+            toolBreakdown: {},
+            eventTimeline: [],
+          },
+        };
+      },
+    };
+
+    const orchestrator = new ThinkingOrchestrator({
+      agentLoop,
+      eventEmitter,
+      logger: new Logger({ level: "error" }),
+      evidenceTimeoutMs: 1,
+      evidenceProvider: () => new Promise(() => undefined),
+    });
+
+    const generator = orchestrator.run({
+      initialMessage: "explique esse arquivo",
+      context,
+    });
+
+    while (true) {
+      const next = await generator.next();
+      if (next.done) {
+        break;
+      }
+    }
+
+    expect(agentLoopCalls).toBe(1);
+    expect(emittedEvents).toContainEqual(
+      expect.objectContaining({
+        type: "thinking_step",
+        item: expect.objectContaining({
+          stage: "collecting_evidence",
+          status: "warning",
+          title: "Workspace evidence unavailable",
+        }),
+      }),
+    );
+    expect(emittedEvents).toContainEqual(
+      expect.objectContaining({
+        type: "response_buffer_flush",
+      }),
+    );
+  });
+
   it("should stream low-risk general answers before final validation", async () => {
     const context: ThinkingRunInput["context"] = {
       mode: "ask",
@@ -284,6 +368,7 @@ describe("ThinkingOrchestrator", () => {
     }
 
     expect(evidenceCalls).toBe(0);
+    expect(runtimeOptions?.timeoutMs).toBe(60000);
     expect(runtimeOptions?.toolUsePolicy?.mode).toBe("required");
     expect(runtimeOptions?.toolUsePolicy?.allowedTools).toEqual([
       "ListDirectory",

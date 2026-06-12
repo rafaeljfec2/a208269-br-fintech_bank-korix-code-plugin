@@ -2,14 +2,80 @@
 
 AI-native coding runtime agentic - um assistente de código inteligente, rápido e controlável integrado ao VSCode
 
-Managed by Axiom Agents. Stack: typescript/node.
+Managed by Axiom Agents. Stack: typescript/react.
 
-**Status**: ✅ Phase 4 Runtime Complete (event-driven agentic loop, 83 tests passing)
+## Behavioral Guidelines
+
+Guidelines to reduce common LLM coding mistakes. Adapted from
+[andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills/blob/main/CLAUDE.md).
+Apply together with the project-specific sections below.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+### 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 ## Stack
 
 - **Language**: typescript
-- **Framework**: node
+- **Framework**: react
 - **Package Manager**: pnpm
 - **Build Tool**: tsc
 - **Test Runner**: vitest
@@ -18,8 +84,8 @@ Managed by Axiom Agents. Stack: typescript/node.
 ## Commands
 
 ```bash
-pnpm run lint  # eslint src --ext ts
-pnpm run test  # vitest
+pnpm run lint  # eslint src --ext ts,tsx
+pnpm run test  # vitest run
 pnpm run format  # prettier --write "src/**/*.ts"
 ```
 
@@ -27,62 +93,32 @@ pnpm run format  # prettier --write "src/**/*.ts"
 
 ```
 docs/
+  features/
+packages/
+  context-compiler/
+scripts/
 src/
+  __tests__/
   context/
   core/
-    runtime/        # ✅ Phase 4 - Event-driven agent runtime (11 files, 83 tests)
-      agentLoop.ts
-      cancellation.ts
-      checkpoints.ts
-      executionEngine.ts
-      iterationGuard.ts
-      recovery.ts
-      runtimeEvents.ts
-      runtimeMetrics.ts
-      runtimeState.ts
-      runtimeTypes.ts
-      taskQueue.ts
+  di/
   harness/
   modes/
+  patch/
+  prompts/
   providers/
-  telemetry/
-  terminal/
-  tools/          # 18 tools registered (filesystem, git, search, diagnostics, workspace)
-  ui/
+  shared/
 ```
-
-## Runtime Architecture (Phase 4)
-
-**Event-Driven Agentic Loop**: 24+ typed events covering lifecycle, provider streaming, tool execution, checkpoints, recovery, and guards.
-
-**Core Components**:
-- **AgentLoop** (193 lines): Minimalist lifecycle orchestrator - delegates to specialized managers
-- **ExecutionEngine** (253 lines): Brain - processes provider streams, executes tools, manages state
-- **RuntimeState** (290 lines): 4 modular states (Conversation, Execution, Workspace, Memory) with snapshot/restore
-- **CheckpointManager** (105 lines): Incremental file snapshots with SHA-256 hashing, rolling window of 10
-- **RecoveryManager** (126 lines): Exponential backoff (1s→2s→4s), auto-rollback after 3 retries
-- **IterationGuard** (88 lines): Loop prevention - max 25 iterations, stall detection (30s), duplicate tools (>3), no-progress (3 identical iterations)
-- **CancellationManager** (64 lines): AbortController integration with cleanup callbacks
-- **RuntimeMetrics** (74 lines): Token counts, tool breakdown, event timeline
-- **TaskQueue** (65 lines): Priority queue with per-task AbortController
-
-**Design Decisions**:
-- Sequential tool execution (deterministic order, no race conditions)
-- Checkpoint only modified files (~10 files vs entire workspace)
-- Max 25 iterations (empirical from Cursor/Claude Code)
-- Node.js `fs/promises` instead of vscode.workspace.fs (testability)
-- Readonly getters, mutable internal state
-
-**Test Coverage**: 83 unit tests across 4 suites, 100% passing
 
 ## Code Conventions
 
 - Use `??` (nullish coalescing) — NEVER `||` for default values
 - NEVER use `any` type anywhere
 - Mark all interface/type properties as `readonly`
-- Keep files under 400-500 lines — refactor if approaching limit
+- Keep files under 800 lines — refactor if approaching limit
+- Frontend components: mobile-first, `readonly` props
+- Conditional rendering: ternary with `null` — NEVER `&&`
 - Test descriptions in English
-- Runtime layer must NOT import from vscode (use Node.js APIs)
 
 ## Anti-patterns — NEVER do this
 
@@ -91,146 +127,23 @@ src/
 - `as any` anywhere → type it properly
 - `catch (e: any)` → use `catch (e: unknown)`
 - Deep relative `../../../../` from apps → use package aliases
-- vscode imports in `src/core/runtime/*` → breaks testability
 
-## Available Tools (19 registered)
+### Frontend
+- `&&` for conditional rendering → use ternary with `null`
+- JWT in `localStorage` → httpOnly cookies only
+- `dangerouslySetInnerHTML` without sanitization → use DOMPurify
 
-**Filesystem** (5): ReadFile, WriteFile, ListDirectory, FileChunks, SearchFiles  
-**Terminal** (1): RunCommand  
-**Edit** (1): EditFile (KORIX_PATCH format)  
-**Git** (3): GitStatus, GitDiff, ChangedFiles  
-**Search** (3): Grep, FindReferences, FindSymbols  
-**Diagnostics** (2): Problems, GetDiagnostics  
-**Workspace** (3): WorkspaceGraph, GetOpenFiles, GetCurrentFile  
-**User Interaction** (1): AskUserQuestion
+- **ESLint config:** `eslint.config.js`
 
-## Interactive Questions (AskUserQuestion)
+## Monorepo
 
-**Use AskUserQuestion when the user needs to CHOOSE between multiple valid technical approaches where their preference matters.**
+This is a monorepo with the following workspaces:
 
-DO NOT use for questions with factual answers or when explaining concepts.
+- `packages/*`
 
-Use this tool to present structured options when user input is required for decision-making.
+### Workspace packages:
 
-### When to Ask Questions
-
-**USE AskUserQuestion when:**
-- User explicitly asks to "choose between" or "compare" multiple options
-- User asks "which X should I use for Y?" AND multiple valid answers exist
-- Technical decision requires user preference (e.g., DB choice, framework choice)
-- User says "me apresente as opções" / "show me options" / "present options"
-- User asks "de forma interativa" / "interactively"
-
-**Examples where AskUserQuestion is appropriate:**
-- "qual banco de dados você recomenda para sistema com 1M users?" → AskUserQuestion with PostgreSQL, MongoDB, Redis (multiple valid choices)
-- "me apresente as opções de autenticação" → AskUserQuestion with JWT, Session, OAuth2
-- "escolha entre Docker e Kubernetes para deploy" → AskUserQuestion with comparison
-- "qual estratégia de cache usar?" → AskUserQuestion (depends on requirements)
-
-**DO NOT use AskUserQuestion when:**
-
-❌ **Questions with factual answers:**
-  - "o que é TypeScript?" → explain directly
-  - "como funciona async/await?" → explain directly
-  - "qual a sintaxe de X?" → show syntax directly
-  - "o que faz essa função?" → analyze and explain
-
-❌ **Trivial/social queries:**
-  - "olá quem é vc?" → introduce yourself
-  - "como você funciona?" → explain your capabilities
-  - "o que você pode fazer?" → list your features
-  - "qual é seu nome?" → answer directly
-
-❌ **Questions where ONE correct answer exists:**
-  - "qual o tipo de retorno correto?" → analyze and answer
-  - "esse código tem bug?" → diagnose and explain
-  - "como eu faço um for loop em TypeScript?" → show code example
-  - "qual a sintaxe do git commit?" → show syntax
-
-❌ **User is asking for explanation, not decision:**
-  - "qual a diferença entre X e Y?" → explain differences
-  - "por que usar X?" → explain rationale
-  - "como X funciona?" → explain mechanism
-  - "o que é SOLID?" → explain principles
-
-✅ **ONLY use when user must CHOOSE between multiple valid options:**
-  - "qual banco usar: Postgres ou Mongo?" → present tradeoffs
-  - "me apresente as opções de deploy" → show options
-  - "escolha entre JWT e session" → present comparison
-
-### Decision Tree
-
-Ask yourself before using AskUserQuestion:
-
-1. **Is there ONE objectively correct answer?** → Answer directly
-2. **Am I explaining a concept?** → Answer directly
-3. **Does the user need to make a CHOICE between valid options?** → Use AskUserQuestion
-4. **Is this a trivial/social question?** → Answer directly
-
-**Rule of thumb:** If you can answer confidently in 2-3 sentences, DON'T use AskUserQuestion.
-
-### How to Structure Questions
-
-```typescript
-// Single choice (radio buttons) - user picks ONE
-AskUserQuestion({
-  questions: [{
-    question: "Qual estratégia usar para implementar autenticação?",
-    header: "Estratégia Auth",
-    multiSelect: false,
-    options: [
-      {
-        label: "JWT com refresh tokens",
-        description: "Stateless, escalável, complexidade média. Requer Redis para blacklist."
-      },
-      {
-        label: "Session-based com cookies",
-        description: "Simples, stateful, requer session store. Melhor para monólitos."
-      },
-      {
-        label: "OAuth2 + Auth0",
-        description: "Terceirizado, menos controle, custo adicional. Zero manutenção."
-      }
-    ]
-  }]
-})
-
-// Multiple choice (checkboxes) - user picks MANY
-AskUserQuestion({
-  questions: [{
-    question: "Quais testes executar antes do PR?",
-    header: "Suite de Testes",
-    multiSelect: true,
-    options: [
-      { label: "Unit tests", description: "Rápido (~30s), cobertura de funções isoladas" },
-      { label: "Integration tests", description: "Médio (~2min), testa APIs e banco" },
-      { label: "E2E tests", description: "Lento (~10min), cobertura completa do fluxo" }
-    ]
-  }]
-})
-```
-
-### Best Practices
-
-- **Clear context**: Explain WHY you're asking (what's ambiguous or risky)
-- **Good options**: Each option should have trade-offs explained in description
-- **Reasonable defaults**: If timeout happens, first option is auto-selected
-- **Limit choices**: 2-4 options max (use multiSelect for >4 if needed)
-- **Respect answer**: Don't re-ask or second-guess user's choice
-
-### Examples of Good Questions
-
-✅ "Encontrei 3 estratégias válidas para cache (Redis, in-memory, hybrid). Qual usar?"  
-✅ "Código legado usa padrão X, novo código usa Y. Refatorar tudo ou manter híbrido?"  
-✅ "Deploy detectou 15 testes falhando. Rollback, skip testes, ou investigar?"  
-✅ "Encontrei 2 bugs críticos. Qual priorizar? (ambos afetam produção)"
-
-### Examples of Bad Questions
-
-❌ "Devo usar TypeScript?" (já definido no stack)  
-❌ "Qual cor para o botão?" (trivial, não técnico)  
-❌ "Continuar?" (vago, sem contexto)  
-❌ Perguntar algo que o CLAUDE.md ou requisitos já definiram
+- packages/ (context-compiler)
 
 ## Axiom Plugin
 
@@ -248,10 +161,15 @@ Run Claude Code with: `claude --plugin-dir axiom-plugin/`
 - `/axiom-feature-dev` — Full pipeline with architecture, implementation, testing, observability, cost analysis, and review
 - `/axiom-ibk-e2e-from-qa-task` — Lean QA-facing workflow. Reads the E2E configuration block authored by QA inside the [QA] child task description in ADO (URL, credentials, coverage, scenarios) and runs the browser E2E suite per resolved company. Does NOT modify the QA task — only screenshots are published back via publish_e2e_evidence. Skips intake/spec/qa-test-plan generation: the QA task IS the source of truth.
 - `/axiom-ibk-e2e-tests` — Dedicated workflow to execute the IBK E2E suite starting from a Work Item. Generates the QA Test Plan from the AC, executes via cursor-ide-browser and publishes evidence (screenshots) to the ADO [QA] task. Does NOT change production code: produces only test artifacts and reports. Reference: `core/references/sdd/pipeline/03.5-qa-test-plan.md`.
+- `/axiom-ibk-frontend-feature` — Spec-Driven Development pipeline for IBK Internet Banking frontend features. Combines vision-driven analysis (Figma/design images → IBK design system matching → RTK Query services → component implementation) with the full SDD pipeline (intake → spec → review [8 categories + 19 HARD RULES] → QA test plan → design → CSS layer map → TDD red phase → implementation → green phase → CSS audit → verification → AC traceability → PR). BFF endpoints are defined as contracts but implemented separately. Reference: `core/references/sdd/pipeline/00-overview.md` for the full pipeline description.
+- `/axiom-ibk-frontend-microfix` — Lean preset of /axiom-sdd-full for XS/S frontend tasks in the IBK Internet Banking monorepo. Reuses all canonical SDD agents (intake, analyzer, spec-writer, test-writer, implementer) and templates. Adds three workflow-local conventions PENDING constitution approval (HR-20 Micro-Detail Pass, HR-21 Pre-PR Triple-Visual MANDATORY, HR-22 Quality Gates Parallel). Skips CSS Layer Mapping, CSS Audit, Vision Review (second opinion) and the separate Senior Code Review (consolidated into a single final gate). 8 active phases targeting ~80 minutes for tasks within the eligibility envelope (≤ 30 LOC, 0 new components / endpoints / stores / pages / CSS files). REDIRECTs to /axiom-ibk-frontend-feature when scope grows and to /axiom-auto-fix-ibk for known visual divergences. Reference: `.claude/skills/axiom-ibk-frontend-microfix/SKILL.md`.
 - `/axiom-platform-task` — ADO-driven pipeline for the Platform team — handles features, bugs, refactors and infra tasks across Express.js microservices using Clean Architecture (tsyringe + TypeORM + Jest + npm). Includes cross-service contract verification for party-service and authorization-domain.
+- `/axiom-refinamento` — Refinamento multiagente (16 papéis) + análise de coerência com épico de referência + export Markdown. Inicia por sync de repositório, ADO e knowledge base; não inclui implementação nem commit de código de produto.
+- `/axiom-release-notes-deploy` — Gera dois Release Notes (Funcional + Técnico, PT-BR) a partir de uma US de Deploy do Azure DevOps e suas demandas vinculadas. Não usa Iteration/Sprint/Time — a seleção do conteúdo vem da US de Deploy.
 - `/axiom-sdd-feature-dev` — Quality-First feature pipeline. Forces a Specification phase
 - `/axiom-sdd-full` — Spec-Driven Development — full pipeline from constitution intake through specification, review, task decomposition, implementation, verification, and AC traceability.
 - `/axiom-sdd-spec-execute` — Reads a specification from the specs repository and implements it in the target repository.
+- `/axiom-sdd-spec-ideation` — Interactive spec generation workflow for stakeholder meetings (Tech Lead, Delivery Manager,
 - `/axiom-snyk-fix` — Multi-agent Snyk vulnerability fix pipeline — audit, triage, deep analysis (opus), dual expert review, implementation, PR review loop, ADO update
 - `/axiom-standard` — Default workflow — planning, implementation, testing, and review
 - `/axiom-unit-test` — Test generation pipeline — analyze, strategy, create tests, compile, run, report
@@ -271,84 +189,115 @@ Configured in `axiom-plugin/.mcp.json`:
 - **project-knowledge** — Hybrid BM25 + TF-IDF search across project knowledge and documentation
 - **work-item-images** — Image context extraction for work items and visual references
 
+### Visual References Protocol
+
+When a work item has images (Figma screens, UI mockups, screenshots):
+
+1. Call `mcp__work-item-images__list_work_item_images({"work_item_id": <WI_ID>})` to sync + list images
+2. Use the **Read tool** on EACH image — extract every UI component (buttons, badges, inputs, tables, spacing, colors)
+3. For **FIX tasks**: identify which image is CURRENT (wrong) and which is FIGMA (correct)
+   - Extract components from BOTH images
+   - Compare component by component — note every difference (color, spacing, border-radius, text, variant)
+   - Map each difference to the exact file and CSS property in the repo
+4. Every implementation MUST be faithful to the Figma — compare component by component before coding
+
+The Figma image is the ABSOLUTE source of truth — never guess, never skip image analysis.
+
+### ⛔ HARD RULES — Visual Implementation (BLOCKING for ALL UI tasks)
+
+These rules are NON-NEGOTIABLE. Violating any rule is a FATAL workflow error
+that invalidates the entire execution. You MUST follow them before writing code.
+
+**RULE 1 — Icon Color: MUST Investigate Render Method + SVG Source + Variants**
+Before changing ANY icon color, you MUST investigate THREE things:
+
+  Step A: HOW does the Icon component render SVGs?
+    - `<img src="...">` → CSS `color` has ZERO effect (completely isolated)
+    - inline `<svg>` → CSS works IF fill="currentColor"
+    - React SVG component → CSS works via currentColor
+
+  Step B: Read the actual SVG file — what are the fill/stroke values?
+    - hardcoded `fill="#666"` means CSS cannot change it
+    - `fill="currentColor"` means CSS can change it
+
+  Step C: Search for existing COLOR VARIANTS in the design system:
+    - `ls src/assets/icons/*iconName*` or `grep -r "iconName" --include="*.svg"`
+    - If a variant with the correct color already exists (e.g. `copyOrange`),
+      the fix is just changing the icon name prop — a 1-line change!
+
+⛔ Applying CSS `color` when the Icon renders via `<img>` is FORBIDDEN (it has no effect).
+⛔ Not searching for existing color variants before creating new SVGs is FORBIDDEN.
+⛔ Printing "N/A" for SVG source without actually reading it is FORBIDDEN.
+
+**RULE 2 — Structural Components: MUST Decompose ALL Sub-Elements**
+When implementing a badge, tag, chip, or status indicator from Figma:
+  1. Re-read the Figma reference image for this specific component
+  2. List EVERY visible sub-element: internal icon, text, background, border, radius
+  3. Implement ALL of them — missing ANY sub-element is a FATAL error
+⛔ A badge with a checkmark in Figma MUST have a checkmark in code.
+⛔ Implementing only text+background while ignoring an icon is FORBIDDEN.
+
+**RULE 3 — Element Order: MUST Match Figma Exactly (Visibility ≠ Position)**
+When Figma shows elements in a specific left-to-right or top-to-bottom order,
+your JSX render order MUST match that exact sequence. Read the current JSX,
+compare with Figma, and reorder if needed.
+⛔ Rendering a filter chip AFTER the filter button when Figma shows it BEFORE is FORBIDDEN.
+⛔ CRITICAL: Visibility and Position are TWO separate problems.
+  Making an element visible (fixing data/logic) does NOT fix its position.
+  You MUST also verify the JSX render order matches Figma after the element is visible.
+⛔ Concluding 'structure is correct' when JSX order differs from Figma is FORBIDDEN.
+
+**RULE 4 — i18n Multi-Locale: ALL 3 Locales Required**
+3 mandatory locales: pt-BR.json, en-US.json, es-ES.json.
+⛔ Updating only pt-BR.json is FORBIDDEN. All 3 MUST be updated for EVERY text change.
+
+**RULE 5 — No Shortcuts, No Deferrals Without Justification**
+⛔ Deferring an item that was explicitly listed in the work item description is FORBIDDEN
+   unless you provide a concrete technical justification (not budget).
+⛔ Claiming "already correct" without showing file:line evidence is FORBIDDEN.
+
+**RULE 6 — Always Implement From Scratch on Your Branch**
+Your branch was created from a clean `develop`. Previous fix branches (v2, v3, v4, etc.)
+are NOT merged into develop. Their changes DO NOT EXIST on your branch.
+⛔ Claiming "already fixed in vN" or "already done" is WRONG — vN is not on your branch.
+⛔ You MUST implement EVERY divergence from scratch. Read the actual code on YOUR branch.
+⛔ Before starting implementation, run `git log --oneline -3` to confirm you branched from develop HEAD.
+
 ### Skills
 
-Available in `axiom-plugin/skills/`: `a11y-corporate-lifecycle-governance`, `axiom-auto-fix`, `axiom-auto-fix-v2`, `axiom-bff-implement`, `axiom-bug-fix`, `axiom-compound`, `axiom-cost-analysis`, `axiom-datadog-monitor-create`, `axiom-doc-gen`, `axiom-feature-dev`, `axiom-ibk-e2e-from-qa-task`, `axiom-ibk-e2e-tests`, `axiom-ibk-frontend-feature`, `axiom-ibk-frontend-microfix`, `axiom-platform-task`, `axiom-sdd-backend`, `axiom-sdd-bff-implement`, `axiom-sdd-feature-dev`, `axiom-sdd-full`, `axiom-sdd-spec-execute`, `axiom-snyk-fix`, `axiom-standard`, `axiom-unit-test`, `bug-analysis-ado`, `bug-fix-workflow`, `cognitive-load-guardrails`, `context-budget`, `create-env`, `create-gateway`, `create-integration-test`, `create-repository`, `create-route`, `create-unit-test`, `create-usecase`, `desktop-release-publish`, `dual-agent-review`, `frontend-visual-bug-refinement`, `pr-creator-ado`, `pr-final-validation-gate`, `release-notify-teams`, `sdd-css-audit`, `sdd-design`, `sdd-implement`, `sdd-intake`, `sdd-pipeline`, `sdd-qa-test-plan`, `sdd-review`, `sdd-spec`, `sdd-test-first`, `secure-coding`, `senior-code-reviewer`, `setup-errors`, `setup-logs`, `snyk-vulnerability-management`
+Available in `axiom-plugin/skills/`: `a11y-corporate-lifecycle-governance`, `axiom-auto-fix`, `axiom-auto-fix-v2`, `axiom-bff-implement`, `axiom-bug-fix`, `axiom-compound`, `axiom-cost-analysis`, `axiom-datadog-monitor-create`, `axiom-doc-gen`, `axiom-feature-dev`, `axiom-ibk-e2e-from-qa-task`, `axiom-ibk-e2e-tests`, `axiom-ibk-frontend-feature`, `axiom-ibk-frontend-microfix`, `axiom-platform-task`, `axiom-refinamento`, `axiom-release-notes-deploy`, `axiom-sdd-backend`, `axiom-sdd-bff-implement`, `axiom-sdd-feature-dev`, `axiom-sdd-full`, `axiom-sdd-spec-execute`, `axiom-sdd-spec-ideation`, `axiom-snyk-fix`, `axiom-sprint-planning-baseline`, `axiom-sprint-planning-rules`, `axiom-standard`, `axiom-unit-test`, `bug-analysis-ado`, `bug-fix-workflow`, `cognitive-load-guardrails`, `context-budget`, `create-env`, `create-gateway`, `create-integration-test`, `create-repository`, `create-route`, `create-unit-test`, `create-usecase`, `desktop-release-publish`, `dual-agent-review`, `frontend-visual-bug-refinement`, `korix-sdd`, `pr-creator-ado`, `pr-final-validation-gate`, `release-notify-teams`, `sdd-css-audit`, `sdd-design`, `sdd-implement`, `sdd-intake`, `sdd-pipeline`, `sdd-qa-test-plan`, `sdd-review`, `sdd-spec`, `sdd-test-first`, `secure-coding`, `senior-code-reviewer`, `setup-errors`, `setup-logs`, `snyk-vulnerability-management`, `spec-dev`
 
 ## Project Documentation
 
 Native project documentation is available in `docs/`:
 
 - `docs/architecture.md`
-- `docs/runtime.md` — Phase 4 runtime architecture (event-driven loop, managers, state)
 - `docs/backend.md`
 - `docs/config.md`
+- `docs/css-build.md`
 - `docs/database.md`
 - `docs/domain.md`
 - `docs/frontend.md`
 - `docs/implementation.md`
 - `docs/interfaces.md`
+- `docs/korix-context-compiler-roadmap.md`
+- `docs/korix-ui-feedback-analysis.md`
+- `docs/litellm_provider_used.md`
+- `docs/performance.md`
+- `docs/runtime.md`
 - `docs/security.md`
-
-## CSS Build Protection (CRITICAL)
-
-**The webview CSS build is protected against corruption. These rules are MANDATORY.**
-
-### Workflow (DO NOT BREAK)
-
-```bash
-# 1. Tailwind CLI processes main.css
-tailwindcss -i src/webview/main.css -o dist/webview.css --minify
-# → Generates 17KB CSS with Tailwind utilities + xterm styles
-
-# 2. esbuild bundles ONLY JavaScript
-node esbuild.config.js --production
-# → Processes .tsx/.ts files ONLY
-# → Does NOT touch dist/webview.css
-
-# 3. Validation runs automatically
-node scripts/validate-css.js
-# → Verifies CSS size >= 10KB
-# → Verifies Tailwind classes present
-# → Fails build if CSS corrupted
-```
-
-### RULES (NEVER VIOLATE)
-
-❌ **FORBIDDEN:**
-- Importing CSS in React components (`.tsx` files)
-- Adding CSS loader to `esbuild.config.js`
-- Adding `external: ['*.css']` to esbuild config
-- Modifying `dist/webview.css` manually
-
-✅ **ALLOWED:**
-- `@import` CSS libraries in `src/webview/main.css`
-- Tailwind directives in `main.css`
-- Inline styles in React (emergency only)
-
-### Validation
-
-Every build automatically runs `pnpm run validate:css`:
-- Checks CSS file size (must be >= 10KB)
-- Verifies Tailwind classes exist
-- Detects unprocessed `@tailwind` directives
-- **Fails build if CSS corrupted**
-
-Manual validation:
-```bash
-pnpm run validate:css
-```
-
-### If CSS Breaks
-
-1. Check `dist/webview.css` size: `ls -lh dist/webview.css` (should be ~17KB)
-2. Run validation: `pnpm run validate:css`
-3. If validation fails, review recent changes to:
-   - `src/webview/main.css`
-   - `esbuild.config.js`
-   - React component imports
-
-**DO NOT** attempt to "fix" by adding CSS imports or loaders. This will make it worse.
+- `docs/subagent-cancellation-propagation-audit.md`
+- `docs/subagents.md`
+- `docs/terminal-session-cleanup-audit.md`
+- `docs/testing_litellm.md`
+- `docs/testing-guide.md`
+- `docs/testing-user-questions.md`
+- `docs/tools_architecture.md`
+- `docs/tools-api.md`
+- `docs/tools-comparison.md`
+- `docs/tools-roadmap-tasks.md`
+- `docs/tools-roadmap.md`
+- `docs/user-questions-example.md`
 
 ## Domain Rules
 
