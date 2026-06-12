@@ -173,7 +173,8 @@ export type WebviewToExtensionMessage =
   | {
       readonly type: "answer_question";
       readonly payload: AnswerQuestionPayload;
-    };
+    }
+  | { readonly type: "webview_ready"; readonly payload: Record<string, never> };
 
 // ============================================================
 // Helper Type Guards

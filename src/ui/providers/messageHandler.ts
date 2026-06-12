@@ -187,6 +187,7 @@ export class MessageHandler {
       >("provider", "anthropic");
 
     const config = await this.configManager.getConfig(providerType);
+
     const model =
       config?.model ?? this.configManager.getConfiguredModel(providerType);
     const availableModels =
@@ -288,6 +289,10 @@ export class MessageHandler {
         );
         break;
 
+      case "webview_ready":
+        await this.sendInitialState();
+        break;
+
       default:
         this.logger.warn("Unknown message type from webview", { message });
     }
@@ -381,6 +386,7 @@ export class MessageHandler {
     payload: SaveSettingsPayload,
   ): Promise<void> {
     await this.settingsHandler.saveSettings(payload);
+    await this.sendInitialState();
   }
 
   /**

@@ -279,7 +279,13 @@ async function openKorixSidebar(logger: Logger): Promise<void> {
 async function initializeProvider() {
   const logger = getGlobalContainer().get<Logger>(TOKENS.Logger);
   try {
-    const config = await configManager.getConfig("anthropic");
+    const providerType = vscode.workspace
+      .getConfiguration("korix")
+      .get<
+        "anthropic" | "openai" | "ollama" | "openrouter" | "litellm"
+      >("provider", "anthropic");
+
+    const config = await configManager.getConfig(providerType);
     if (config) {
       activeProvider = globalRegistry.createProvider(config);
       logger.info("Provider initialized", {
@@ -288,7 +294,7 @@ async function initializeProvider() {
       });
     } else {
       logger.info(
-        "No provider configured. Will prompt for API key when needed.",
+        `No provider configured for ${providerType}. Will prompt for API key when needed.`,
       );
     }
   } catch (error) {
@@ -300,11 +306,17 @@ async function initializeProvider() {
 async function testProviderStreaming() {
   const logger = getGlobalContainer().get<Logger>(TOKENS.Logger);
   try {
+    const providerType = vscode.workspace
+      .getConfiguration("korix")
+      .get<
+        "anthropic" | "openai" | "ollama" | "openrouter" | "litellm"
+      >("provider", "anthropic");
+
     if (!activeProvider) {
-      await configManager.ensureApiKey("anthropic");
-      const config = await configManager.getConfig("anthropic");
+      await configManager.ensureApiKey(providerType);
+      const config = await configManager.getConfig(providerType);
       if (!config) {
-        throw new Error("Failed to get provider config");
+        throw new Error(`Failed to get provider config for ${providerType}`);
       }
       activeProvider = globalRegistry.createProvider(config);
     }

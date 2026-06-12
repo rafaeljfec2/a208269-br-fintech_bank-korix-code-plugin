@@ -15,6 +15,13 @@ let vscodeApi: ReturnType<typeof acquireVsCodeApi> | undefined;
 
 function getVSCodeAPI() {
   if (vscodeApi) return vscodeApi;
+  if (typeof acquireVsCodeApi === "undefined") {
+    return {
+      postMessage: () => {},
+      getState: () => undefined,
+      setState: () => {},
+    };
+  }
   vscodeApi = acquireVsCodeApi();
   return vscodeApi;
 }
