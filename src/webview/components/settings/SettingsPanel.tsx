@@ -29,6 +29,8 @@ const PROVIDER_MODELS: Record<ProviderType, readonly string[]> = {
     'claude-sonnet-3-5-20240620',
   ],
   openai: [
+    'Qwen/Qwen2.5-Coder-3B-Instruct-AWQ',
+    'Qwen/Qwen2.5-Coder-7B-Instruct-GPTQ-Int4',
     'gpt-4-turbo',
     'gpt-4',
     'gpt-3.5-turbo',
@@ -253,7 +255,7 @@ export default function SettingsPanel() {
         </div>
 
         {/* Base URL (Optional for some providers) */}
-        {(settings.provider === 'litellm' || settings.provider === 'ollama' || settings.provider === 'openrouter') && (
+        {(settings.provider === 'litellm' || settings.provider === 'ollama' || settings.provider === 'openrouter' || settings.provider === 'openai') && (
           <div className="space-y-2">
             <label htmlFor="base-url-input" className="block text-sm font-medium">
               Base URL {settings.provider === 'litellm' && <span className="text-red-500">*</span>}

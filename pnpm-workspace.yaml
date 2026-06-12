@@ -1,2 +1,9 @@
 packages:
-  - "packages/*"
+  - packages/*
+
+onlyBuiltDependencies:
+  - '@vscode/vsce-sign'
+  - esbuild
+  - keytar
+  - node-pty
+  - sharp
