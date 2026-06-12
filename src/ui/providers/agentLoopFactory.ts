@@ -11,6 +11,7 @@ import type { ToolRegistry } from "../../harness/toolRegistry";
 import type { AIProvider } from "../../core/providers/types";
 import type { ProviderConfig } from "../../providers/types";
 import { LiteLLMFactory } from "../../core/providers/litellm/litellmFactory";
+import { OpenAIFactory } from "../../core/providers/openai/openaiFactory";
 import { AgentLoop } from "../../core/runtime/agentLoop";
 import {
   ExecutionEngine,
@@ -24,6 +25,7 @@ import { TOKENS } from "../../di/tokens";
 
 export class AgentLoopFactory {
   private readonly liteLlmFactory: LiteLLMFactory;
+  private readonly openAiFactory: OpenAIFactory;
 
   constructor(
     private readonly container: Container,
@@ -33,12 +35,16 @@ export class AgentLoopFactory {
     private readonly permissionManager: PermissionManager,
   ) {
     this.liteLlmFactory = new LiteLLMFactory(this.logger);
+    this.openAiFactory = new OpenAIFactory(this.logger);
   }
 
   /**
    * Create provider instance based on config
    */
   createProvider(config: ProviderConfig): AIProvider {
+    if (config.type === "openai") {
+      return this.openAiFactory.create(config) as unknown as AIProvider;
+    }
     // Use LiteLLM factory (supports all provider types)
     // Type assertion needed due to dual type hierarchies (will be unified in future refactor)
     return this.liteLlmFactory.create(config) as unknown as AIProvider;
